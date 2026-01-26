@@ -1,0 +1,53 @@
+services:
+  # Сервис базы данных (PostgreSQL)
+  db:
+    image: postgres:18-alpine
+    container_name: kronon_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Монтируем том для БД
+    environment:
+      - POSTGRES_DB=${DB_NAME:-kronon_db}
+      - POSTGRES_USER=${DB_USER:-kronon_user}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    healthcheck:
+      # Проверяет, готова ли БД принимать соединения (экранируем $ для shell)
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s  # Даем время на запуск Postgres перед первой проверкой
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # Кэш и брокер сообщений (Redis)
+  redis:
+    image: redis:7-alpine
+    container_name: kronon_redis
+    # Команда для персистентности (сохранять дамп БД каждые 60 сек, если было хотя бы 1 изменение)
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data  # Монтируем том для сохранения dump.rdb
+    healthcheck:
+      # Проверяет, отвечает ли Redis на команду PING
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s  # Даем время на запуск Redis перед первой проверкой
+    restart: unless-stopped
+    networks:
+      - backend
+
+# Определяем все тома для хранения персистентных данных
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# Определяем общую сеть для всех сервисов
+# Это обеспечивает изоляцию и позволяет контейнерам общаться друг с другом по именам
+networks:
+  backend:
+    driver: bridge
