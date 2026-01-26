@@ -1,0 +1,222 @@
+# =================================================================
+# Конфигурация проекта и Poetry
+# =================================================================
+[project]
+name = "kronon"
+version = "0.1.0"
+description = "Enterprise Accounting Operating System"
+authors = [
+    {name = "Mikalai Sakalouski",email = "nicksok2413@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<4.0"
+
+dependencies = [
+    # Core Framework
+    "django (>=6.0.1,<7.0.0)",
+    "django-ninja (>=1.5.3,<2.0.0)",
+    "django-environ (>=0.12.0,<0.13.0)",
+    "gunicorn (>=24.1.1,<25.0.0)",
+    "uvicorn[standard] (>=0.40.0,<0.41.0)",
+    "whitenoise (>=6.11.0,<7.0.0)",
+    # Database & Cache
+    "psycopg[binary] (>=3.3.2,<4.0.0)",
+    "redis (>=7.1.0,<8.0.0)",
+    "django-redis (>=6.0.0,<7.0.0)",
+    # Asynchronous Tasks
+    "celery (>=5.6.2,<6.0.0)",
+    # Security & Permissions
+    "django-guardian (>=3.2.0,<4.0.0)",
+    "django-axes (>=8.1.0,<9.0.0)",
+    # Utilities
+    "pillow (>=12.1.0,<13.0.0)",
+    "loguru (>=0.7.3,<0.8.0)",
+    "sentry-sdk[celery,django,loguru] (>=2.50.0,<3.0.0)",
+]
+
+[dependency-groups]
+dev = [
+    # Testing
+    "pytest (>=9.0.2,<10.0.0)",
+    "pytest-django (>=4.11.1,<5.0.0)",
+    "pytest-asyncio (>=1.3.0,<2.0.0)",
+    "pytest-env (>=1.2.0,<2.0.0)",
+    "pytest-cov (>=7.0.0,<8.0.0)",
+    "factory-boy (>=3.3.3,<4.0.0)",
+    "faker (>=40.1.2,<41.0.0)",
+    # Linters & Formatters
+    "ruff (>=0.14.14,<0.15.0)",
+    "pre-commit (>=4.5.1,<5.0.0)",
+    # Type Checking
+    "mypy (>=1.19.1,<2.0.0)",
+    "django-stubs (>=5.2.9,<6.0.0)",
+    "types-redis (>=4.6.0.20241004,<5.0.0.0)",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+package-mode = false
+
+
+# =================================================================
+# Конфигурация Mypy (статическая типизация)
+# =================================================================
+[tool.mypy]
+# Версия Python, под которую анализируем код
+python_version = "3.12"
+
+# --- Плагины ---
+# mypy_django_plugin: плагин для корректной работы с Django
+plugins = "mypy_django_plugin.main"
+
+# --- Импорты и модули ---
+# Игнорировать библиотеки без стабов (чтобы build не падал из-за сторонних либ)
+ignore_missing_imports = true
+# Включаем явное определение баз пакетов (для импортов)
+explicit_package_bases = true
+# Запрещает неявный реэкспорт
+implicit_reexport = false
+
+# --- Строгие проверки (Strict Mode) ---
+
+# 1. Проверки определений (Definitions)
+# Запрещает создавать новые функции без полных аннотаций типов
+disallow_untyped_defs = true
+# Проверяет тела функций, даже если у них нет аннотаций типов
+check_untyped_defs = true
+# Запрещает декораторы без типов (чтобы декоратор не превращал типизированную функцию в Any)
+disallow_untyped_decorators = true
+
+# 2. Проверки вызовов (Calls)
+# Запрещает вызывать функции, которые не типизированы (из сторонних "плохих" библиотек)
+# Часто вызывает боль, но гарантирует безопасность (если мешает - можно отключить локально)
+disallow_untyped_calls = true
+
+# 3. Generics и Any
+# Запрещает использовать Generics без параметров (нельзя List, нужно List[int])
+disallow_any_generics = true
+# Предупреждает, если функция с указанным типом возвращает Any
+warn_return_any = true
+
+# 4. Optional (None)
+# Запрещает неявный None
+no_implicit_optional = true
+# Строгая проверка Optional (если тип User | None, mypy заставит проверить "if user is not None")
+strict_optional = true
+
+# 5. Качество кода и конфига
+# Ругается, если cast() не нужен (например cast(int, 5) - это и так int)
+warn_redundant_casts = true
+# Ругается, если есть '# type: ignore', но ошибки в этой строке на самом деле нет
+warn_unused_ignores = true
+# Ругается на настройки в этом файле, которые не используются
+warn_unused_configs = true
+# Показывает код, который никогда не выполнится
+warn_unreachable = true
+
+# 6. Строгое равенство
+# Запрещает сравнивать несовместимые типы (if "hello" == 5: -> Error, это всегда False)
+strict_equality = true
+
+# --- Исключения ---
+# Не проверяем миграции (там автогенерируемый код, часто без типов) и тесты (там можно ослабить)
+exclude = [
+    "migrations/",
+    "tests/"
+]
+
+[tool.django-stubs]
+# Конфигурация плагина Django-stubs
+django_settings_module = "config.settings"  # Указываем путь к настройкам Django
+
+# =================================================================
+# Конфигурация Ruff (линтер и форматер)
+# =================================================================
+[tool.ruff]
+# Устанавливаем максимальную длину строки
+line-length = 120
+
+# Указываем директории, которые Ruff должен игнорировать
+exclude = [
+    ".git",
+    ".idea",
+    ".venv",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    "__pypackages__",
+    "*/migrations/*",  # Миграции не проверяем так строго
+]
+
+[tool.ruff.lint]
+# Наборы правил:
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes (логические ошибки)
+    "W",   # pycodestyle warnings
+    "I",   # isort (сортировка импортов)
+    "B",   # flake8-bugbear (поиск вероятных багов)
+    "S",   # flake8-bandit (безопасность: пароли, eval, слабые шифры)
+    "C4",  # flake8-comprehensions (оптимизация list comprehensions)
+    "UP",  # pyupgrade (обновление синтаксиса до Python 3.12)
+]
+
+# Игнорируем правила:
+ignore = [
+    "E501",  # Длину строки контролирует форматер
+]
+
+# Настройка исключений правил для конкретных файлов
+[tool.ruff.lint.per-file-ignores]
+# В тестах отключаем проверки безопасности
+"tests/**/*.py" = [
+    "S101",  # Разрешаем использование `assert` (в продакшене это опасно, в тестах — необходимо)
+    "S311",  # Разрешаем стандартные генераторы случайных чисел (random), криптостойкость тут не нужна
+]
+
+# Файлы __init__.py
+"__init__.py" = [
+    "F401",  # Разрешаем импортировать модуль, но не использовать его явно в этом файле
+]
+
+# В settings.py иногда нужны специфичные импорты
+"config/settings.py" = ["F403", "F405"]
+
+
+# =================================================================
+# Конфигурация Pytest
+# =================================================================
+[tool.pytest.ini_options]
+# Минимальная версия pytest
+minversion = "8.0"
+
+# Указываем Django настройки для тестов
+DJANGO_SETTINGS_MODULE = "config.settings"
+
+# Пути к тестам
+testpaths = ["tests"]
+
+# Опции запуска
+# --reuse-db ускоряет тесты: не удаляет тестовую БД между прогонами, а просто очищает таблицы
+addopts = "--cov=apps --cov-report=term-missing --reuse-db"
+
+# Игнорируем предупреждения о deprecation (опционально, чтобы вывод был чище)
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+]
+
+# Настройки pytest-env (переменные окружения для тестов)
+env = [
+    # Включаем debug-режим
+    "DEBUG=True",
+    # Заглушка секретного ключа django
+    "SECRET_KEY=test-secret-key-for-pytest",
+    # URL тестовой БД
+    "DATABASE_URL=postgres://postgres:postgres@localhost:5432/kronon_db",
+    # Используем другую базу Redis (10), чтобы не затереть кэш разработки
+    "REDIS_URL=redis://localhost:6379/10",
+]
