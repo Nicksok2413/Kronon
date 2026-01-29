@@ -11,7 +11,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-import environ
+from environ import Env
 
 # Импортируем функции настройки Loguru и Sentry
 from config.core.logging import setup_loguru
@@ -25,16 +25,16 @@ from config.core.sentry import setup_sentry
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Инициализация обработки переменных окружения
-env = environ.Env()
+env = Env()
 
 # Чтение .env файла (ищем .env файл в корне проекта)
 READ_DOT_ENV_FILE: bool = env.bool("DJANGO_READ_DOT_ENV_FILE", default=True)
 
 if READ_DOT_ENV_FILE:
-    env_file = BASE_DIR / ".env"
+    env_file: Path = BASE_DIR / ".env"
 
     if env_file.exists():
-        environ.Env.read_env(env_file)
+        Env.read_env(env_file)
 
 
 # ==============================================================================
@@ -48,7 +48,12 @@ SECRET_KEY: str = env("SECRET_KEY")
 DEBUG: bool = env.bool("DEBUG", default=False)
 
 # Список хостов, которым разрешено обращаться к приложению
-ALLOWED_HOSTS: list[str] = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+ALLOWED_HOSTS: list[str] = env.list(
+    "ALLOWED_HOSTS",
+    default=[
+        "localhost",
+        "127.0.0.1"],
+)
 
 # --- CORS (Cross-Origin Resource Sharing) ---
 # Список хостов фронтенда, которым разрешено обращаться к приложению (React на порту `5173`)
@@ -59,8 +64,8 @@ CORS_ALLOWED_ORIGINS: list[str] = env.list(
         "http://127.0.0.1:5173"
     ],
 )
-# Если нужно разрешить Cookie/Credentials (важно для авторизации)
-CORS_ALLOW_CREDENTIALS: bool = True
+# Разрешаем Cookie/Credentials (важно для авторизации)
+CORS_ALLOW_CREDENTIALS = True
 
 # --- Настройки прокси (Nginx) ---
 # Если Django запущен за Nginx (в Docker), нужно доверять заголовкам прокси
@@ -136,7 +141,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 _DB_NAME: str = env("DB_NAME", default="kronon_db")
 _DB_USER: str = env("DB_USER", default="postgres")
 _DB_PASSWORD: str = env("DB_PASSWORD", default="postgres")
-_DB_HOST: str = env("DB_HOST", default="db") # 'db' для Docker, 'localhost' для локальной разработки
+_DB_HOST: str = env("DB_HOST", default="db") # `localhost` для локальной разработки
 _DB_PORT: int = env.int("DB_PORT", default=5432)
 
 DATABASES = {
@@ -158,7 +163,7 @@ DATABASES = {
 REDIS_HOST: str = env("REDIS_HOST", default="localhost")
 REDIS_PORT: int = env.int("REDIS_PORT", default=6379)
 
-# Флаг запущены ли тесты (pytest)
+# Проверка запущены ли тесты (pytest)
 TESTING: bool = "test" in sys.argv or any(arg.startswith("pytest") for arg in sys.argv)
 
 # Явно аннотируем тип переменной CACHES для mypy (Strict mode)
@@ -190,7 +195,7 @@ CACHE_TTL = 60 * 10
 
 
 # ==============================================================================
-# AUTHENTICATION, SECURITY & CORS
+# AUTHENTICATION & SECURITY
 # ==============================================================================
 
 # Указываем Django использовать кастомную модель пользователя
@@ -249,7 +254,7 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # Максимум 30 минут на зада
 # INTERNATIONALIZATION
 # ==============================================================================
 
-LANGUAGE_CODE = 'ru-ru'
+LANGUAGE_CODE = "ru-ru"
 TIME_ZONE = "Europe/Minsk"
 USE_I18N = True
 USE_TZ = True
@@ -267,7 +272,7 @@ DATE_INPUT_FORMATS = [
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Директории для общих статических файлов (не внутри apps)
+# Директория для общих статических файлов (не внутри apps)
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
@@ -300,6 +305,21 @@ DEFAULT_FROM_EMAIL: str = env("DEFAULT_FROM_EMAIL", default="noreply@kronon.by")
 
 
 # ==============================================================================
+# BUSINESS LOGIC SETTINGS & VALIDATION
+# ==============================================================================
+
+# Максимальный размер загружаемого изображения (в МБ)
+MAX_IMAGE_SIZE_MB = 5
+# Максимальный размер загружаемого документа (в МБ)
+MAX_DOCUMENT_SIZE_MB = 20
+
+
+# Регион для телефонов для парсинга номеров без кода страны (ISO 3166-1 alpha-2)
+# 'BY' - Беларусь, 'RU' - Россия, 'KZ' - Казахстан
+DEFAULT_PHONE_REGION = "BY"  # по умолчанию `Беларусь`
+
+
+# ==============================================================================
 # OTHERS
 # ==============================================================================
 
@@ -310,32 +330,54 @@ ANONYMOUS_USER_NAME = None
 
 
 # ==============================================================================
-# INITIALIZATION (Logging & Sentry)
+# LOGURU & SENTRY CONFIGURATION
 # ==============================================================================
 
+# Отключаем стандартную конфигурацию Django logging, чтобы Loguru мог полностью управлять процессом
+LOGGING_CONFIG = None
+LOGGING: dict[str, Any] = {}
+
+# Параметры логирования
+LOG_LEVEL: str = env("LOG_LEVEL", default="INFO")
+LOGFILE_SIZE: int = env.int("LOGFILE_SIZE", default=10)
+LOGFILE_COUNT: int = env.int("LOGFILE_COUNT", default=5)
+
+# Параметры Sentry
+SENTRY_DSN: str | None = env("SENTRY_DSN", default=None)
+SENTRY_ENVIRONMENT: str = env("SENTRY_ENVIRONMENT", default="production")
+
+
 @dataclass
-class AppConfig:
+class KrononConfig:
     """
-    Класс-контейнер, который собирает необходимые настройки
-    и удовлетворяет протоколам LoggingSettings и SentrySettings.
+    Класс-контейнер для инициализации систем логирования и мониторинга.
+    Удовлетворяет протоколам LoggingSettings и SentrySettings.
     """
     # Общие
-    BASE_DIR: Path = BASE_DIR
-    DEBUG: bool  = DEBUG
+    BASE_DIR: Path
+    DEBUG: bool
     # Loguru
-    LOG_LEVEL: str = env("LOG_LEVEL", default="INFO")
-    LOGFILE_SIZE: int = env.int("LOGFILE_SIZE", default=10)
-    LOGFILE_COUNT: int = env.int("LOGFILE_COUNT", default=5)
+    LOG_LEVEL: str
+    LOGFILE_SIZE: int
+    LOGFILE_COUNT: int
     # Sentry
-    SENTRY_DSN: str = env("SENTRY_DSN", default=None)
-    SENTRY_ENVIRONMENT: str = env("SENTRY_ENVIRONMENT", default="production")
+    SENTRY_DSN: str | None
+    SENTRY_ENVIRONMENT: str
 
 
-# Инициализация класса настроек
-_app_config = AppConfig()
+# Собираем конфиг
+_config = KrononConfig(
+    BASE_DIR=BASE_DIR,
+    DEBUG=DEBUG,
+    LOG_LEVEL=LOG_LEVEL,
+    LOGFILE_SIZE=LOGFILE_SIZE,
+    LOGFILE_COUNT=LOGFILE_COUNT,
+    SENTRY_DSN=SENTRY_DSN,
+    SENTRY_ENVIRONMENT=SENTRY_ENVIRONMENT
+)
 
 # Инициализируем Loguru
-setup_loguru(_app_config)
+setup_loguru(_config)
 
 # Инициализируем Sentry
-setup_sentry(_app_config)
+setup_sentry(_config)
