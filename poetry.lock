@@ -1131,6 +1131,18 @@ re2 = ["google-re2 (>=1.1)"]
 tests = ["pytest (>=9)", "typing-extensions (>=4.15)"]
 
 [[package]]
+name = "phonenumberslite"
+version = "9.0.22"
+description = "Python version of Google's common library for parsing, formatting, storing and validating international phone numbers."
+optional = false
+python-versions = ">=2.5"
+groups = ["main"]
+files = [
+    {file = "phonenumberslite-9.0.22-py2.py3-none-any.whl", hash = "sha256:ae0c0e2778334dcf6d4322d09f8269efc4b6a1d3d425d6fa1913b9cd1641105e"},
+    {file = "phonenumberslite-9.0.22.tar.gz", hash = "sha256:87ffe32a61167ff4403d39b7ecdab0a9a8b5560b511dfb8b0a82cac824437175"},
+]
+
+[[package]]
 name = "pillow"
 version = "12.1.0"
 description = "Python Imaging Library (fork)"
@@ -2444,4 +2456,4 @@ dev = ["black (>=19.3b0) ; python_version >= \"3.6\"", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<4.0"
-content-hash = "ac5efb40af89d7d8697ba74edd62a7db9cd63fceb4aa4c170db20f987d86fd00"
+content-hash = "f4f5078ac6ad033e2120aeb906274814a158c975154efc1f7291b2c64c0f4d51"
