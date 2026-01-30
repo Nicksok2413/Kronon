@@ -1,14 +1,36 @@
+# Определяем "шаблон" для app-сервисов с помощью якоря
+x-app-base: &app-base
+  build:
+    context: .  # Контекст сборки - корень проекта
+    dockerfile: Dockerfile  # Путь к Dockerfile
+    target: runner  # Этап №2 'Runner'
+  env_file: .env  # Передаем все переменные из .env в контейнер
+  volumes:
+    - media_volume:/app/media  # Монтируем том для медиа
+    - logs_volume:/app/logs  # Монтируем том для логов
+  depends_on:
+    db:
+      # Запускаем только после того, как db станет healthy
+      condition: service_healthy
+    redis:
+      # Запускаем только после того, как redis станет healthy
+      condition: service_healthy
+  restart: unless-stopped
+  networks:
+    - backend
+
 services:
+  # --- INFRASTRUCTURE ---
   # Сервис базы данных (PostgreSQL)
   db:
-    image: postgres:18-alpine
+    image: postgres:18-bullseye
     container_name: kronon_db
-    volumes:
-      - postgres_data:/var/lib/postgresql/data  # Монтируем том для БД
     environment:
-      - POSTGRES_DB=${DB_NAME:-kronon_db}
-      - POSTGRES_USER=${DB_USER:-kronon_user}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-kronon_db}
+      POSTGRES_USER: ${DB_USER:-kronon_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+        - postgres_data:/var/lib/postgresql/data  # Монтируем том для БД
     healthcheck:
       # Проверяет, готова ли БД принимать соединения (экранируем $ для shell)
       test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
@@ -32,12 +54,87 @@ services:
       # Проверяет, отвечает ли Redis на команду PING
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 5
       start_period: 5s  # Даем время на запуск Redis перед первой проверкой
     restart: unless-stopped
     networks:
       - backend
+
+  # --- APPLICATION ---
+  app:
+    <<: *app-base
+    container_name: kronon_web
+    # Команда перехватывается в Entrypoint и модифицируется
+    command: gunicorn
+    volumes:
+        - static_volume:/app/staticfiles  # Монтируем том для статики
+    healthcheck:
+        # Временный healthcheck, пока нет специального эндпоинта /health
+        test: [ "CMD", "curl", "-f", "http://localhost:8000/admin/login/" ]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+        start_period: 10s  # Даем время на запуск app перед первой проверкой
+
+  # Worker
+  celery:
+      <<: *app-base
+      container_name: kronon_celery
+      command: celery -A config worker -l info -c 2
+
+# --- MONITORING ---
+#  prometheus:
+#      image: prom/prometheus:latest
+#      volumes:
+#          - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+#          - prometheus_data:/prometheus
+#      ports:
+#          - "9090:9090"
+#      networks:
+#          - backend
+#
+#  loki:
+#      image: grafana/loki:latest
+#      volumes:
+#          - ./monitoring/loki-config.yaml:/etc/loki/local-config.yaml:ro
+#          - loki_data:/loki
+#      ports:
+#          - "3100:3100"
+#      networks:
+#          - backend
+#
+#  promtail:
+#      image: grafana/promtail:latest
+#      volumes:
+#          - ./monitoring/promtail-config.yaml:/etc/promtail/config.yaml:ro
+#          - /var/lib/docker/containers:/var/lib/docker/containers:ro
+#          - /var/run/docker.sock:/var/run/docker.sock
+#      networks:
+#          - backend
+#
+#  grafana:
+#      image: grafana/grafana:latest
+#      volumes:
+#          - grafana_data:/var/lib/grafana
+#      environment:
+#          GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+#          GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+#      ports:
+#          - "3000:3000"
+#      depends_on:
+#          - prometheus
+#          - loki
+#      networks:
+#          - backend
+#
+#    celery-exporter:
+#      image: danihodovic/celery-exporter:latest
+#      container_name: monitoring_celery_exporter
+#      command: --broker-url=${CELERY_BROKER_URL:-redis://redis:6379/2}
+#      restart: unless-stopped
+#      networks:
+#        - backend
 
 # Определяем все тома для хранения персистентных данных
 volumes:
@@ -45,6 +142,12 @@ volumes:
     driver: local
   redis_data:
     driver: local
+  logs_volume:
+      driver: local
+  media_volume:
+      driver: local
+  static_volume:
+      driver: local
 
 # Определяем общую сеть для всех сервисов
 # Это обеспечивает изоляцию и позволяет контейнерам общаться друг с другом по именам
