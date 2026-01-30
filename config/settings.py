@@ -139,9 +139,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Сборка URL подключения к БД
 _DB_NAME: str = env("DB_NAME", default="kronon_db")
-_DB_USER: str = env("DB_USER", default="postgres")
-_DB_PASSWORD: str = env("DB_PASSWORD", default="postgres")
-_DB_HOST: str = env("DB_HOST", default="db") # `localhost` для локальной разработки
+_DB_USER: str = env("DB_USER", default="kronon_user")
+_DB_PASSWORD: str = env("DB_PASSWORD", default="secret_password")
+_DB_HOST: str = env("DB_HOST", default="db")  # `localhost` для локальной разработки
 _DB_PORT: int = env.int("DB_PORT", default=5432)
 
 DATABASES = {
@@ -160,7 +160,7 @@ DATABASES = {
 # CACHE (Redis)
 # ==============================================================================
 
-REDIS_HOST: str = env("REDIS_HOST", default="localhost")
+REDIS_HOST: str = env("REDIS_HOST", default="redis")  # `localhost` для локальной разработки
 REDIS_PORT: int = env.int("REDIS_PORT", default=6379)
 
 # Проверка запущены ли тесты (pytest)
