@@ -30,8 +30,8 @@ RUN wget -O su-exec.tar.gz https://github.com/ncopa/su-exec/archive/master.tar.g
     cd / && \
     rm -rf su-exec.tar.gz su-exec-master
 
-# Устанавливаем Poetry
-RUN pip install "poetry==$POETRY_VERSION"
+# Обновляем pip и устанавливаем Poetry
+RUN pip install --upgrade pip && pip install "poetry==$POETRY_VERSION"
 
 # Копируем файлы зависимостей
 COPY pyproject.toml poetry.lock ./
@@ -74,10 +74,10 @@ COPY --from=builder /app/.venv /app/.venv
 # Копируем Entrypoint
 COPY --chmod=755 scripts/entrypoint.sh /entrypoint.sh
 
-# Копируем всё, так как у нас монолит
+# Копируем код проекта
 COPY --chown=kronon:kronon . .
 
-# Создаем папки для статики и медиа (чтобы у kronon были права)
+# Создаем папки для статики, медиа и логов (чтобы у kronon были права)
 RUN mkdir -p /app/staticfiles /app/media /app/logs && \
     chown -R kronon:kronon /app/staticfiles /app/media /app/logs
 
@@ -85,4 +85,4 @@ EXPOSE 8000
 
 ENTRYPOINT ["/entrypoint.sh"]
 
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--worker-class", "uvicorn.workers.UvicornWorker"]
