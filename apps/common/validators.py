@@ -28,7 +28,7 @@ class FileSizeValidator:
         self.max_size_mb = max_size_mb
         self.message = message or _("Размер файла не должен превышать {max_size} МБ.").format(max_size=max_size_mb)
 
-    def __call__(self, file: File) -> None:
+    def __call__(self, file: File[Any]) -> None:
         """
         Args:
             file (File): Загружаемый файл.

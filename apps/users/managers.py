@@ -2,13 +2,16 @@
 Менеджер пользователей для аутентификации по Email.
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from django.contrib.auth.base_user import BaseUserManager
 from django.utils.translation import gettext_lazy as _
 
+if TYPE_CHECKING:
+    from apps.users.models import User
 
-class CustomUserManager(BaseUserManager):
+
+class CustomUserManager(BaseUserManager["User"]):
     """
     Кастомный менеджер модели пользователя.
 
@@ -16,7 +19,7 @@ class CustomUserManager(BaseUserManager):
     вместо стандартного имени пользователя (username).
     """
 
-    def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> Any:
+    def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> "User":
         """
         Создает и сохраняет пользователя с указанным email и паролем.
 
@@ -47,7 +50,7 @@ class CustomUserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email: str, password: str | None = None, **extra_fields: Any) -> Any:
+    def create_superuser(self, email: str, password: str | None = None, **extra_fields: Any) -> "User":
         """
         Создает и сохраняет суперпользователя (администратора).
 

@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from apps.users.models import Department, Profile, User
 
 
-class ProfileInline(admin.StackedInline):
+class ProfileInline(admin.StackedInline[Profile, User]):
     """Встроенное редактирование профиля внутри формы пользователя."""
 
     model = Profile
@@ -18,7 +18,7 @@ class ProfileInline(admin.StackedInline):
 
 
 @admin.register(Department)
-class DepartmentAdmin(admin.ModelAdmin):
+class DepartmentAdmin(admin.ModelAdmin[Department]):
     """Админка для отделов."""
 
     list_display = ("name", "head", "parent", "get_employees_count")
@@ -31,7 +31,7 @@ class DepartmentAdmin(admin.ModelAdmin):
 
 
 @admin.register(User)
-class UserAdmin(BaseUserAdmin):
+class UserAdmin(BaseUserAdmin[User]):
     """
     Кастомная админка пользователя.
     Добавляет фильтры, поиск и inline-редактирование профиля.
