@@ -1,6 +1,7 @@
 """
 Кастомные валидаторы для всего проекта.
 """
+
 from typing import Any
 
 import phonenumbers
@@ -25,11 +26,9 @@ class FileSizeValidator:
             message (str | None): Кастомное сообщение об ошибке.
         """
         self.max_size_mb = max_size_mb
-        self.message = message or _(
-            "Размер файла не должен превышать {max_size} МБ."
-        ).format(max_size=max_size_mb)
+        self.message = message or _("Размер файла не должен превышать {max_size} МБ.").format(max_size=max_size_mb)
 
-    def __call__(self, file: File) -> None:
+    def __call__(self, file: File[Any]) -> None:
         """
         Args:
             file (File): Загружаемый файл.
@@ -41,10 +40,7 @@ class FileSizeValidator:
         """
         Необходимо для сравнения объектов валидатора при создании миграций.
         """
-        return (
-            isinstance(other, self.__class__)
-            and self.max_size_mb == other.max_size_mb
-        )
+        return isinstance(other, self.__class__) and self.max_size_mb == other.max_size_mb
 
 
 def validate_international_phone_number(value: str) -> None:
@@ -61,15 +57,11 @@ def validate_international_phone_number(value: str) -> None:
 
         # Проверяем, является ли номер валидным
         if not phonenumbers.is_valid_number(parsed_phone):
-            raise ValidationError(
-                _("Введен некорректный телефонный номер. Пример: +375291234567")
-            )
+            raise ValidationError(_("Введен некорректный телефонный номер. Пример: +375291234567"))
 
     except phonenumbers.NumberParseException:
         # Если библиотека не смогла распарсить номер, он невалиден
-        raise ValidationError(
-            _("Номер телефона содержит недопустимые символы.")
-        )
+        raise ValidationError(_("Номер телефона содержит недопустимые символы.")) from None
 
 
 # Инстансы валидаторов для повторного использования
@@ -78,6 +70,5 @@ validate_document_size = FileSizeValidator(max_size_mb=settings.MAX_DOCUMENT_SIZ
 
 # Валидатор для полей, где должны быть только буквы и дефис (ФИО)
 validate_alpha_hyphen = RegexValidator(
-    r"^[а-яА-ЯёЁa-zA-Z\s-]+$",
-    message=_("Допустимы только буквы, пробелы и дефисы.")
+    r"^[а-яА-ЯёЁa-zA-Z\s-]+$", message=_("Допустимы только буквы, пробелы и дефисы.")
 )

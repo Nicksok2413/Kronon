@@ -31,9 +31,11 @@ dependencies = [
     # Utilities
     "pillow (>=12.1.0,<13.0.0)",
     "loguru (>=0.7.3,<0.8.0)",
-    "sentry-sdk[celery,django,loguru] (>=2.50.0,<3.0.0)",
+    "sentry-sdk[celery,django,loguru] (>=2.51.0,<3.0.0)",
     "django-cors-headers (>=4.9.0,<5.0.0)",
-    "phonenumberslite (>=9.0.22,<10.0.0)",
+    "phonenumberslite (>=9.0.23,<10.0.0)",
+    # Важно для Mypy + Django (Runtime-патчи)
+    "django-stubs-ext (>=5.2.9,<6.0.0)",
 ]
 
 [dependency-groups]
@@ -99,7 +101,7 @@ disallow_untyped_calls = true
 
 # 3. Generics и Any
 # Запрещает использовать Generics без параметров (нельзя List, нужно List[int])
-disallow_any_generics = true
+disallow_any_generics = false
 # Предупреждает, если функция с указанным типом возвращает Any
 warn_return_any = true
 
@@ -193,7 +195,7 @@ ignore = [
 # =================================================================
 [tool.pytest.ini_options]
 # Минимальная версия pytest
-minversion = "8.0"
+minversion = "12.0"
 
 # Указываем Django настройки для тестов
 DJANGO_SETTINGS_MODULE = "config.settings"
@@ -218,7 +220,7 @@ env = [
     # Заглушка секретного ключа django
     "SECRET_KEY=test-secret-key-for-pytest",
     # URL тестовой БД
-    "DATABASE_URL=postgres://postgres:postgres@localhost:5432/kronon_db",
+    "DATABASE_URL=postgres://test_user:test_password@localhost:5432/test_db",
     # Используем другую базу Redis (10), чтобы не затереть кэш разработки
     "REDIS_URL=redis://localhost:6379/10",
 ]

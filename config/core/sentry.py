@@ -1,22 +1,23 @@
 """
 Централизованная настройка Sentry SDK.
 """
+
 from logging import ERROR, INFO  # Стандартные уровни логирования для Sentry
 from typing import Protocol
 
 import sentry_sdk
+from loguru import logger
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.loguru import LoguruIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.threading import ThreadingIntegration
 
-from loguru import logger
-
 
 # Определяем протокол (контракт), которому должен соответствовать объект настроек
 class SentrySettingsProtocol(Protocol):
     """Протокол для объекта настроек, используемых Sentry."""
+
     SENTRY_DSN: str | None
     SENTRY_ENVIRONMENT: str
     DEBUG: bool
@@ -69,7 +70,7 @@ def setup_sentry(settings: SentrySettingsProtocol) -> None:
                 # Loguru (перехват error-логов как событий)
                 LoguruIntegration(
                     level=INFO,  # Breadcrumbs
-                    event_level=ERROR  # Events
+                    event_level=ERROR,  # Events
                 ),
                 # Потоки (важно для Celery)
                 ThreadingIntegration(propagate_hub=True),
