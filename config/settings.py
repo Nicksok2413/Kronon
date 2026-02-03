@@ -11,11 +11,21 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+from django_stubs_ext import monkeypatch as type_hinting_patch
 from environ import Env
 
 # Импортируем функции настройки Loguru и Sentry
 from config.core.logging import setup_loguru
 from config.core.sentry import setup_sentry
+
+# ==============================================================================
+# TYPE HINTING PATCH
+# ==============================================================================
+
+# Патчим Django с помощью django_stubs_ext
+# для поддержки дженериков (ModelAdmin[User] и т.д.) в рантайме
+type_hinting_patch()  # Это необходимо для Strict Mypy режима
+
 
 # ==============================================================================
 # ENVIRONMENT CONFIGURATION
@@ -346,7 +356,7 @@ class KrononConfig:
     DEBUG: bool
     # Loguru
     LOG_LEVEL: str
-    LOGFILE_SIZE: int
+    LOGFILE_SIZE: str | int
     LOGFILE_COUNT: int
     # Sentry
     SENTRY_DSN: str | None
