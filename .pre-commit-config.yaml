@@ -1,0 +1,46 @@
+# =========================================================================
+# Конфигурация pre-commit хуков
+# =========================================================================
+
+repos:
+  # -------------------------------------------------------------------------
+  # Репозиторий с базовыми хуками
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Предотвращает коммит файлов с маркерами конфликтов слияния
+      - id: check-merge-conflict
+      # Проверяет синтаксис YAML файлов
+      - id: check-yaml
+      # Проверяет синтаксис JSON файлов
+      - id: check-json
+      # Проверяет синтаксис TOML файлов
+      - id: check-toml
+      # Убирает лишние пробелы в конце строк
+      - id: trailing-whitespace
+      # Ищет приватные ключи
+      - id: detect-private-key
+
+  # -------------------------------------------------------------------------
+  # Хуки для Ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.14
+    hooks:
+      # Запуск линтера (аналог `ruff check --fix`)
+      - id: ruff-check
+        # --fix: Автоматически исправлять ошибки
+        # --exit-non-zero-on-fix: Падать, если исправления были
+        args: [--fix, --exit-non-zero-on-fix]
+      # # Запуск форматтера (аналог `ruff format`)
+      - id: ruff-format
+
+  # Проверка безопасности (Bandit)
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.3
+    hooks:
+      - id: bandit
+        # -c pyproject.toml: Читать настройки исключений из pyproject.toml
+        # apps config: Сканировать только код приложения и настроек (игнорируя тесты)
+        args: [ "-c", "pyproject.toml", "-r", "apps", "config" ]
+        # Устанавливаем доп. зависимость для поддержки формата TOML в конфигах
+        additional_dependencies: [ "bandit[toml]" ]
