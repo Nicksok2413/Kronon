@@ -1,6 +1,7 @@
 """
 Настройки админ-панели для пользователей и структуры.
 """
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.translation import gettext_lazy as _
@@ -10,6 +11,7 @@ from apps.users.models import Department, Profile, User
 
 class ProfileInline(admin.StackedInline):
     """Встроенное редактирование профиля внутри формы пользователя."""
+
     model = Profile
     can_delete = False
     verbose_name_plural = _("Профиль")
@@ -18,6 +20,7 @@ class ProfileInline(admin.StackedInline):
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
     """Админка для отделов."""
+
     list_display = ("name", "head", "parent", "get_employees_count")
     search_fields = ("name", "head__email", "head__last_name")
     list_select_related = ("head", "parent")  # Оптимизация запросов
@@ -33,6 +36,7 @@ class UserAdmin(BaseUserAdmin):
     Кастомная админка пользователя.
     Добавляет фильтры, поиск и inline-редактирование профиля.
     """
+
     ordering = ["email"]
     list_display = ("email", "last_name", "first_name", "role", "department", "is_active")
     list_filter = ("role", "department", "is_active", "is_staff")
@@ -51,8 +55,11 @@ class UserAdmin(BaseUserAdmin):
 
     # Поля для формы создания
     add_fieldsets = (
-        (None, {
-            "classes": ("wide",),
-            "fields": ("email", "password", "confirm_password"),
-        }),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": ("email", "password", "confirm_password"),
+            },
+        ),
     )

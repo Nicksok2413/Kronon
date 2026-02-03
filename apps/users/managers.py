@@ -1,6 +1,7 @@
 """
 Менеджер пользователей для аутентификации по Email.
 """
+
 from typing import Any
 
 from django.contrib.auth.base_user import BaseUserManager

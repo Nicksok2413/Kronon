@@ -2,7 +2,8 @@
 Сигналы приложения Users.
 Автоматически создают профиль при создании пользователя.
 """
-from typing import Any, Type
+
+from typing import Any
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -12,7 +13,7 @@ from apps.users.models import Profile, User
 
 
 @receiver(post_save, sender=User)
-def manage_user_profile(sender: Type[User], instance: User, created: bool, **kwargs: Any) -> None:
+def manage_user_profile(sender: type[User], instance: User, created: bool, **kwargs: Any) -> None:
     """
     Сигнал для управления Профилем при сохранении Пользователя.
     Если User обновляется, сохраняет и Profile.
@@ -44,6 +45,4 @@ def manage_user_profile(sender: Type[User], instance: User, created: bool, **kwa
 
     except Exception as exc:
         # Логируем ошибку, если по какой-то причине профиль не создался
-        log.exception(
-            f"Ошибка в сигнале manage_user_profile для {instance.email}: {exc}"
-        )
+        log.exception(f"Ошибка в сигнале manage_user_profile для {instance.email}: {exc}")

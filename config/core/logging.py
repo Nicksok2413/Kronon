@@ -1,6 +1,7 @@
 """
 Централизованная настройка логирования (Loguru) для Django.
 """
+
 import logging
 import sys
 from pathlib import Path
@@ -12,6 +13,7 @@ from loguru import logger
 # Определяем протокол (контракт), которому должен соответствовать объект настроек
 class LoguruSettingsProtocol(Protocol):
     """Протокол для объекта настроек, используемых Loguru."""
+
     LOG_LEVEL: str
     LOGFILE_SIZE: str | int
     LOGFILE_COUNT: int
@@ -38,9 +40,7 @@ class InterceptHandler(logging.Handler):
                 frame = frame.f_back
             depth += 1
 
-        logger.opt(depth=depth, exception=record.exc_info).log(
-            level, record.getMessage()
-        )
+        logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
 def setup_loguru(settings: LoguruSettingsProtocol) -> None:
@@ -67,8 +67,8 @@ def setup_loguru(settings: LoguruSettingsProtocol) -> None:
         sys.stderr,
         level=log_level,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-               "<level>{level: <8}</level> | "
-               "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
         colorize=True,
     )
 

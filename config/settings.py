@@ -50,19 +50,14 @@ DEBUG: bool = env.bool("DEBUG", default=False)
 # Список хостов, которым разрешено обращаться к приложению
 ALLOWED_HOSTS: list[str] = env.list(
     "ALLOWED_HOSTS",
-    default=[
-        "localhost",
-        "127.0.0.1"],
+    default=["localhost", "127.0.0.1"],
 )
 
 # --- CORS (Cross-Origin Resource Sharing) ---
 # Список хостов фронтенда, которым разрешено обращаться к приложению (React на порту `5173`)
 CORS_ALLOWED_ORIGINS: list[str] = env.list(
     "CORS_ALLOWED_ORIGINS",
-    default=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173"
-    ],
+    default=["http://localhost:5173", "http://127.0.0.1:5173"],
 )
 # Разрешаем Cookie/Credentials (важно для авторизации)
 CORS_ALLOW_CREDENTIALS = True
@@ -87,13 +82,11 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     # --- Сторонние библиотеки ---
     "ninja",  # Быстрый API (FastAPI-like)
     "guardian",  # Объектные права доступа (Object Level Permissions)
     "axes",  # Защита от подбора паролей (brute-force protection)
     "corsheaders",  # CORS (для React)
-
     # --- Приложения проекта Kronon ---
     "apps.users",  # Пользователи, Отделы, Авторизация
 ]
@@ -202,7 +195,7 @@ CACHE_TTL = 60 * 10
 AUTH_USER_MODEL = "users.User"
 
 AUTHENTICATION_BACKENDS = [
-    "axes.backends.AxesBackend",                  # Защита от перебора паролей
+    "axes.backends.AxesBackend",  # Защита от перебора паролей
     "django.contrib.auth.backends.ModelBackend",  # Стандартный вход
     "guardian.backends.ObjectPermissionBackend",  # Объектные права
 ]
@@ -234,16 +227,10 @@ AXES_ENABLE_ACCESS_LOG = True
 # ==============================================================================
 
 # URL брокера (по умолчанию база №2 в Redis)
-CELERY_BROKER_URL: str = env(
-    "CELERY_BROKER_URL",
-    default=f"redis://{REDIS_HOST}:{REDIS_PORT}/2"
-)
+CELERY_BROKER_URL: str = env("CELERY_BROKER_URL", default=f"redis://{REDIS_HOST}:{REDIS_PORT}/2")
 
 # URL для хранения результатов выполнения задач (по умолчанию база №2 в Redis)
-CELERY_RESULT_BACKEND: str = env(
-    "CELERY_RESULT_BACKEND",
-    default=f"redis://{REDIS_HOST}:{REDIS_PORT}/2"
-)
+CELERY_RESULT_BACKEND: str = env("CELERY_RESULT_BACKEND", default=f"redis://{REDIS_HOST}:{REDIS_PORT}/2")
 
 CELERY_TIMEZONE = "Europe/Minsk"
 CELERY_TASK_TRACK_STARTED = True
@@ -353,6 +340,7 @@ class KrononConfig:
     Класс-контейнер для инициализации систем логирования и мониторинга.
     Удовлетворяет протоколам LoggingSettings и SentrySettings.
     """
+
     # Общие
     BASE_DIR: Path
     DEBUG: bool
@@ -373,7 +361,7 @@ _config = KrononConfig(
     LOGFILE_SIZE=LOGFILE_SIZE,
     LOGFILE_COUNT=LOGFILE_COUNT,
     SENTRY_DSN=SENTRY_DSN,
-    SENTRY_ENVIRONMENT=SENTRY_ENVIRONMENT
+    SENTRY_ENVIRONMENT=SENTRY_ENVIRONMENT,
 )
 
 # Инициализируем Loguru

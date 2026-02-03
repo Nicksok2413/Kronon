@@ -1,6 +1,7 @@
 """
 Модели пользователей, профилей и оргструктуры.
 """
+
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import FileExtensionValidator
 from django.db import models
@@ -16,6 +17,7 @@ class UserRole(models.TextChoices):
     Роли сотрудников в системе Kronon.
     Влияют на права доступа и бизнес-логику.
     """
+
     DIRECTOR = "director", "Директор"
     CHIEF_ACCOUNTANT = "chief_acc", "Главный бухгалтер"
     LEAD_ACCOUNTANT = "lead_acc", "Ведущий бухгалтер"
@@ -31,6 +33,7 @@ class Department(models.Model):
     Организационная единица (Отдел).
     Может иметь начальника и родительский отдел.
     """
+
     name = models.CharField(_("Название"), max_length=150, unique=True)
 
     parent = models.ForeignKey(
@@ -67,6 +70,7 @@ class User(AbstractUser):
     Использует email вместо username. Содержит только данные авторизации и позицию.
     Личные данные вынесены в модель Profile.
     """
+
     # Убираем поле username
     username = None  # type: ignore
 
@@ -116,6 +120,7 @@ class Profile(models.Model):
     Расширенный профиль сотрудника.
     Хранит фото, телефон, дату рождения и биографию.
     """
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
