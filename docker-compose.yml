@@ -1,16 +1,16 @@
 # Определяем "шаблон" для app-сервисов с помощью якоря
 x-app-base: &app-base
   build:
-    context: .  # Контекст сборки - корень проекта
-    dockerfile: Dockerfile  # Путь к Dockerfile
-    target: runner  # Этап №2 'Runner'
-  env_file: .env  # Передаем все переменные из .env в контейнер
+    context: .                         # Контекст сборки - корень проекта
+    dockerfile: docker/Dockerfile      # Путь к Dockerfile
+    target: runner                     # Этап №2 'Runner'
+  env_file: .env                       # Передаем все переменные из .env в контейнер
   volumes:
-    - media_volume:/app/media  # Монтируем том для медиа
-    - logs_volume:/app/logs  # Монтируем том для логов
+    - media_volume:/app/media          # Монтируем том для медиа
+    - logs_volume:/app/logs            # Монтируем том для логов
   depends_on:
-    db:
-      # Запускаем только после того, как db станет healthy
+    pgbouncer:
+      # Запускаем только после того, как pgbouncer станет healthy
       condition: service_healthy
     redis:
       # Запускаем только после того, как redis станет healthy
@@ -22,22 +22,77 @@ x-app-base: &app-base
 services:
   # --- INFRASTRUCTURE ---
   # Сервис базы данных (PostgreSQL)
+  # Настроен для работы на сервере с 1 ГБ RAM
   db:
-    image: postgres:18-bullseye
+    image: postgres:18.1-bookworm
     container_name: kronon_db
+    # Увеличиваем лимит разделяемой памяти (важно для сложных запросов)
+    shm_size: 256mb
+    # Тонкая настройка производительности через флаги запуска:
+    # - shared_buffers: кэш страниц БД (25% от RAM)
+    # - effective_cache_size: оценка доступного кэша для планировщика (75% от RAM)
+    # - maintenance_work_mem: сервисные операции (индексы, вакуум), важно для скорости миграций
+    # - work_mem: лимит памяти на одну операцию сортировки внутри запроса
+    # - max_connections: лимит реальных процессов БД (с PgBouncer можно держать низким, экономя RAM)
+    # - random_page_cost: оптимизация под SSD (сообщаем, что случайное чтение дешевое)
+    # - effective_io_concurrency: использование преимуществ AIO в Postgres 18
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c maintenance_work_mem=64MB
+      -c work_mem=8MB
+      -c max_connections=50
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
     environment:
       POSTGRES_DB: ${DB_NAME:-kronon_db}
       POSTGRES_USER: ${DB_USER:-kronon_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-        - postgres_data:/var/lib/postgresql/data  # Монтируем том для БД
+      - postgres_data:/var/lib/postgresql/data  # Монтируем том для БД
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"                           # Максимум 1 ядро
+          memory: 1024M                         # Максимум 1 ГБ RAM
+        reservations:
+          memory: 256M                          # Гарантированный резерв
     healthcheck:
       # Проверяет, готова ли БД принимать соединения (экранируем $ для shell)
       test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s  # Даем время на запуск Postgres перед первой проверкой
+      start_period: 15s  # Даем время на запуск Postgres перед первой проверкой
+    restart: unless-stopped
+    networks:
+      - backend
+
+  # Пулер соединений (PgBouncer)
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: kronon_pgbouncer
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - ADMIN_USERS=${DB_USER}
+      - POOL_MODE=transaction        # Самый эффективный режим для Django/Celery
+      - MAX_CLIENT_CONN=100          # Сколько приложений может подключиться к пулеру
+      - DEFAULT_POOL_SIZE=20         # Сколько реальных соединений держать открытыми к БД
+    depends_on:
+      db:
+        # Запускаем только после того, как db станет healthy
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -h localhost -p 6432" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
     networks:
       - backend
@@ -50,10 +105,14 @@ services:
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data  # Монтируем том для сохранения dump.rdb
+    deploy:
+      resources:
+        limits:
+          memory: 128M  #  Максимум 128 МБ RAM
     healthcheck:
       # Проверяет, отвечает ли Redis на команду PING
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 3s
       retries: 5
       start_period: 5s  # Даем время на запуск Redis перед первой проверкой
@@ -72,12 +131,12 @@ services:
     healthcheck:
         # Временный healthcheck, пока нет специального эндпоинта /health
         test: [ "CMD", "curl", "-f", "http://localhost:8000/admin/login/" ]
-        interval: 10s
+        interval: 15s
         timeout: 5s
-        retries: 5
-        start_period: 10s  # Даем время на запуск app перед первой проверкой
+        retries: 3
+        start_period: 20s  # Даем время на запуск app перед первой проверкой
 
-  # Worker
+  # Celery Worker
   celery:
       <<: *app-base
       container_name: kronon_celery
@@ -136,6 +195,7 @@ services:
 #      networks:
 #        - backend
 
+# --- STORAGE & NETWORKING ---
 # Определяем все тома для хранения персистентных данных
 volumes:
   postgres_data:
