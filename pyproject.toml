@@ -195,7 +195,7 @@ ignore = [
 # =================================================================
 [tool.pytest.ini_options]
 # Минимальная версия pytest
-minversion = "12.0"
+minversion = "8.0"
 
 # Указываем Django настройки для тестов
 DJANGO_SETTINGS_MODULE = "config.settings"
