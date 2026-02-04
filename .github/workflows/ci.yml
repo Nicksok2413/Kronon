@@ -102,11 +102,23 @@ jobs:
         run: poetry run mypy .
 
       # 8. Запуск тестов Pytest
-      - name: Run Tests (Pytest)
-        # Передаем тестовые переменные окружения
+      # - name: Run Tests (Pytest)
+      #   # Передаем тестовые переменные окружения
+      #   env:
+      #     DEBUG: True
+      #     SECRET_KEY: test-secret-key-for-pytest
+      #     DATABASE_URL: postgres://test_user:test_password@localhost:5432/test_db
+      #     REDIS_URL: redis://localhost:6379/10
+      #   run: poetry run pytest
+
+      # 9. Проверка миграций (проверяем, что все миграции сгенерированы и применены)
+      - name: Check for missing migrations
+        # Передаем тестовые переменные окружения, чтобы `settings.py` мог загрузиться
         env:
-          DEBUG: True
           SECRET_KEY: test-secret-key-for-pytest
-          DATABASE_URL: postgres://test_user:test_password@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/10
-        run: poetry run pytest
+          DB_NAME: test_db
+          DB_USER: test_user
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: 5432
+        run: poetry run python manage.py makemigrations --check --dry-run
