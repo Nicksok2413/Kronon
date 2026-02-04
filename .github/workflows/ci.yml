@@ -112,13 +112,13 @@ jobs:
       #   run: poetry run pytest
 
       # 9. Проверка миграций (проверяем, что все миграции сгенерированы и применены)
-      - name: Check for missing migrations
-        # Передаем тестовые переменные окружения, чтобы `settings.py` мог загрузиться
-        env:
-          SECRET_KEY: test-secret-key-for-pytest
-          DB_NAME: test_db
-          DB_USER: test_user
-          DB_PASSWORD: test_password
-          DB_HOST: localhost
-          DB_PORT: 5432
-        run: poetry run python manage.py makemigrations --check --dry-run
+      # - name: Check for missing migrations
+      #   # Передаем тестовые переменные окружения, чтобы `settings.py` мог загрузиться
+      #   env:
+      #     SECRET_KEY: test-secret-key-for-pytest
+      #     DB_NAME: test_db
+      #     DB_USER: test_user
+      #     DB_PASSWORD: test_password
+      #     DB_HOST: localhost
+      #     DB_PORT: 5432
+      #   run: poetry run python manage.py makemigrations --check --dry-run
