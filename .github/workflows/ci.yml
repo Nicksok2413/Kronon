@@ -18,19 +18,28 @@ jobs:
       # Поднимаем сервисы для тестов
       postgres:
         image: postgres:18-alpine
+        # Передаем тестовые переменные окружения
         env:
           POSTGRES_DB: test_db
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
-        ports:
-          - 5432:5432
+        # Healthcheck
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+        ports:
+          - 5432:5432
+          
       redis:
         image: redis:7-alpine
+        # Healthcheck: ждем, пока Redis не начнет отвечать на PONG
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
         ports:
           - 6379:6379
 
@@ -82,10 +91,19 @@ jobs:
 
       # 7. Проверка статической типизации с помощью mypy
       - name: Type check (mypy)
+        env:
+          # Передаем тестовые переменные окружения, чтобы `settings.py` мог загрузиться
+          SECRET_KEY: test-secret-key-for-pytest
+          DB_NAME: test_db
+          DB_USER: test_user
+          DB_PASSWORD: test_password
+          DB_HOST: localhost
+          DB_PORT: 5432
         run: poetry run mypy .
 
       # 8. Запуск тестов Pytest
       - name: Run Tests (Pytest)
+        # Передаем тестовые переменные окружения
         env:
           DEBUG: True
           SECRET_KEY: test-secret-key-for-pytest
