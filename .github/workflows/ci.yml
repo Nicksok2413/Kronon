@@ -36,14 +36,14 @@ jobs:
     # Поднимаем сервисы для тестов
     services:
       postgres:
-        image: postgres:18-alpine
+        image: postgres:18.1-alpine
         env:
           POSTGRES_DB: test_db
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
         # Healthcheck
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U test_user -d test_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
