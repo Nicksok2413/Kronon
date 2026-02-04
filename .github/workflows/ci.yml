@@ -2,10 +2,8 @@ name: Kronon CI
 
 # Триггеры для запуска воркфлоу
 on:
-  # Запуск на пуши в main (master) и dev
   push:
     branches: [ "main", "master", "dev" ]
-  # Запуск на создание/обновление PR в main (master)
   pull_request:
     branches: [ "main", "master" ]
 
@@ -14,11 +12,31 @@ jobs:
     name: Code Quality & Tests
     runs-on: ubuntu-latest
 
+    # Глобальные переменные окружения для всего Job-а
+    env:
+      # Настройки Python/Poetry
+      PYTHON_VERSION: "3.12"
+      POETRY_VERSION: "2.2.0"
+
+      # Настройки Django
+      SECRET_KEY: test-secret-key-for-ci-pipeline
+      DEBUG: "True"
+
+      # Настройки БД
+      DB_NAME: test_db
+      DB_USER: test_user
+      DB_PASSWORD: test_password
+      DB_HOST: localhost
+      DB_PORT: 5432
+
+      # Настройки Redis
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+
+    # Поднимаем сервисы для тестов
     services:
-      # Поднимаем сервисы для тестов
       postgres:
         image: postgres:18-alpine
-        # Передаем тестовые переменные окружения
         env:
           POSTGRES_DB: test_db
           POSTGRES_USER: test_user
@@ -31,10 +49,10 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-          
+
       redis:
         image: redis:7-alpine
-        # Healthcheck: ждем, пока Redis не начнет отвечать на PONG
+        # Healthcheck
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -44,26 +62,23 @@ jobs:
           - 6379:6379
 
     steps:
-      # 1. Клонируем репозиторий
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Устанавливаем Python
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      # 3. Устанавливаем Poetry
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
-          version: "2.2.0"
+          version: ${{ env.POETRY_VERSION }}
           installer-parallel: true
           virtualenvs-create: true
           virtualenvs-in-project: true
 
-      # 4. Настраиваем кэширование виртуального окружения
+      # Настраиваем кэширование виртуального окружения
       - name: Load cached venv
         # Даем ID этому шагу, чтобы ссылаться на него
         id: cached-poetry-dependencies
@@ -72,53 +87,31 @@ jobs:
           # Путь к директории, которую нужно кэшировать
           path: .venv
           # Ключ кэша: он будет уникальным для комбинации ОС, версии Python и содержимого poetry.lock
-          key: ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
+          key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
           # Ключи для восстановления, если точного совпадения нет
           restore-keys: |
-            ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-
+            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
 
-      # 5. Устанавливаем зависимости
+      # Устанавливаем зависимости
       - name: Install dependencies
         # Запускаем этот шаг, только если кэш не был найден
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-root
 
-      # 6. Проверка кода с помощью Ruff
+      # 1. Линтинг
       - name: Lint & format check (Ruff)
         run: |
           poetry run ruff check .
           poetry run ruff format --check .
 
-      # 7. Проверка статической типизации с помощью mypy
+      # 2. Типизация
       - name: Type check (mypy)
-        env:
-          # Передаем тестовые переменные окружения, чтобы `settings.py` мог загрузиться
-          SECRET_KEY: test-secret-key-for-pytest
-          DB_NAME: test_db
-          DB_USER: test_user
-          DB_PASSWORD: test_password
-          DB_HOST: localhost
-          DB_PORT: 5432
         run: poetry run mypy .
 
-      # 8. Запуск тестов Pytest
-      # - name: Run Tests (Pytest)
-      #   # Передаем тестовые переменные окружения
-      #   env:
-      #     DEBUG: True
-      #     SECRET_KEY: test-secret-key-for-pytest
-      #     DATABASE_URL: postgres://test_user:test_password@localhost:5432/test_db
-      #     REDIS_URL: redis://localhost:6379/10
-      #   run: poetry run pytest
+      # 3. Проверка пропущенных миграций
+      - name: Check for missing migrations
+        run: poetry run python manage.py makemigrations --check --dry-run
 
-      # 9. Проверка миграций (проверяем, что все миграции сгенерированы и применены)
-      # - name: Check for missing migrations
-      #   # Передаем тестовые переменные окружения, чтобы `settings.py` мог загрузиться
-      #   env:
-      #     SECRET_KEY: test-secret-key-for-pytest
-      #     DB_NAME: test_db
-      #     DB_USER: test_user
-      #     DB_PASSWORD: test_password
-      #     DB_HOST: localhost
-      #     DB_PORT: 5432
-      #   run: poetry run python manage.py makemigrations --check --dry-run
+      # 4. Тесты
+      - name: Run Tests (Pytest)
+        run: poetry run pytest
