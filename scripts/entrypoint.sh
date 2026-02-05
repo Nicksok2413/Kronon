@@ -6,7 +6,7 @@ set -e
 # --- Функция для проверки готовности БД ---
 wait_for_db() {
     echo "-> (Entrypoint) Ожидание запуска PostgreSQL..."
-    python << END
+    python3 -c '
 import os
 import psycopg
 import sys
@@ -46,7 +46,7 @@ except KeyError as exc:
 except Exception as exc:
     print(f"-> (Entrypoint) Произошла ошибка при проверке БД (psycopg3): {exc}")
     sys.exit(1)
-END
+'
 }
 
 # Ждем БД
