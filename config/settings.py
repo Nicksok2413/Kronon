@@ -145,7 +145,12 @@ _DB_NAME: str = env("DB_NAME", default="kronon_db")
 _DB_USER: str = env("DB_USER", default="kronon_user")
 _DB_PASSWORD: str = env("DB_PASSWORD", default="secret_password")
 _DB_HOST: str = env("DB_HOST", default="db")  # `localhost` для локальной разработки
-_DB_PORT: int = env.int("DB_PORT", default=5432)
+_DB_PORT: int = env.int("DB_PORT", default=6432)  # `5432` для локальной разработки
+
+# Определяем, работаем ли мы через PgBouncer (порт 6432)
+# Если порт 6432 — отключаем серверные курсоры, так как пулер работает в режиме транзакций
+_USE_PGBOUNCER: bool = _DB_PORT == 6432
+
 
 DATABASES = {
     "default": {
@@ -155,6 +160,8 @@ DATABASES = {
         "PASSWORD": _DB_PASSWORD,
         "HOST": _DB_HOST,
         "PORT": _DB_PORT,
+        # Transaction Pooling (важно для PgBouncer)
+        "DISABLE_SERVER_SIDE_CURSORS": _USE_PGBOUNCER,
     }
 }
 

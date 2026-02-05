@@ -36,7 +36,7 @@ jobs:
     # Поднимаем сервисы для тестов
     services:
       postgres:
-        image: postgres:18.1-alpine
+        image: postgres:18.1-bookworm
         env:
           POSTGRES_DB: test_db
           POSTGRES_USER: test_user
