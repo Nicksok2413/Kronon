@@ -75,12 +75,17 @@ services:
     image: edoburu/pgbouncer:latest
     container_name: kronon_pgbouncer
     environment:
-      - DB_HOST=db
-      - DB_PORT=5432
+      # Хост и ПОРТ реальной БД
+      - DB_HOST=${POSTGRES_HOST:-db}
+      - DB_PORT=${POSTGRES_PORT:-5432}
+      # Порт, который будет слушать сам PgBouncer
+      - LISTEN_PORT=6432
+      # Доступ к БД
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
       - ADMIN_USERS=${DB_USER}
+      # Настройки пулинга
       - POOL_MODE=transaction        # Самый эффективный режим для Django/Celery
       - MAX_CLIENT_CONN=100          # Сколько приложений может подключиться к пулеру
       - DEFAULT_POOL_SIZE=20         # Сколько реальных соединений держать открытыми к БД
@@ -89,7 +94,7 @@ services:
         # Запускаем только после того, как db станет healthy
         condition: service_healthy
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -h localhost -p 6432" ]
+      test: [ "CMD-SHELL", "pg_isready -h localhost -p 6432 -U $${DB_USER} -d $${DB_NAME}" ]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -137,10 +142,10 @@ services:
         start_period: 20s  # Даем время на запуск app перед первой проверкой
 
   # Celery Worker
-  celery:
+  celery_worker:
       <<: *app-base
       container_name: kronon_celery
-      command: celery -A config worker -l info -c 2
+      command: celery -A config.celery:app worker -l info -c 2
 
 # --- MONITORING ---
 #  prometheus:
