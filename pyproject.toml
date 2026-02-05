@@ -200,12 +200,22 @@ minversion = "8.0"
 # Указываем Django настройки для тестов
 DJANGO_SETTINGS_MODULE = "config.settings"
 
+# Указываем корень проекта для поиска импортов
+pythonpath = ["."]
 # Пути к тестам
 testpaths = ["tests"]
+# Шаблоны имен файлов
+python_files = ["test_*.py", "*_test.py"]
+
+# auto - автоматически помечает async функции как тесты
+asyncio_mode = "auto"
+
+# Указываем, где искать фикстуру event_loop (scope function)
+asyncio_default_fixture_loop_scope = "function"
 
 # Опции запуска
 # --reuse-db ускоряет тесты: не удаляет тестовую БД между прогонами, а просто очищает таблицы
-addopts = "--cov=apps --cov-report=term-missing --reuse-db"
+addopts = "--reuse-db"
 
 # Игнорируем предупреждения о deprecation (опционально, чтобы вывод был чище)
 filterwarnings = [
@@ -219,8 +229,11 @@ env = [
     "DEBUG=True",
     # Заглушка секретного ключа django
     "SECRET_KEY=test-secret-key-for-pytest",
-    # URL тестовой БД
-    "DATABASE_URL=postgres://test_user:test_password@localhost:5432/test_db",
     # Используем другую базу Redis (10), чтобы не затереть кэш разработки
     "REDIS_URL=redis://localhost:6379/10",
 ]
+
+[tool.coverage.run]
+# Какие папки учитывать при расчете покрытия
+source = ["apps"]
+omit = ["*/migrations/*", "*/tests/*"]
