@@ -14,20 +14,13 @@ jobs:
 
     # Глобальные переменные окружения для всего Job-а
     env:
-      # Настройки Python/Poetry
       PYTHON_VERSION: "3.12"
       POETRY_VERSION: "2.2.0"
-
-      # Настройки Django
       SECRET_KEY: test-secret-key-for-ci-pipeline
       DEBUG: "True"
 
-      # Настройки БД
-      DB_NAME: test_db
-      DB_USER: test_user
-      DB_PASSWORD: test_password
-      DB_HOST: localhost
-      DB_PORT: 5432
+      # Формируем DATABASE_URL для автоматического подхвата в settings.py
+      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
 
       # Настройки Redis
       REDIS_HOST: localhost
