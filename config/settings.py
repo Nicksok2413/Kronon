@@ -140,30 +140,30 @@ WSGI_APPLICATION = "config.wsgi.application"
 # DATABASE (PostgreSQL)
 # ==============================================================================
 
-# Сборка URL подключения к БД
-_DB_NAME: str = env("DB_NAME", default="kronon_db")
-_DB_USER: str = env("DB_USER", default="kronon_user")
-_DB_PASSWORD: str = env("DB_PASSWORD", default="secret_password")
-_DB_HOST: str = env("DB_HOST", default="db")  # `localhost` для локальной разработки
-_DB_PORT: int = env.int("DB_PORT", default=6432)  # `5432` для локальной разработки
+# Проверяем, нет ли готовой URL подключения к БД (Pytest/CI)
+if env.str("DATABASE_URL", default=""):
+    DATABASES = {"default": env.db_url("DATABASE_URL")}
+
+else:
+    # Cобираем URL подключения к БД
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": env("DB_NAME", default="kronon_db"),
+            "USER": env("DB_USER", default="kronon_user"),
+            "PASSWORD": env("DB_PASSWORD", default="secret_password"),
+            "HOST": env("DB_HOST", default="pgbouncer"),
+            "PORT": env.int("DB_PORT", default=6432),
+        }
+    }
 
 # Определяем, работаем ли мы через PgBouncer (порт 6432)
 # Если порт 6432 — отключаем серверные курсоры, так как пулер работает в режиме транзакций
-_USE_PGBOUNCER: bool = _DB_PORT == 6432
+_CURRENT_PORT: int = DATABASES["default"].get("PORT", 6432)
+_USE_PGBOUNCER: bool = _CURRENT_PORT == 6432
 
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": _DB_NAME,
-        "USER": _DB_USER,
-        "PASSWORD": _DB_PASSWORD,
-        "HOST": _DB_HOST,
-        "PORT": _DB_PORT,
-        # Transaction Pooling (важно для PgBouncer)
-        "DISABLE_SERVER_SIDE_CURSORS": _USE_PGBOUNCER,
-    }
-}
+# Transaction Pooling (для PgBouncer)
+DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = _USE_PGBOUNCER
 
 
 # ==============================================================================
