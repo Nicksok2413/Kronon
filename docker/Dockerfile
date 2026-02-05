@@ -5,9 +5,10 @@ FROM python:3.12-slim-bookworm AS builder
 
 # Устанавливаем переменные окружения для Poetry
 ENV POETRY_VERSION=2.2.0 \
-    POETRY_HOME="/opt/poetry" \
-    POETRY_VIRTUALENVS_CREATE=1 \
-    POETRY_VIRTUALENVS_IN_PROJECT=1 \
+    POETRY_NO_INTERACTION=1 \
+    POETRY_VIRTUALENVS_CREATE=true \
+    POETRY_VIRTUALENVS_IN_PROJECT=false \
+    POETRY_VIRTUALENVS_PATH="/opt/venv" \
     PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
@@ -39,6 +40,8 @@ COPY pyproject.toml poetry.lock ./
 # Устанавливаем зависимости (Production only)
 RUN poetry install --only main --no-root
 
+# Создаем стабильную символическую ссылку на venv (убираем хеш из пути)
+RUN ln -s /opt/venv/$(ls /opt/venv | head -n 1) /opt/venv/active
 
 # ==============================================================================
 # 2. RUNNER: Финальный образ
@@ -46,32 +49,34 @@ RUN poetry install --only main --no-root
 FROM python:3.12-slim-bookworm AS runner
 
 # Переменные окружения для Python
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    VIRTUAL_ENV=/app/.venv \
-    PATH="/app/.venv/bin:$PATH"
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH="/app" \
+    HOME="/home/kronon" \
+    XDG_CACHE_HOME="/home/kronon/.cache" \
+    VIRTUAL_ENV="/opt/venv/active" \
+    PATH="/opt/venv/active/bin:$PATH"
+
 
 WORKDIR /app
 
 # Устанавливаем runtime-зависимостей
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    libpq-5 \
+    libpq5 \
     gettext \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Создаем группу kronon (GID 1000) и пользователя kronon (UID 1000)
-# Для безопасности, чтобы не запускать приложение от root
-# Для решения проблем с правами доступа к volumes
+# Создаем группу kronon (GID 1000) и non-root пользователя kronon (UID 1000)
 RUN groupadd -g 1000 kronon && \
     useradd -u 1000 -g kronon -s /bin/sh -m kronon
 
-# Копируем артефакты из builder
+# Копируем скомпилированные артефакты и venv из билдера
 COPY --from=builder /usr/local/bin/su-exec /usr/local/bin/su-exec
-COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /opt/venv /opt/venv
 
-# Копируем Entrypoint
+# Копируем энтрипойнт и устанавливаем права
 COPY --chmod=755 scripts/entrypoint.sh /entrypoint.sh
 
 # Копируем код проекта
@@ -83,6 +88,8 @@ RUN mkdir -p /app/staticfiles /app/media /app/logs && \
 
 EXPOSE 8000
 
+# Точка входа
 ENTRYPOINT ["/entrypoint.sh"]
 
+# Команда по умолчанию
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--worker-class", "uvicorn.workers.UvicornWorker"]
