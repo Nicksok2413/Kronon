@@ -39,6 +39,8 @@ repos:
     rev: 1.9.3
     hooks:
       - id: bandit
+        # Исключаем папку tests из сканирования этим хуком
+        exclude: ^tests/
         # -c pyproject.toml: Читать настройки исключений из pyproject.toml
         # apps config: Сканировать только код приложения и настроек (игнорируя тесты)
         args: [ "-c", "pyproject.toml", "-r", "apps", "config" ]

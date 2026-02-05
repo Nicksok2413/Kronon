@@ -6,6 +6,15 @@
 # Команда по умолчанию, которая будет вызвана при запуске `make`
 default: help
 
+# Автоматическая подгрузка .env
+ifneq ("$(wildcard .env)","")
+    include .env
+    export
+endif
+
+# Собираем URL для тестов
+TEST_DB_URL=postgresql://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)
+
 # Цвета
 GREEN  := $(shell tput -Txterm setaf 2)
 RESET  := $(shell tput -Txterm sgr0)
@@ -34,7 +43,8 @@ help:
 	@echo "  lint-fix       - Исправить код код с помощью Ruff"
 	@echo "  format         - Отформатировать код с помощью Ruff"
 	@echo "  types          - Проверить статическую типизацию mypy"
-	@echo "  test           - Запустить тесты pytest с отчетом о покрытии"
+	@echo "  test           - Запустить тесты pytest"
+	@echo "  test-cov       - Запустить тесты pytest с отчетом о покрытии кода"
 	@echo "  check          - Запустить статический анализ (lint, types) последовательно"
 	@echo "  check-all      - Запустить все проверки (lint, types, test) последовательно"
 	@echo "  clean          - Очистить временные файлы (pycache, coverage, builds)"
@@ -123,8 +133,12 @@ types:
 	poetry run mypy .
 
 test:
-	@echo "-> Запуск тестов pytest..."
-	poetry run pytest
+	@echo "-> ${GREEN}Запуск тестов с (подключение к localhost:5432)...${RESET}"
+	DATABASE_URL=$(TEST_DB_URL) poetry run pytest
+
+test-cov:
+	@echo "-> ${GREEN}Запуск тестов с отчетом о покрытии (подключение к localhost:5432)...${RESET}"
+	DATABASE_URL=$(TEST_DB_URL) poetry run pytest --cov=apps/ --cov-report=term-missing --cov-report=html
 
 check: lint types
 	@echo "-> Статический анализ (lint, types) успешно пройден!"
