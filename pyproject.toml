@@ -101,7 +101,7 @@ disallow_untyped_calls = true
 
 # 3. Generics и Any
 # Запрещает использовать Generics без параметров (нельзя List, нужно List[int])
-disallow_any_generics = false
+disallow_any_generics = true
 # Предупреждает, если функция с указанным типом возвращает Any
 warn_return_any = true
 
