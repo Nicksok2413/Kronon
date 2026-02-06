@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     "corsheaders",  # CORS (для React)
     # --- Приложения проекта Kronon ---
     "apps.users",  # Пользователи, Отделы, Авторизация
+    "apps.clients",  # Клиенты
 ]
 
 MIDDLEWARE = [
