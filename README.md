@@ -1,4 +1,4 @@
-# Kronon 🕰️
+# Kronon
 
 ![Python](https://img.shields.io/badge/Python-3.12-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/django-6.0-092E20?style=for-the-badge&logo=django&logoColor=white)
