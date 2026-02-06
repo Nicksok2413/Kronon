@@ -15,7 +15,7 @@ class LoguruSettingsProtocol(Protocol):
     """Протокол для объекта настроек, используемых Loguru."""
 
     LOG_LEVEL: str
-    LOGFILE_SIZE: str | int
+    LOGFILE_SIZE: int
     LOGFILE_COUNT: int
     BASE_DIR: Path
 

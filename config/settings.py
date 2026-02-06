@@ -363,7 +363,7 @@ class KrononConfig:
     DEBUG: bool
     # Loguru
     LOG_LEVEL: str
-    LOGFILE_SIZE: str | int
+    LOGFILE_SIZE: int
     LOGFILE_COUNT: int
     # Sentry
     SENTRY_DSN: str | None

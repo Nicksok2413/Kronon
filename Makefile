@@ -6,15 +6,6 @@
 # Команда по умолчанию, которая будет вызвана при запуске `make`
 default: help
 
-# Автоматическая подгрузка .env
-ifneq ("$(wildcard .env)","")
-    include .env
-    export
-endif
-
-# Собираем URL для тестов
-TEST_DB_URL=postgresql://$(DB_USER):$(DB_PASSWORD)@localhost:5432/$(DB_NAME)
-
 # Цвета
 GREEN  := $(shell tput -Txterm setaf 2)
 RESET  := $(shell tput -Txterm sgr0)
@@ -134,11 +125,11 @@ types:
 
 test:
 	@echo "-> ${GREEN}Запуск тестов с (подключение к localhost:5432)...${RESET}"
-	DATABASE_URL=$(TEST_DB_URL) poetry run pytest
+	poetry run pytest
 
 test-cov:
 	@echo "-> ${GREEN}Запуск тестов с отчетом о покрытии (подключение к localhost:5432)...${RESET}"
-	DATABASE_URL=$(TEST_DB_URL) poetry run pytest --cov=apps/ --cov-report=term-missing --cov-report=html
+	poetry run pytest --cov=apps/ --cov-report=term-missing --cov-report=html
 
 check: lint types
 	@echo "-> Статический анализ (lint, types) успешно пройден!"
