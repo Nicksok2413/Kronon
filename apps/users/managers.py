@@ -19,7 +19,7 @@ class CustomUserManager(BaseUserManager["User"]):
     вместо стандартного имени пользователя (username).
     """
 
-    def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> "User":
+    def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> User:
         """
         Создает и сохраняет пользователя с указанным email и паролем.
 
@@ -50,7 +50,7 @@ class CustomUserManager(BaseUserManager["User"]):
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email: str, password: str | None = None, **extra_fields: Any) -> "User":
+    def create_superuser(self, email: str, password: str | None = None, **extra_fields: Any) -> User:
         """
         Создает и сохраняет суперпользователя (администратора).
 
