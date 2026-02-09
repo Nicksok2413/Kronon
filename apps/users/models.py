@@ -2,6 +2,8 @@
 Модели пользователей, профилей и оргструктуры.
 """
 
+import uuid
+
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import FileExtensionValidator
 from django.db import models
@@ -71,6 +73,9 @@ class User(AbstractUser):
     Личные данные вынесены в модель Profile.
     """
 
+    # Переопределяем id
+    id = models.UUIDField(primary_key=True, default=uuid.uuid7, editable=False, verbose_name="ID")
+
     # Убираем поле username
     username = None  # type: ignore
 
@@ -104,6 +109,8 @@ class User(AbstractUser):
     class Meta:
         verbose_name = _("Сотрудник")
         verbose_name_plural = _("Сотрудники")
+        # UUIDv7 сортируется по времени, поэтому сортировка по ID = сортировка по дате регистрации
+        ordering = ["-date_joined"]
 
     def __str__(self) -> str:
         return self.email
