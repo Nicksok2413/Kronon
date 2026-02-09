@@ -1,6 +1,6 @@
 # Kronon
 
-![Python](https://img.shields.io/badge/Python-3.12-blue?style=for-the-badge&logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.14-blue?style=for-the-badge&logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/django-6.0-092E20?style=for-the-badge&logo=django&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/postgresql-18.1-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Redis](https://img.shields.io/badge/Redis-7.x-DC382D?style=for-the-badge&logo=redis&logoColor=white)
@@ -39,7 +39,7 @@
 Проект построен на базе **Clean Architecture** и **12-Factor App** методологий.
 
 ### Backend & Core
-*   **Python 3.12** — Язык разработки.
+*   **Python 3.14** — Язык разработки.
 *   **Django 6.0** — Основной фреймворк (Admin, ORM, Auth).
 *   **Django Ninja** — Высокопроизводительный асинхронный API (FastAPI-like experience).
 *   **Pydantic V2** — Валидация данных и сериализация.
@@ -89,7 +89,7 @@ kronon/
 
 ### Предварительные требования
 *   Docker & Docker Compose
-*   Python 3.12 & Poetry (для локальной разработки)
+*   Python 3.14 & Poetry (для локальной разработки)
 *   Make (рекомендуется)
 
 ### Быстрый старт
