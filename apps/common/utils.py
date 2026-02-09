@@ -26,7 +26,7 @@ class RandomFileName:
         """
         self.path_suffix = path_suffix
 
-    def __call__(self, instance: "Model", filename: str) -> str:
+    def __call__(self, instance: Model, filename: str) -> str:
         """
         Args:
             instance ("Model"): Экземпляр модели (Profile, Contract, и т.д.).

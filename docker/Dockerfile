@@ -1,7 +1,7 @@
 # ==============================================================================
 # 1. BUILDER: Сборка зависимостей и утилит
 # ==============================================================================
-FROM python:3.12-slim-bookworm AS builder
+FROM python:3.14-slim-bookworm AS builder
 
 # Устанавливаем переменные окружения для Poetry
 ENV POETRY_VERSION=2.2.0 \
@@ -46,7 +46,7 @@ RUN ln -s /opt/venv/$(ls /opt/venv | head -n 1) /opt/venv/active
 # ==============================================================================
 # 2. RUNNER: Финальный образ
 # ==============================================================================
-FROM python:3.12-slim-bookworm AS runner
+FROM python:3.14-slim-bookworm AS runner
 
 # Переменные окружения для Python
 ENV PYTHONUNBUFFERED=1 \
