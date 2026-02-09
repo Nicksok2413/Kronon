@@ -41,7 +41,6 @@ files = [
 
 [package.dependencies]
 idna = ">=2.8"
-typing_extensions = {version = ">=4.5", markers = "python_version < \"3.13\""}
 
 [package.extras]
 trio = ["trio (>=0.31.0) ; python_version < \"3.10\"", "trio (>=0.32.0) ; python_version >= \"3.10\""]
@@ -609,7 +608,6 @@ files = [
 
 [package.dependencies]
 django = ">=3.2"
-typing_extensions = {version = ">=4.12.0", markers = "python_version < \"3.13\""}
 
 [[package]]
 name = "django-ninja"
@@ -1327,7 +1325,6 @@ files = [
 
 [package.dependencies]
 psycopg-binary = {version = "3.3.2", optional = true, markers = "implementation_name != \"pypy\" and extra == \"binary\""}
-typing-extensions = {version = ">=4.6", markers = "python_version < \"3.13\""}
 tzdata = {version = "*", markers = "sys_platform == \"win32\""}
 
 [package.extras]
@@ -1624,7 +1621,6 @@ files = [
 
 [package.dependencies]
 pytest = ">=8.2,<10"
-typing-extensions = {version = ">=4.12", markers = "python_version < \"3.13\""}
 
 [package.extras]
 docs = ["sphinx (>=5.3)", "sphinx-rtd-theme (>=1)"]
@@ -2450,5 +2446,5 @@ dev = ["black (>=19.3b0) ; python_version >= \"3.6\"", "pytest (>=4.6.2)"]
 
 [metadata]
 lock-version = "2.1"
-python-versions = ">=3.12,<4.0"
-content-hash = "e14fd17c1d16d97170bc398a630d50ff7951b878138418f717ac713ce06af9c7"
+python-versions = ">=3.14,<4.0"
+content-hash = "0012ae5ad6fd20d056dc33ac59d8888f2bf9d98005a90e8fb3951b3f577db42d"
