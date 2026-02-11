@@ -13,25 +13,27 @@ requires-python = ">=3.14,<4.0"
 
 dependencies = [
     # Core Framework
-    "django (>=6.0.1,<7.0.0)",
+    "django (>=6.0.2,<7.0.0)",
     "django-ninja (>=1.5.3,<2.0.0)",
+    "django-ninja-extra (>=0.31.0,<0.32.0)",
     "django-environ (>=0.12.0,<0.13.0)",
-    "gunicorn (>=24.1.1,<25.0.0)",
+    "gunicorn (>=25.0.3,<26.0.0)",
     "uvicorn[standard] (>=0.40.0,<0.41.0)",
     "whitenoise (>=6.11.0,<7.0.0)",
     # Database & Cache
     "psycopg[binary] (>=3.3.2,<4.0.0)",
-    "redis (>=7.1.0,<8.0.0)",
+    "redis (>=7.1.1,<8.0.0)",
     "django-redis (>=6.0.0,<7.0.0)",
     # Asynchronous Tasks
     "celery (>=5.6.2,<6.0.0)",
     # Security & Permissions
+    "django-ninja-jwt (>=5.4.4,<6.0.0)",
     "django-guardian (>=3.2.0,<4.0.0)",
-    "django-axes (>=8.1.0,<9.0.0)",
+    "django-axes (>=8.3.0,<9.0.0)",
     # Utilities
-    "pillow (>=12.1.0,<13.0.0)",
+    "pillow (>=12.1.1,<13.0.0)",
     "loguru (>=0.7.3,<0.8.0)",
-    "sentry-sdk[celery,django,loguru] (>=2.51.0,<3.0.0)",
+    "sentry-sdk[celery,django,loguru] (>=2.52.0,<3.0.0)",
     "django-cors-headers (>=4.9.0,<5.0.0)",
     "phonenumberslite (>=9.0.23,<10.0.0)",
     # Важно для Mypy + Django (Runtime-патчи)
@@ -47,7 +49,7 @@ dev = [
     "pytest-env (>=1.2.0,<2.0.0)",
     "pytest-cov (>=7.0.0,<8.0.0)",
     "factory-boy (>=3.3.3,<4.0.0)",
-    "faker (>=40.1.2,<41.0.0)",
+    "faker (>=40.4.0,<41.0.0)",
     # Linters & Formatters
     "ruff (>=0.14.14,<0.15.0)",
     "pre-commit (>=4.5.1,<5.0.0)",
