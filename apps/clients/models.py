@@ -135,16 +135,17 @@ class Client(BaseModel):
         },
     )
 
-    assistant = models.ForeignKey(
+    primary_accountant = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="clients_assisted",
+        related_name="clients_primary",
         verbose_name=_("Бухгалтер по первичной документации"),
-        help_text=_("Сотрудник, помогающий с первичкой и рутиной"),
+        help_text=_("Ввод накладных, банка, кассы"),
         limit_choices_to={
             "role__in": [
+                UserRole.JUNIOR_ACCOUNTANT,
                 UserRole.ACCOUNTANT,
                 UserRole.LEAD_ACCOUNTANT,
             ]
@@ -161,6 +162,7 @@ class Client(BaseModel):
         help_text=_("Если зарплату считает отдельный специалист"),
         limit_choices_to={
             "role__in": [
+                UserRole.JUNIOR_ACCOUNTANT,
                 UserRole.ACCOUNTANT,
                 UserRole.LEAD_ACCOUNTANT,
             ]
@@ -174,7 +176,7 @@ class Client(BaseModel):
         blank=True,
         related_name="clients_hr",
         verbose_name=_("Специалист по кадрам"),
-        help_text=_("Ответственный за кадровый учет (ПУ-1, ПУ-2, контракты)"),
+        help_text=_("Ответственный за кадровый учет (контракты, ПУ-1, ПУ-2 и т.д.)"),
         limit_choices_to={"role": UserRole.HR},
     )
 
@@ -197,7 +199,6 @@ class Client(BaseModel):
     class Meta:
         verbose_name = _("Клиент")
         verbose_name_plural = _("Клиенты")
-        ordering = ["-created_at"]
 
     def __str__(self) -> str:
         return f"{self.name} (УНП: {self.unp})"

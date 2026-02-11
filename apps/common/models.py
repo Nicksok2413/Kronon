@@ -56,6 +56,9 @@ class BaseModel(models.Model):
 
     class Meta:
         abstract = True
+        # Сортировка по умолчанию (обратный порядок - новые сверху)
+        # UUIDv7 сортируется по времени быстрее, чем created_at
+        ordering = ["-id"]
 
     @property
     def is_deleted(self) -> bool:

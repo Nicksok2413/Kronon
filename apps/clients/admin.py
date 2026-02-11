@@ -19,7 +19,7 @@ class ClientAdmin(admin.ModelAdmin[Client]):
         "status",
         "department",
         "accountant",
-        "assistant",
+        "primary_accountant",
         "payroll_accountant",
         "hr_specialist",
     )
@@ -30,7 +30,7 @@ class ClientAdmin(admin.ModelAdmin[Client]):
         "org_type",
         "tax_system",
         "accountant",
-        "assistant",
+        "primary_accountant",
         "payroll_accountant",
         "hr_specialist",
     )
@@ -41,7 +41,7 @@ class ClientAdmin(admin.ModelAdmin[Client]):
     list_select_related = (
         "department",
         "accountant",
-        "assistant",
+        "primary_accountant",
         "payroll_accountant",
         "hr_specialist",
     )
@@ -63,7 +63,7 @@ class ClientAdmin(admin.ModelAdmin[Client]):
         ),
         (
             "Команда и Учет",
-            {"fields": ("tax_system", "accountant", "assistant", "payroll_accountant", "hr_specialist")},
+            {"fields": ("tax_system", "accountant", "primary_accountant", "payroll_accountant", "hr_specialist")},
         ),
         ("Контакты и Интеграции", {"fields": ("contact_info", "google_folder_id")}),
     )
@@ -71,7 +71,7 @@ class ClientAdmin(admin.ModelAdmin[Client]):
     # Автокомплит (поиск в выпадающем списке), чтобы список не тормозил, если юзеров станет много
     autocomplete_fields = [
         "accountant",
-        "assistant",
+        "primary_accountant",
         "payroll_accountant",
         "hr_specialist",
     ]
