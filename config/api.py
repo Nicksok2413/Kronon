@@ -2,12 +2,12 @@
 Root API Configuration.
 """
 
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from ninja_extra import NinjaExtraAPI
 from ninja_jwt.authentication import JWTAuth
 from ninja_jwt.controller import NinjaJWTDefaultController
 
-# from apps.clients.api.v1 import router as clients_router
+from apps.clients.api.v1 import router as clients_router
 
 # Инициализируем API
 # NinjaExtraAPI дает больше возможностей, чем просто NinjaAPI
@@ -22,20 +22,22 @@ api = NinjaExtraAPI(
 
 # --- Подключение контроллеров ---
 
-
 # Авторизация (получение токена, рефреш)
 # Эндпоинты: /api/token/pair, /api/token/refresh, /api/token/verify
 api.register_controllers(NinjaJWTDefaultController)
 
-# Приложения
-# api.add_router("/clients", clients_router, tags=["Clients"])
+
+# --- Подключаем роутеры приложений ---
+
+# Клиенты
+api.add_router("/clients", clients_router, tags=["Clients"])
 
 
 # --- Обработка ошибок (Global Exception Handlers) ---
 
 
 @api.exception_handler(ValueError)
-def value_error_handler(request: HttpRequest, exc: ValueError):
+def value_error_handler(request: HttpRequest, exc: ValueError) -> HttpResponse:
     """Перехват ошибок валидации бизнес-логики."""
     return api.create_response(
         request,
@@ -45,7 +47,7 @@ def value_error_handler(request: HttpRequest, exc: ValueError):
 
 
 @api.exception_handler(Exception)
-def internal_server_error_handler(request: HttpRequest, exc: Exception):
+def internal_server_error_handler(request: HttpRequest, exc: Exception) -> HttpResponse:
     """
     Глобальный перехватчик 500 ошибок.
     В DEBUG режиме Django сам покажет трейсбек, но в проде нельзя его светить.
