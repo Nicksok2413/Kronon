@@ -61,7 +61,7 @@ def validate_international_phone_number(value: str) -> None:
 
     except phonenumbers.NumberParseException:
         # Если библиотека не смогла распарсить номер, он невалиден
-        raise ValidationError(_("Номер телефона содержит недопустимые символы.")) from None
+        raise ValidationError(_("Номер телефона содержит недопустимые символы")) from None
 
 
 def validate_unp(value: str) -> None:
@@ -70,7 +70,7 @@ def validate_unp(value: str) -> None:
     Алгоритм проверки контрольной суммы для ИП и юридических лиц.
     """
     if not value.isdigit() or len(value) != 9:
-        raise ValidationError(_("УНП должен состоять из 9 цифр."))
+        raise ValidationError(_("УНП должен состоять из 9 цифр"))
 
     # Алгоритм проверки контрольной суммы для ИП и Юр.лиц
     # (Для ИП алгоритм такой же, коэффициенты те же)
@@ -84,12 +84,12 @@ def validate_unp(value: str) -> None:
     # Но для большинства УНП достаточно базовой проверки
     # В упрощенном варианте, если остаток 10 - УНП невалиден (обычно такие не выдают)
     if remainder == 10:
-        raise ValidationError(_("Некорректный формат УНП (ошибка контрольной суммы)."))
+        raise ValidationError(_("Некорректный формат УНП (ошибка контрольной суммы)"))
 
     calculated_control_digit = remainder
 
     if calculated_control_digit != digits[8]:
-        raise ValidationError(_("Недействительный УНП (не совпадает контрольная сумма)."))
+        raise ValidationError(_("Недействительный УНП (не совпадает контрольная сумма)"))
 
 
 # Инстансы валидаторов для повторного использования
@@ -97,6 +97,4 @@ validate_image_size = FileSizeValidator(max_size_mb=settings.MAX_IMAGE_SIZE_MB)
 validate_document_size = FileSizeValidator(max_size_mb=settings.MAX_DOCUMENT_SIZE_MB)
 
 # Валидатор для полей, где должны быть только буквы и дефис (ФИО)
-validate_alpha_hyphen = RegexValidator(
-    r"^[а-яА-ЯёЁa-zA-Z\s-]+$", message=_("Допустимы только буквы, пробелы и дефисы.")
-)
+validate_alpha_hyphen = RegexValidator(r"^[а-яА-ЯёЁa-zA-Z\s-]+$", message=_("Допустимы только буквы, пробелы и дефисы"))
