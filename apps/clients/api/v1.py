@@ -13,8 +13,9 @@ from ninja.errors import HttpError
 from ninja_jwt.authentication import AsyncJWTAuth
 
 from apps.clients.models import Client
-from apps.clients.schemas.client import ClientOut
+from apps.clients.schemas.client import ClientCreate, ClientOut
 from apps.clients.selectors import get_client_by_id, get_client_list
+from apps.clients.services import create_client
 
 # Создаем роутер
 # auth=AsyncJWTAuth() - все эндпоинты в этом роутере требуют токен
@@ -62,3 +63,15 @@ async def get_client(request: HttpRequest, client_id: uuid.UUID) -> Client:
 
     # Ninja сам преобразует Client в ClientOut
     return client
+
+
+@router.post("/", response={201: ClientOut})
+async def create_client_endpoint(request: HttpRequest, payload: ClientCreate):
+    """
+    Создание нового клиента.
+    """
+    # Можно добавить проверку прав (например, только админ или lead_acc)
+    # if not request.user.has_perm("clients.add_client"): ...
+
+    client = await create_client(payload)
+    return 201, client
