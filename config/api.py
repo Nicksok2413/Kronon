@@ -4,7 +4,7 @@ Root API Configuration.
 
 from django.http import HttpRequest, HttpResponse
 from ninja_extra import NinjaExtraAPI
-from ninja_jwt.authentication import JWTAuth
+from ninja_jwt.authentication import AsyncJWTAuth
 from ninja_jwt.controller import NinjaJWTDefaultController
 
 from apps.clients.api.v1 import router as clients_router
@@ -16,7 +16,7 @@ api = NinjaExtraAPI(
     version="1.0.0",
     description="Enterprise Accounting OS API",
     urls_namespace="api",  # Важно для reverse()
-    auth=JWTAuth(),  # JWT по умолчанию для всех эндпоинтов (кроме тех, где auth=None)
+    auth=AsyncJWTAuth(),  # JWT по умолчанию для всех эндпоинтов (кроме тех, где auth=None)
 )
 
 
