@@ -43,17 +43,18 @@ class FileSizeValidator:
         return isinstance(other, self.__class__) and self.max_size_mb == other.max_size_mb
 
 
-def validate_international_phone_number(value: str) -> None:
+def validate_international_phone_number(phone: str) -> None:
     """
     Валидирует телефонный номер с помощью библиотеки phonenumbers.
     Поддерживает международные форматы и локальный формат региона DEFAULT_PHONE_REGION.
     """
-    if not value:
+    # Если телефон не указан, пропускаем валидацию
+    if not phone:
         return
 
     try:
         # Пытаемся распарсить номер
-        parsed_phone = phonenumbers.parse(value, settings.DEFAULT_PHONE_REGION)
+        parsed_phone = phonenumbers.parse(phone, settings.DEFAULT_PHONE_REGION)
 
         # Проверяем, является ли номер валидным
         if not phonenumbers.is_valid_number(parsed_phone):
@@ -64,17 +65,36 @@ def validate_international_phone_number(value: str) -> None:
         raise ValidationError(_("Номер телефона содержит недопустимые символы")) from None
 
 
-def validate_unp(value: str) -> None:
+def validate_phone_pydantic(phone: str | None) -> str | None:
+    """
+    Валидатор телефона для использования в Pydantic схемах (Django Ninja).
+    Преобразует Django ValidationError в Pydantic ValueError.
+    """
+    # Если телефон не указан, пропускаем валидацию
+    if not phone:
+        return phone
+
+    # Используем validate_international_phone_number
+    # Перехватываем Django ValidationError и кидаем ValueError
+    try:
+        validate_international_phone_number(phone)
+    except ValidationError as exc:
+        # Pydantic ожидает ValueError для ошибок валидации
+        raise ValueError(exc.message) from exc
+    return phone
+
+
+def validate_unp(unp: str) -> None:
     """
     Валидирует УНП (Учетный номер плательщика, Беларусь).
     Алгоритм проверки контрольной суммы для ИП и юридических лиц.
     """
-    if not value.isdigit() or len(value) != 9:
+    if not unp.isdigit() or len(unp) != 9:
         raise ValidationError(_("УНП должен состоять из 9 цифр"))
 
     # Алгоритм проверки контрольной суммы для ИП и Юр.лиц
     # (Для ИП алгоритм такой же, коэффициенты те же)
-    digits = [int(d) for d in value]
+    digits = [int(digit) for digit in unp]
     weights = [29, 23, 19, 17, 13, 7, 5, 3]
 
     checksum = sum(digit * weight for digit, weight in zip(digits[:8], weights, strict=True))
