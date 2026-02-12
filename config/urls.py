@@ -5,13 +5,14 @@ URL configuration for Kronon project.
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path
+from django.urls import URLPattern, URLResolver, path
 
 from config.api import api
 
-urlpatterns = [
+urlpatterns: list[URLPattern | URLResolver] = [
+    # Админка
     path("admin/", admin.site.urls),
-    # Подключаем API по префиксу /api/
+    # API
     path("api/", api.urls),
 ]
 
