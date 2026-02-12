@@ -94,6 +94,8 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     # --- Сторонние библиотеки ---
     "ninja",  # Быстрый API (FastAPI-like)
+    "ninja_extra",  # База для контроллеров
+    "ninja_jwt",  # JWT (команды + таблицы черного списка)
     "guardian",  # Объектные права доступа (Object Level Permissions)
     "axes",  # Защита от подбора паролей (brute-force protection)
     "corsheaders",  # CORS (для React)
