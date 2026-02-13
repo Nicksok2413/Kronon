@@ -50,7 +50,7 @@ def validate_international_phone_number(phone: str) -> None:
     """
     # Если телефон не указан, пропускаем валидацию
     if not phone:
-        return
+        return None
 
     try:
         # Пытаемся распарсить номер
@@ -72,7 +72,7 @@ def validate_phone_pydantic(phone: str | None) -> str | None:
     """
     # Если телефон не указан, пропускаем валидацию
     if not phone:
-        return phone
+        return None
 
     # Используем validate_international_phone_number
     # Перехватываем Django ValidationError и кидаем ValueError
