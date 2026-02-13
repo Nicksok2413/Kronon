@@ -29,32 +29,29 @@ class SoftDeleteQuerySet(models.QuerySet[_M]):
         """
         return self.filter(deleted_at__isnull=False)
 
-    def delete(self) -> tuple[int, dict[str, int]]:
+    async def adelete(self) -> tuple[int, dict[str, int]]:
         """
         Переопределение стандартного метода удаления (Bulk Delete).
-        Вместо физического удаления проставляет текущее время в `deleted_at`.
+        Вместо физического удаления проставляет текущее время в `deleted_at` и `updated_at`.
 
         Returns:
             tuple[int, dict[str, int]]: (Количество удаленных записей, Словарь по типам объектов).
             Формат совпадает со стандартным Django delete().
         """
-        # Используем update() для массового обновления
-        # Это эффективно (один SQL запрос) и не вызывает сигналы pre_save/post_save
-        # (что является стандартным поведением для bulk-операций в Django)
         now = timezone.now()
-        updated_count = self.update(deleted_at=now, updated_at=now)
+        updated_count = await self.aupdate(deleted_at=now, updated_at=now)
 
         # Эмулируем возвращаемое значение стандартного delete()
         return updated_count, {self.model._meta.label: updated_count}
 
-    def hard_delete(self) -> tuple[int, dict[str, int]]:
+    async def ahard_delete(self) -> tuple[int, dict[str, int]]:
         """
         Физическое удаление записей из базы данных (навсегда).
         Использует стандартный метод delete() родительского класса.
         """
-        return super().delete()
+        return await super().adelete()
 
-    def restore(self) -> int:
+    async def arestore(self) -> int:
         """
         Восстановление удаленных записей.
 
@@ -62,7 +59,7 @@ class SoftDeleteQuerySet(models.QuerySet[_M]):
             int: Количество восстановленных записей.
         """
         now = timezone.now()
-        return self.update(deleted_at=None, updated_at=now)
+        return await self.aupdate(deleted_at=None, updated_at=now)
 
 
 # Создаем класс менеджера через from_queryset
