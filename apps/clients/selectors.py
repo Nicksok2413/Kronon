@@ -52,5 +52,5 @@ async def get_client_by_id(client_id: uuid.UUID) -> Client | None:
         Client | None: Объект клиента, если найден и активен.
                           None, если клиент не найден или удален.
     """
-    # .filter().afirst() вместо .get(), чтобы избежать исключения DoesNotExist и вернуть None
+    # .filter().afirst() вместо .aget(), чтобы избежать исключения DoesNotExist и вернуть None
     return await _get_base_queryset().filter(id=client_id).afirst()
