@@ -48,6 +48,23 @@ class ClientContactInfo(Schema):
     contacts: list[ContactPersonSchema] = Field(default_factory=list, description="Список контактных лиц")
 
 
+class ClientContactInfoUpdate(Schema):
+    """
+    Схема для частичного обновления контактов.
+    """
+
+    general_email: EmailStr | None = None
+    general_phone: PhoneNumber | None = None
+    address_legal: str | None = None
+    address_mailing: str | None = None
+    website: str | None = None
+
+    # Списком управляем целиком: если прислали новый список - заменяем старый
+    # Если нужно будет менять контакты точечно, будем делать через отдельные эндпоинты
+    # /api/clients/{id}/contacts/{contact_id}, иначе логика слияния списков превратится в ад
+    contacts: list[ContactPersonSchema] | None = None
+
+
 class ClientCreate(Schema):
     """
     Схема для создания нового клиента (входные данные).
@@ -85,6 +102,37 @@ class ClientCreate(Schema):
 
     # Интеграции
     google_folder_id: str | None = Field(default=None, max_length=100, description="ID папки на Google Drive")
+
+
+class ClientUpdate(Schema):
+    """
+    Схема для частичного обновления клиента (PATCH).
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
+
+    name: str | None = Field(default=None, min_length=1, max_length=150)
+    full_legal_name: str | None = Field(default=None, max_length=255)
+    unp: str | None = Field(default=None, pattern=r"^\d{9}$")
+
+    org_type: OrganizationType | None = None
+    tax_system: TaxSystem | None = None
+    status: ClientStatus | None = None
+
+    department_id: uuid.UUID | None = None
+
+    accountant_id: uuid.UUID | None = None
+    primary_accountant_id: uuid.UUID | None = None
+    payroll_accountant_id: uuid.UUID | None = None
+    hr_specialist_id: uuid.UUID | None = None
+
+    # Вложенная схема тоже для апдейта
+    contact_info: ClientContactInfoUpdate | None = None
+
+    google_folder_id: str | None = Field(default=None, max_length=100)
 
 
 class ClientOut(Schema):

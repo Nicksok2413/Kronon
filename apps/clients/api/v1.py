@@ -13,11 +13,10 @@ from ninja.errors import HttpError
 from ninja_jwt.authentication import AsyncJWTAuth
 
 from apps.clients.models import Client
-from apps.clients.schemas.client import ClientCreate, ClientOut
+from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.selectors import get_client_by_id, get_client_list
-from apps.clients.services import create_client
+from apps.clients.services import create_client, update_client
 
-# Создаем роутер
 # auth=AsyncJWTAuth() - все эндпоинты в этом роутере требуют токен
 router = Router(auth=AsyncJWTAuth())
 
@@ -69,9 +68,36 @@ async def get_client(request: HttpRequest, client_id: uuid.UUID) -> Client:
 async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) -> tuple[int, Client]:
     """
     Создание нового клиента.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+        payload (ClientCreate): ...
+
+    Returns:
+        Client: Объект клиента.
     """
     # TODO: добавить проверку прав (например, только админ или lead_acc)
     # if not request.user.has_perm("clients.add_client"): ...
 
     client = await create_client(payload)
     return 201, client
+
+
+@router.patch("/{client_id}", response=ClientOut)
+async def update_client_endpoint(request: HttpRequest, client_id: uuid.UUID, payload: ClientUpdate) -> Client:
+    """
+    Частичное обновление данных клиента.
+    """
+    # Сначала находим клиента (Read Layer)
+    # Используем селектор или ORM напрямую (так как нам нужен объект для передачи в сервис)
+    client = await Client.objects.active().filter(id=client_id).afirst()
+
+    if not client:
+        raise HttpError(404, "Клиент не найден")
+
+    # TODO: Проверка прав (Permission Layer)
+
+    # Вызываем сервис обновления (Write Layer)
+    updated_client = await update_client(client, payload)
+
+    return updated_client

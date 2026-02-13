@@ -12,7 +12,7 @@ from apps.common.validators import validate_unp
 from apps.users.models import Department, User, UserRole
 
 if TYPE_CHECKING:
-    from apps.clients.schemas.client import ClientContactInfo
+    from apps.clients.schemas.client import ClientContactInfo, ClientContactInfoUpdate
 
 
 class OrganizationType(models.TextChoices):
@@ -232,3 +232,31 @@ class Client(BaseModel):
         # exclude_none=True — не сохранять поля, где явно стоит None
         clean_data = data.model_dump(mode="json", exclude_unset=True, exclude_none=True)
         self.contact_info = clean_data
+
+    def patch_contact_data(self, data: ClientContactInfoUpdate) -> None:
+        """
+        Частично обновляет JSON-поле contact_info.
+
+        Стратегия слияния:
+        1. Берем текущий словарь из БД.
+        2. Берем только те поля из data, которые были явно переданы (exclude_unset).
+        3. Обновляем (merge) словарь верхнего уровня.
+        4. Вложенные списки (contacts) заменяются целиком, если они переданы.
+        """
+        # Текущие данные (гарантируем dict)
+        current_data = self.contact_info if isinstance(self.contact_info, dict) else {}
+
+        # Новые данные (только то, что пришло с фронта)
+        # mode="json" важен для сериализации UUID/Enum
+        updates = data.model_dump(exclude_unset=True, mode="json")
+
+        # Нечего обновлять
+        if not updates:
+            return None
+
+        # Merge (стандартный dict.update перезаписывает ключи верхнего уровня)
+        current_data.update(updates)
+
+        self.contact_info = current_data
+
+        return None
