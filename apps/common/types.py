@@ -1,5 +1,5 @@
 """
-Global types of Kronon project.
+Common custom types of Kronon project.
 """
 
 from typing import Annotated
