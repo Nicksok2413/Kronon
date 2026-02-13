@@ -66,11 +66,11 @@ async def get_client(request: HttpRequest, client_id: uuid.UUID) -> Client:
 
 
 @router.post("/", response={201: ClientOut})
-async def create_client_endpoint(request: HttpRequest, payload: ClientCreate):
+async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) -> tuple[int, Client]:
     """
     Создание нового клиента.
     """
-    # Можно добавить проверку прав (например, только админ или lead_acc)
+    # TODO: добавить проверку прав (например, только админ или lead_acc)
     # if not request.user.has_perm("clients.add_client"): ...
 
     client = await create_client(payload)
