@@ -1,7 +1,7 @@
 # Makefile - Единая точка входа для управления проектом
 
 # .PHONY гарантирует, что make не будет путать эти команды с именами файлов
-.PHONY: help install run up down rebuild prune logs migrations migrate superuser lint lint-fix format types test check check-all clean
+.PHONY: help install run up down rebuild prune logs migrations migrate superuser clear_migrations lint lint-fix format types test check check-all clean
 
 # Команда по умолчанию, которая будет вызвана при запуске `make`
 default: help
@@ -14,20 +14,21 @@ help:
 	@echo "${GREEN}Kronon Management Commands:${RESET}"
 	@echo ""
 	@echo "Установка зависимостей и запуск локального сервера разработки:"
-	@echo "  install         - Установить Python зависимости"
-	@echo "  run             - Запустить локальный сервер разработки"
+	@echo "  install         	- Установить Python зависимости"
+	@echo "  run             	- Запустить локальный сервер разработки"
 	@echo ""
 	@echo "Управление Docker окружением:"
-	@echo "  up             - Запустить все сервисы в фоновом режиме"
-	@echo "  down           - Остановить все сервисы"
-	@echo "  rebuild        - Пересобрать образы и запустить сервисы"
-	@echo "  prune          - Остановить сервисы и УДАЛИТЬ ВСЕ ДАННЫЕ (БД, логи)"
-	@echo "  logs           - Показать логи всех сервисов"
+	@echo "  up             	- Запустить все сервисы в фоновом режиме"
+	@echo "  down           	- Остановить все сервисы"
+	@echo "  rebuild        	- Пересобрать образы и запустить сервисы"
+	@echo "  prune          	- Остановить сервисы и УДАЛИТЬ ВСЕ ДАННЫЕ (БД, логи)"
+	@echo "  logs           	- Показать логи всех сервисов"
 	@echo ""
 	@echo "Управление миграциями базы данных:"
-	@echo "  migrations     - Создать новые миграции"
-	@echo "  migrate        - Применить миграции"
-	@echo "  superuser      - Создать суперпользователя (администратора)"
+	@echo "  migrations     	- Создать новые миграции"
+	@echo "  migrate        	- Применить миграции"
+	@echo "  superuser      	- Создать суперпользователя (администратора)"
+	@echo "  clear_migrations   - Удалить все файлы миграций (для удобства разработки)"
 	@echo ""
 	@echo "Проверка качества кода и тесты:"
 	@echo "  lint           - Проверить код код с помощью Ruff"
@@ -103,6 +104,17 @@ superuser:
 	@echo "-> Создание суперпользователя..."
 	poetry run python manage.py createsuperuser
 	@echo "-> Суперпользователь успешно создан."
+
+clear_migrations:
+	@echo "ВНИМАНИЕ: Эта команда УДАЛИТ ВСЕ ФАЙЛЫ МИГРАЦИЙ."
+	@read -p "Вы уверены, что хотите продолжить? [y/N] " confirm && \
+	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
+		echo "-> Начинаем удаление файлов миграций..."; \
+		scripts/clear_migrations.sh; \
+		echo "-> Очистка завершена."; \
+	else \
+		echo "-> Очистка отменена."; \
+	fi
 
 # ------------------------------------------------------------------------------
 # Проверка качества кода и тесты
