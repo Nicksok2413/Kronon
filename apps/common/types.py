@@ -1,3 +1,7 @@
+"""
+Global types of Kronon project.
+"""
+
 from typing import Annotated
 
 from pydantic import AfterValidator
