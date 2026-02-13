@@ -8,9 +8,10 @@
 import uuid
 
 from apps.clients.models import Client
+from apps.common.managers import SoftDeleteQuerySet
 
 
-def _get_base_queryset():
+def _get_base_queryset() -> SoftDeleteQuerySet[Client]:
     """
     Внутренний метод для получения базового QuerySet с оптимизацией.
     Подгружает (join) все связанные поля, необходимые для схемы ClientOut.
