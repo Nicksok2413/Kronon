@@ -8,6 +8,21 @@
 import uuid
 
 from apps.clients.models import Client
+from apps.common.managers import SoftDeleteQuerySet
+
+
+def _get_base_queryset() -> SoftDeleteQuerySet[Client]:
+    """
+    Внутренний метод для получения базового QuerySet с оптимизацией.
+    Подгружает (join) все связанные поля, необходимые для схемы ClientOut.
+    """
+    return Client.objects.active().select_related(
+        "department",
+        "accountant",
+        "primary_accountant",
+        "payroll_accountant",
+        "hr_specialist",
+    )
 
 
 async def get_client_list() -> list[Client]:
@@ -20,10 +35,9 @@ async def get_client_list() -> list[Client]:
     Returns:
         list[Client]: Список объектов активных клиентов.
     """
-    # В Django ORM QuerySet ленивый
-    # Чтобы выполнить запрос асинхронно, итерируемся по нему через `async for`
-    # Это позволяет Event Loop'у переключаться на другие задачи во время I/O
-    queryset = Client.objects.active()
+    queryset = _get_base_queryset()
+
+    # Асинхронная итерация по подготовленному QuerySet
     return [client async for client in queryset]
 
 
@@ -38,6 +52,5 @@ async def get_client_by_id(client_id: uuid.UUID) -> Client | None:
         Client | None: Объект клиента, если найден и активен.
                           None, если клиент не найден или удален.
     """
-    # .filter().afirst() вместо .get(), чтобы избежать исключения DoesNotExist и вернуть None
-    # afirst() - нативный асинхронный метод Django ORM
-    return await Client.objects.active().filter(id=client_id).afirst()
+    # .filter().afirst() вместо .aget(), чтобы избежать исключения DoesNotExist и вернуть None
+    return await _get_base_queryset().filter(id=client_id).afirst()

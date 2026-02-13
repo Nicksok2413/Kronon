@@ -2,12 +2,17 @@
 Модели для управления клиентами (Юр.лица и ИП).
 """
 
+from typing import TYPE_CHECKING
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from apps.common.models import BaseModel
 from apps.common.validators import validate_unp
 from apps.users.models import Department, User, UserRole
+
+if TYPE_CHECKING:
+    from apps.clients.schemas.client import ClientContactInfo
 
 
 class OrganizationType(models.TextChoices):
@@ -69,7 +74,7 @@ class Client(BaseModel):
     )
 
     full_legal_name = models.CharField(
-        _("Полное юр. название"),
+        _("Полное юридическое название"),
         max_length=255,
         blank=True,
         help_text=_("Например: Общество с ограниченной ответственностью 'АБВ'"),
@@ -202,3 +207,28 @@ class Client(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.name} (УНП: {self.unp})"
+
+    @property
+    def contact_data(self) -> ClientContactInfo:
+        """
+        Превращает JSON из базы в типизированный Pydantic-объект.
+        Использование: email = client.contact_data.general_email
+        """
+        # Если данных нет или это не словарь, создаем пустую схему
+        if not isinstance(self.contact_info, dict) or not self.contact_info:
+            return ClientContactInfo()
+
+        # model_validate — стандарт Pydantic v2 для создания из словаря
+        return ClientContactInfo.model_validate(self.contact_info)
+
+    def set_contact_data(self, data: ClientContactInfo) -> None:
+        """
+        Безопасно сохраняет Pydantic-объект в JSON-поле.
+        Сохраняет в базу только те поля, которые были реально заполнены.
+        Использование: client.set_contact_data(new_info)
+        """
+        # mode="json" гарантирует, что UUID/Enums станут строками
+        # exclude_unset=True — не сохранять дефолты (Field(None))
+        # exclude_none=True — не сохранять поля, где явно стоит None
+        clean_data = data.model_dump(mode="json", exclude_unset=True, exclude_none=True)
+        self.contact_info = clean_data

@@ -95,7 +95,8 @@ INSTALLED_APPS = [
     # --- Сторонние библиотеки ---
     "ninja",  # Быстрый API (FastAPI-like)
     "ninja_extra",  # База для контроллеров
-    "ninja_jwt",  # JWT (команды + таблицы черного списка)
+    "ninja_jwt",  # JWT
+    "ninja_jwt.token_blacklist",  # Черный список токенов
     "guardian",  # Объектные права доступа (Object Level Permissions)
     "axes",  # Защита от подбора паролей (brute-force protection)
     "corsheaders",  # CORS (для React)
@@ -228,7 +229,30 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# --- Настройки Ninja JWT ---
+
+NINJA_JWT = {
+    # Access токен живет 60 минут (достаточно для комфортной работы бухгалтера)
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    # Refresh токен живет 7 дней (чтобы не логиниться каждое утро, но и не вечно)
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    # При обновлении токена выдавать новый Refresh Token
+    "ROTATE_REFRESH_TOKENS": True,
+    # Заносить старый Refresh Token в черный список (чтобы его нельзя было украсть и использовать)
+    "BLACKLIST_AFTER_ROTATION": True,
+    # Не обновлять last_login при каждом запросе (экономит лишний запрос к БД в async режиме)
+    "UPDATE_LAST_LOGIN": False,
+    # Используем секретный ключ Django для подписи
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    # Указываем, какое поле модели User использовать как ID в токене (UUID id)
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+}
+
+
 # --- Настройки Axes ---
+
 # Количество неудачных попыток до блокировки
 AXES_FAILURE_LIMIT = 5
 # Время "остывания" после блокировки (10 минут)
