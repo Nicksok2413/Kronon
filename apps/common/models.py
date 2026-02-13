@@ -66,25 +66,25 @@ class BaseModel(models.Model):
         """Удобное свойство для проверки статуса."""
         return self.deleted_at is not None
 
-    def delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
+    async def adelete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
         """
-        Мягкое удаление одиночного объекта.
+        Мягкое удаление объекта.
         """
         now = timezone.now()
         self.deleted_at = now
         self.updated_at = now
 
         # Используем update_fields для оптимизации SQL запроса
-        self.save(using=using, update_fields=["deleted_at", "updated_at"])
+        await self.asave(using=using, update_fields=["deleted_at", "updated_at"])
         return 1, {self._meta.label: 1}
 
-    def hard_delete(self, using: str | None = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
+    async def ahard_delete(self, **kwargs: Any) -> tuple[int, dict[str, int]]:
         """
         Физическое удаление объекта из БД.
         """
-        return super().delete(using=using, keep_parents=keep_parents)
+        return await super().adelete(**kwargs)
 
-    def restore(self) -> None:
+    async def arestore(self) -> None:
         """
         Восстановление удаленного объекта.
         """
@@ -93,4 +93,4 @@ class BaseModel(models.Model):
         self.updated_at = now
 
         # Используем update_fields для оптимизации SQL запроса
-        self.save(update_fields=["deleted_at", "updated_at"])
+        await self.asave(update_fields=["deleted_at", "updated_at"])
