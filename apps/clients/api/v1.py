@@ -55,7 +55,7 @@ async def get_client(request: HttpRequest, client_id: uuid.UUID) -> Client:
     Returns:
         Client: Объект клиента.
     """
-    client = await get_client_by_id(client_id)
+    client = await get_client_by_id(client_id=client_id)
 
     if not client:
         raise HttpError(status_code=404, message="Клиент не найден")
@@ -79,7 +79,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     # TODO: добавить проверку прав (например, только админ или lead_acc)
     # if not request.user.has_perm("clients.add_client"): ...
 
-    client = await create_client(payload)
+    client = await create_client(data=payload)
     return 201, client
 
 
@@ -100,7 +100,7 @@ async def update_client_endpoint(request: HttpRequest, client_id: uuid.UUID, pay
         Client: Обновленный объект клиент.
     """
     # Сначала находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id)
+    client = await get_client_by_id(client_id=client_id)
 
     if not client:
         raise HttpError(404, "Клиент не найден")
@@ -108,6 +108,6 @@ async def update_client_endpoint(request: HttpRequest, client_id: uuid.UUID, pay
     # TODO: Проверка прав (Permission Layer)
 
     # Вызываем сервис обновления
-    updated_client = await update_client(client, payload)
+    updated_client = await update_client(client=client, data=payload)
 
     return updated_client

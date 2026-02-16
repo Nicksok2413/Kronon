@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from apps.clients.types import ContactInfo
 from apps.common.models import BaseModel
 from apps.common.validators import validate_unp
 from apps.users.models import Department, User, UserRole
 
 if TYPE_CHECKING:
     from apps.clients.schemas.contacts import ClientContactInfoUpdate
+    from apps.clients.types import ContactInfo
 
 
 class OrganizationType(models.TextChoices):
@@ -217,12 +217,18 @@ class Client(BaseModel):
         Returns:
             ContactInfo: Объект с данными.
         """
+        from apps.clients.types import ContactInfo
+
         # Если данных нет или это не словарь, создаем пустую схему
         if not isinstance(self.contact_info, dict) or not self.contact_info:
             return ContactInfo()
 
-        # model_validate: стандарт Pydantic v2 для создания из словаря
-        return ContactInfo.model_validate(self.contact_info)
+        try:
+            return ContactInfo.model_validate(self.contact_info)
+        except Exception:
+            # Модель молча возвращает пустой объект, если данные битые
+            # Если будет нужно дебажить битые данные, будет это делать скриптами проверки
+            return ContactInfo()
 
     def set_contact_data(self, data: ContactInfo) -> None:
         """

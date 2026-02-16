@@ -1,6 +1,8 @@
 """
-Доменные типы и структуры данных (Value Objects).
-Описывают структуру данных, хранящихся в JSON-полях моделей.
+Доменные типы и структуры данных (Value Objects) приложения Clients.
+
+Описывают структуру данных, хранящихся внутри JSON-полей.
+Не зависят от API и Ninja.
 """
 
 from pydantic import BaseModel as PydanticBaseModel
