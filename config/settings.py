@@ -229,6 +229,12 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
+# --- Admin credentials ---
+
+ADMIN_EMAIL: str = env("ADMIN_EMAIL", default=None)
+ADMIN_PASSWORD: str = env("ADMIN_PASSWORD", default=None)
+
+
 # --- Настройки Ninja JWT ---
 
 NINJA_JWT = {

@@ -10,7 +10,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from apps.common.utils import RandomFileName
+from apps.common.utils.paths import RandomFileName
 from apps.common.validators import validate_image_size, validate_international_phone_number
 from apps.users.managers import CustomUserManager
 

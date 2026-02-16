@@ -77,7 +77,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
         Client: Созданный объект клиента.
     """
     # TODO: добавить проверку прав (например, только админ или lead_acc)
-    # if not request.user.has_perm("clients.add_client"): ...
+    # if not request.user.ahas_perm("clients.add_client"): ...
 
     client = await create_client(data=payload)
     return 201, client
@@ -105,7 +105,7 @@ async def update_client_endpoint(request: HttpRequest, client_id: uuid.UUID, pay
     if not client:
         raise HttpError(404, "Клиент не найден")
 
-    # TODO: Проверка прав (Permission Layer)
+    # TODO: добавить проверку прав
 
     # Вызываем сервис обновления
     updated_client = await update_client(client=client, data=payload)
