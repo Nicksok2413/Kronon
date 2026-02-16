@@ -21,7 +21,7 @@ from apps.clients.services import create_client, update_client
 router = Router(auth=AsyncJWTAuth())
 
 
-@router.get("/", response=list[ClientOut])
+@router.get("/", response={200: list[ClientOut]})
 async def list_clients(request: HttpRequest) -> list[Client]:
     """
     Получить список всех активных клиентов.
@@ -38,7 +38,7 @@ async def list_clients(request: HttpRequest) -> list[Client]:
     return await get_client_list()
 
 
-@router.get("/{client_id}", response=ClientOut)
+@router.get("/{client_id}", response={200: ClientOut})
 async def get_client(request: HttpRequest, client_id: uuid.UUID) -> Client:
     """
     Получить детальную информацию о клиенте по ID.
@@ -49,11 +49,11 @@ async def get_client(request: HttpRequest, client_id: uuid.UUID) -> Client:
         request (HttpRequest): Объект HTTP запроса.
         client_id (uuid.UUID): Уникальный идентификатор клиента (UUIDv7).
 
-    Returns:
-        Client: Объект клиента.
-
     Raises:
         HttpError(404): Если клиент не найден.
+
+    Returns:
+        Client: Объект клиента.
     """
     client = await get_client_by_id(client_id)
 
@@ -71,10 +71,10 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
 
     Args:
         request (HttpRequest): Объект HTTP запроса.
-        payload (ClientCreate): ...
+        payload (ClientCreate): Данные для создания.
 
     Returns:
-        Client: Объект клиента.
+        Client: Созданный объект клиента.
     """
     # TODO: добавить проверку прав (например, только админ или lead_acc)
     # if not request.user.has_perm("clients.add_client"): ...
@@ -83,21 +83,31 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     return 201, client
 
 
-@router.patch("/{client_id}", response=ClientOut)
+@router.patch("/{client_id}", response={200: ClientOut})
 async def update_client_endpoint(request: HttpRequest, client_id: uuid.UUID, payload: ClientUpdate) -> Client:
     """
     Частичное обновление данных клиента.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+        client_id (uuid.UUID): Уникальный идентификатор клиента (UUIDv7).
+        payload (ClientUpdate): Данные для обновления.
+
+    Raises:
+        HttpError(404): Если клиент не найден.
+
+    Returns:
+        Client: Обновленный объект клиент.
     """
-    # Сначала находим клиента (Read Layer)
-    # Используем селектор или ORM напрямую (так как нам нужен объект для передачи в сервис)
-    client = await Client.objects.active().filter(id=client_id).afirst()
+    # Сначала находим клиента, используя селектор для поиска
+    client = await get_client_by_id(client_id)
 
     if not client:
         raise HttpError(404, "Клиент не найден")
 
     # TODO: Проверка прав (Permission Layer)
 
-    # Вызываем сервис обновления (Write Layer)
+    # Вызываем сервис обновления
     updated_client = await update_client(client, payload)
 
     return updated_client

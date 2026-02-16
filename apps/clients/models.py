@@ -7,12 +7,13 @@ from typing import TYPE_CHECKING
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from apps.clients.types import ContactInfo
 from apps.common.models import BaseModel
 from apps.common.validators import validate_unp
 from apps.users.models import Department, User, UserRole
 
 if TYPE_CHECKING:
-    from apps.clients.schemas.client import ClientContactInfo, ClientContactInfoUpdate
+    from apps.clients.schemas.contacts import ClientContactInfoUpdate
 
 
 class OrganizationType(models.TextChoices):
@@ -209,27 +210,31 @@ class Client(BaseModel):
         return f"{self.name} (УНП: {self.unp})"
 
     @property
-    def contact_data(self) -> ClientContactInfo:
+    def contact_data(self) -> ContactInfo:
         """
         Превращает JSON из базы в типизированный Pydantic-объект.
-        Использование: email = client.contact_data.general_email
+
+        Returns:
+            ContactInfo: Объект с данными.
         """
         # Если данных нет или это не словарь, создаем пустую схему
         if not isinstance(self.contact_info, dict) or not self.contact_info:
-            return ClientContactInfo()
+            return ContactInfo()
 
-        # model_validate — стандарт Pydantic v2 для создания из словаря
-        return ClientContactInfo.model_validate(self.contact_info)
+        # model_validate: стандарт Pydantic v2 для создания из словаря
+        return ContactInfo.model_validate(self.contact_info)
 
-    def set_contact_data(self, data: ClientContactInfo) -> None:
+    def set_contact_data(self, data: ContactInfo) -> None:
         """
         Безопасно сохраняет Pydantic-объект в JSON-поле.
         Сохраняет в базу только те поля, которые были реально заполнены.
-        Использование: client.set_contact_data(new_info)
+
+        Args:
+            data (ContactInfo): Новые данные.
         """
         # mode="json" гарантирует, что UUID/Enums станут строками
-        # exclude_unset=True — не сохранять дефолты (Field(None))
-        # exclude_none=True — не сохранять поля, где явно стоит None
+        # exclude_unset=True: не сохранять дефолты (Field(None))
+        # exclude_none=True: не сохранять поля, где явно стоит None
         clean_data = data.model_dump(mode="json", exclude_unset=True, exclude_none=True)
         self.contact_info = clean_data
 
@@ -242,21 +247,24 @@ class Client(BaseModel):
         2. Берем только те поля из data, которые были явно переданы (exclude_unset).
         3. Обновляем (merge) словарь верхнего уровня.
         4. Вложенные списки (contacts) заменяются целиком, если они переданы.
+
+        Args:
+            data (ClientContactInfoUpdate): Схема с изменениями.
         """
-        # Текущие данные (гарантируем dict)
+        # Гарантируем, что работаем со словарем
         current_data = self.contact_info if isinstance(self.contact_info, dict) else {}
 
-        # Новые данные (только то, что пришло с фронта)
-        # mode="json" важен для сериализации UUID/Enum
+        # mode="json" гарантирует, что UUID/Enums станут строками
+        # exclude_unset=True: Берем только то, что пришло с фронта
+        # exclude_none=False: Разрешаем null, чтобы удалять значения полей
         updates = data.model_dump(exclude_unset=True, mode="json")
 
         # Нечего обновлять
         if not updates:
             return None
 
-        # Merge (стандартный dict.update перезаписывает ключи верхнего уровня)
-        current_data.update(updates)
-
-        self.contact_info = current_data
+        # Используем распаковку для создания нового словаря
+        # Значения из updates перезапишут значения из current_data
+        self.contact_info = {**current_data, **updates}
 
         return None
