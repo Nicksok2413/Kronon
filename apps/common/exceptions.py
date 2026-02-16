@@ -5,7 +5,7 @@ Custom exception handlers for API.
 from django.conf import settings
 from django.db import IntegrityError
 from django.http import HttpRequest, HttpResponse
-from loguru import logger
+from loguru import logger as log
 from ninja import NinjaAPI
 from pydantic import ValidationError
 
@@ -97,7 +97,7 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
         if settings.DEBUG:
             raise exc
 
-        logger.error(f"Необработанное исключение в {request.path}: {exc}", exc_info=True)
+        log.error(f"Необработанное исключение в {request.path}: {exc}", exc_info=True)
 
         return api.create_response(
             request,

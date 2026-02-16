@@ -6,63 +6,11 @@ import uuid
 from datetime import datetime
 
 from ninja import Schema
-from pydantic import ConfigDict, EmailStr, Field
+from pydantic import ConfigDict, Field
 
 from apps.clients.models import ClientStatus, OrganizationType, TaxSystem
-from apps.common.types import PhoneNumber
+from apps.clients.schemas.contacts import ClientContactInfo, ClientContactInfoUpdate
 from apps.users.schemas import DepartmentOut, UserOut
-
-
-class ContactPersonSchema(Schema):
-    """
-    Структурированные данные контактного лица клиента.
-    """
-
-    role: str | None = Field(default=None, description="Должность (например: Директор, ИП)")
-
-    full_name: str | None = Field(
-        default=None,
-        min_length=2,
-        max_length=150,
-        # Regex паттерн для проверки имен (только буквы, пробелы, дефисы)
-        pattern=r"^[а-яА-ЯёЁa-zA-Z\s-]+$",
-        description="ФИО",
-    )
-
-    email: EmailStr | None = Field(default=None, description="Email")
-    phone: PhoneNumber | None = Field(default=None, description="Мобильный телефон")
-
-
-class ClientContactInfo(Schema):
-    """
-    Общая структура контактных данных клиента.
-    """
-
-    general_email: EmailStr | None = Field(default=None, description="Email организации")
-    general_phone: PhoneNumber | None = Field(default=None, description="Телефон организации")
-    address_legal: str | None = Field(default=None, description="Юридический адрес")
-    address_mailing: str | None = Field(default=None, description="Почтовый адрес")
-    website: str | None = Field(default=None, description="Сайт компании")
-
-    # Список контактных лиц
-    contacts: list[ContactPersonSchema] = Field(default_factory=list, description="Список контактных лиц")
-
-
-class ClientContactInfoUpdate(Schema):
-    """
-    Схема для частичного обновления контактов.
-    """
-
-    general_email: EmailStr | None = None
-    general_phone: PhoneNumber | None = None
-    address_legal: str | None = None
-    address_mailing: str | None = None
-    website: str | None = None
-
-    # Списком управляем целиком: если прислали новый список - заменяем старый
-    # Если нужно будет менять контакты точечно, будем делать через отдельные эндпоинты
-    # /api/clients/{id}/contacts/{contact_id}, иначе логика слияния списков превратится в ад
-    contacts: list[ContactPersonSchema] | None = None
 
 
 class ClientCreate(Schema):
@@ -73,15 +21,16 @@ class ClientCreate(Schema):
     model_config = ConfigDict(
         extra="forbid",  # Запрет лишних полей (защита от опечаток фронта)
         str_strip_whitespace=True,  # Автоматически убирать лишние пробелы в начале/конце строк
-        validate_assignment=True,  # Валидация при изменении атрибутов после создания объекта
     )
 
     name: str = Field(..., min_length=1, max_length=150, description="Краткое название")
     full_legal_name: str | None = Field(default=None, max_length=255, description="Полное юридическое название")
-    unp: str = Field(..., pattern=r"^\d{9}$", description="УНП")  # Regex паттерн проверяет, что это ровно 9 цифр
+
+    # Regex паттерн проверяет, что это ровно 9 цифр
+    unp: str = Field(..., pattern=r"^\d{9}$", description="УНП")
 
     org_type: OrganizationType = Field(default=OrganizationType.OOO, description="Тип организации")
-    tax_system: TaxSystem = Field(default=TaxSystem.USN_NO_NDS, description="Налоговый режим")
+    tax_system: TaxSystem = Field(default=TaxSystem.USN_NO_NDS, description="Система налогообложения")
     status: ClientStatus = Field(default=ClientStatus.ONBOARDING, description="Статус клиента")
 
     # Обслуживающий отдел
@@ -97,7 +46,7 @@ class ClientCreate(Schema):
     # Фронтенд будет слать JSON: {"contact_info": {"contacts": [{"role": "Директор", ...}]}}
     contact_info: ClientContactInfo = Field(
         default_factory=ClientContactInfo,
-        description="Контактная информация и список лиц",
+        description="Контактная информация",
     )
 
     # Интеграции
@@ -107,32 +56,53 @@ class ClientCreate(Schema):
 class ClientUpdate(Schema):
     """
     Схема для частичного обновления клиента (PATCH).
+    Все поля опциональны. При передаче null значение очищается.
     """
 
     model_config = ConfigDict(
-        extra="forbid",
-        str_strip_whitespace=True,
+        extra="forbid",  # Запрет лишних полей (защита от опечаток фронта)
+        str_strip_whitespace=True,  # Автоматически убирать лишние пробелы в начале/конце строк
     )
 
-    name: str | None = Field(default=None, min_length=1, max_length=150)
-    full_legal_name: str | None = Field(default=None, max_length=255)
-    unp: str | None = Field(default=None, pattern=r"^\d{9}$")
+    name: str | None = Field(default=None, min_length=1, max_length=150, description="Обновить краткое название")
+    full_legal_name: str | None = Field(default=None, max_length=255, description="Обновить полное юр. название")
 
-    org_type: OrganizationType | None = None
-    tax_system: TaxSystem | None = None
-    status: ClientStatus | None = None
+    # Regex паттерн проверяет, что это ровно 9 цифр
+    unp: str | None = Field(default=None, pattern=r"^\d{9}$", description="Обновить УНП")
 
-    department_id: uuid.UUID | None = None
+    org_type: OrganizationType | None = Field(default=None, description="Обновить тип организации")
+    tax_system: TaxSystem | None = Field(default=None, description="Обновить систему налогообложения")
+    status: ClientStatus | None = Field(default=None, description="Обновить статус клиента")
 
-    accountant_id: uuid.UUID | None = None
-    primary_accountant_id: uuid.UUID | None = None
-    payroll_accountant_id: uuid.UUID | None = None
-    hr_specialist_id: uuid.UUID | None = None
+    # Обслуживающий отдел
+    department_id: uuid.UUID | None = Field(default=None, description="Обновить ID обслуживающего отдела")
 
-    # Вложенная схема тоже для апдейта
-    contact_info: ClientContactInfoUpdate | None = None
+    # Ответственные
+    accountant_id: uuid.UUID | None = Field(
+        default=None,
+        description="Обновить ID Ведущего бухгалтера",
+    )
+    primary_accountant_id: uuid.UUID | None = Field(
+        default=None,
+        description="Обновить ID Бухгалтера по первичной документации",
+    )
+    payroll_accountant_id: uuid.UUID | None = Field(
+        default=None,
+        description="Обновить ID Бухгалтера по заработной плате",
+    )
+    hr_specialist_id: uuid.UUID | None = Field(
+        default=None,
+        description="Обновить ID Специалиста по кадрам",
+    )
 
-    google_folder_id: str | None = Field(default=None, max_length=100)
+    # Вложенная схема для PATCH (позволяет обновлять email, не трогая телефон)
+    contact_info: ClientContactInfoUpdate | None = Field(
+        default=None,
+        description="Обновить контактную информацию",
+    )
+
+    # Интеграции
+    google_folder_id: str | None = Field(default=None, max_length=100, description="Обновить ID папки на Google Drive")
 
 
 class ClientOut(Schema):

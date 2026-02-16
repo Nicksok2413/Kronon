@@ -6,7 +6,7 @@ from logging import ERROR, INFO  # Стандартные уровни логи�
 from typing import Protocol
 
 import sentry_sdk
-from loguru import logger
+from loguru import logger as log
 from sentry_sdk.integrations.celery import CeleryIntegration
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.loguru import LoguruIntegration
@@ -35,7 +35,7 @@ def setup_sentry(settings: SentrySettingsProtocol) -> None:
     if not sentry_dsn:
         # В режиме DEBUG отсутствие DSN - норма
         if not settings.DEBUG:
-            logger.warning("SENTRY_DSN не установлен! Мониторинг отключен.")
+            log.warning("SENTRY_DSN не установлен! Мониторинг отключен.")
         return
 
     # --- Определяем параметры Sentry ---
@@ -45,7 +45,7 @@ def setup_sentry(settings: SentrySettingsProtocol) -> None:
     # Частота семплирования для Profiling
     profiles_sample_rate = 1.0 if settings.DEBUG else 0.1  # Аналогично трейсам
 
-    logger.info(f"Инициализация Sentry (Env: {settings.SENTRY_ENVIRONMENT})...")
+    log.info(f"Инициализация Sentry (Env: {settings.SENTRY_ENVIRONMENT})...")
 
     try:
         sentry_sdk.init(
@@ -76,7 +76,7 @@ def setup_sentry(settings: SentrySettingsProtocol) -> None:
                 ThreadingIntegration(propagate_hub=True),
             ],
         )
-        logger.success("Sentry SDK успешно инициализирован.")
+        log.success("Sentry SDK успешно инициализирован.")
 
     except Exception as exc:
-        logger.exception(f"Ошибка инициализации Sentry: {exc}")
+        log.exception(f"Ошибка инициализации Sentry: {exc}")
