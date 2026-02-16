@@ -68,6 +68,13 @@ if [ "${APPLY_MIGRATIONS:-false}" = "true" ]; then
     su-exec "${APP_USER}" python manage.py migrate --noinput
 fi
 
+# Создаем суперпользователя (если нужно)
+if [ "${CREATE_SUPERUSER:-false}" = "true" ]; then
+    echo "-> (Entrypoint) Создание суперпользователя..."
+    # Запускаем от имени kronon
+    su-exec "${APP_USER}" python manage.py init_superuser
+fi
+
 # Собираем статику
 if [ "${COLLECT_STATIC:-false}" = "true" ]; then
     echo "-> (Entrypoint) Сбор статики..."
