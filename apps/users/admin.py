@@ -102,7 +102,7 @@ class UserAdmin(BaseUserAdmin[User]):
 
         return format_html('<span style="{} {}">{}</span>', base_style, color_style, text)
 
-    @admin.display(description=_("Статус"), ordering="probation_end_date")
+    @admin.display(description=_("Испытательный срок"), ordering="probation_end_date")
     def probation_badge(self, obj: User) -> str:
         """
         Рисует HTML бейдж в списке пользователей.
@@ -114,7 +114,7 @@ class UserAdmin(BaseUserAdmin[User]):
         if obj.employment_status == EmploymentStatus.PROBATION:
             date_str = obj.probation_end_date.strftime("%d.%m.%Y") if obj.probation_end_date else "???"
             # Красный бейдж (дата окончания испытательного срока)
-            return self._render_badge(text=f"IS ({date_str})", color_style="color: #cc0000; background-color: #ffcccc;")
+            return self._render_badge(text=f"{date_str}", color_style="color: #cc0000; background-color: #ffcccc;")
 
         elif obj.employment_status == EmploymentStatus.CONTRACTOR:
             # Желтый бейдж (договор подряда)
