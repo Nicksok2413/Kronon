@@ -2,7 +2,7 @@
 Утилиты для работы с УНП (Учетный номер плательщика).
 """
 
-# import random
+import secrets
 
 
 def generate_valid_unp() -> str:
@@ -16,9 +16,7 @@ def generate_valid_unp() -> str:
         str: Валидный УНП (строка из 9 цифр).
     """
     # Генерируем первые 8 случайных цифр
-    # digits = [random.randint(0, 9) for _ in range(8)]
-    # TODO: придумать что делать с линтером, ругается на random
-    digits: list[int] = []  # temporary for commit
+    digits = [secrets.randbelow(10) for _ in range(8)]
 
     # Веса для расчета контрольной суммы (стандарт для ЮЛ)
     weights = [29, 23, 19, 17, 13, 7, 5, 3]
