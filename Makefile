@@ -1,7 +1,7 @@
 # Makefile - Единая точка входа для управления проектом
 
 # .PHONY гарантирует, что make не будет путать эти команды с именами файлов
-.PHONY: help install run up down rebuild prune logs migrations migrate superuser clear_migrations lint lint-fix format types test check check-all clean
+.PHONY: help install run up down rebuild prune logs migrations migrate superuser clear_migrations lint lint-fix format types populate test check check-all clean
 
 # Команда по умолчанию, которая будет вызвана при запуске `make`
 default: help
@@ -31,15 +31,16 @@ help:
 	@echo "  clear_migrations   - Удалить все файлы миграций (для удобства разработки)"
 	@echo ""
 	@echo "Проверка качества кода и тесты:"
-	@echo "  lint           - Проверить код код с помощью Ruff"
-	@echo "  lint-fix       - Исправить код код с помощью Ruff"
-	@echo "  format         - Отформатировать код с помощью Ruff"
-	@echo "  types          - Проверить статическую типизацию mypy"
-	@echo "  test           - Запустить тесты pytest"
-	@echo "  test-cov       - Запустить тесты pytest с отчетом о покрытии кода"
-	@echo "  check          - Запустить статический анализ (lint, types) последовательно"
-	@echo "  check-all      - Запустить все проверки (lint, types, test) последовательно"
-	@echo "  clean          - Очистить временные файлы (pycache, coverage, builds)"
+	@echo "  lint           	- Проверить код код с помощью Ruff"
+	@echo "  lint-fix       	- Исправить код код с помощью Ruff"
+	@echo "  format         	- Отформатировать код с помощью Ruff"
+	@echo "  types          	- Проверить статическую типизацию mypy"
+	@echo "  populate       	- Наполнить БД тестовыми данными (для удобства разработки)"
+	@echo "  test           	- Запустить тесты pytest"
+	@echo "  test-cov       	- Запустить тесты pytest с отчетом о покрытии кода"
+	@echo "  check          	- Запустить статический анализ (lint, types) последовательно"
+	@echo "  check-all      	- Запустить все проверки (lint, types, test) последовательно"
+	@echo "  clean          	- Очистить временные файлы (pycache, coverage, builds)"
 
 
 # ------------------------------------------------------------------------------
@@ -134,6 +135,11 @@ format:
 types:
 	@echo "-> ${GREEN}Проверка типов с помощью mypy...${RESET}"
 	poetry run mypy .
+
+populate:
+	@echo "-> Наполнение БД тестовыми данными..."
+	# Запускаем скрипт как модуль (-m), чтобы работал импорт config.settings
+	poetry run python -m tests.seed
 
 test:
 	@echo "-> ${GREEN}Запуск тестов с (подключение к localhost:5432)...${RESET}"
