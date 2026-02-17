@@ -1,6 +1,8 @@
-# === Docker ===
+# === Docker & Deployment ===
 .dockerignore
+scripts/
 Dockerfile
+Makefile
 docker-compose.yml
 docker-compose.local.yml
 docker-compose.test.yml
@@ -25,9 +27,9 @@ __pycache__
 .env
 .env.*
 .venv
-venv
-env
-ENV
+venv/
+env/
+ENV/
 
 # === OS ===
 *.log
@@ -47,10 +49,10 @@ Thumbs.db
 *.dump
 
 # === Testing / coverage reports ===
-.pytest_cache
+tests/
+htmlcov/
+.pytest_cache/
 .coverage
-htmlcov
-tests
 
 # === mypy ===
 .mypy_cache/
@@ -59,7 +61,7 @@ tests
 .ruff_cache/
 
 # === Other ===
+logs/
 README.md
 *.md
 .pre-commit-config.yaml
-/logs
