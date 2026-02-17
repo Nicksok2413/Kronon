@@ -77,7 +77,7 @@ COPY --from=builder /usr/local/bin/su-exec /usr/local/bin/su-exec
 COPY --from=builder /opt/venv /opt/venv
 
 # Копируем энтрипойнт и устанавливаем права
-COPY --chmod=755 scripts/entrypoint.sh /entrypoint.sh
+COPY --chmod=755 docker/entrypoint.sh /entrypoint.sh
 
 # Копируем код проекта
 COPY --chown=kronon:kronon . .
