@@ -14,9 +14,37 @@ from django.utils.translation import gettext_lazy as _
 from apps.common.managers import SoftDeleteManager
 
 
-class BaseModel(models.Model):
+class TimeStampedModel(models.Model):
     """
-    Базовая модель с UUIDv7 (в качестве первичного ключа), таймстэмпами и мягким удалением.
+    Абстрактная модель с таймстэмпами (датами создания/обновления).
+
+    Используется там, где не нужен UUIDv7 PK или SoftDelete (например, Profile, M2M таблицы).
+    """
+
+    created_at = models.DateTimeField(
+        _("Дата создания"),
+        auto_now_add=True,
+        editable=False,
+    )
+    updated_at = models.DateTimeField(
+        _("Дата обновления"),
+        auto_now=True,
+        editable=False,
+    )
+
+    class Meta:
+        abstract = True
+
+
+class BaseModel(TimeStampedModel):
+    """
+    Основная базовая модель для бизнес-сущностей (Clients, Contracts, etc).
+
+    Наследует таймстэмпы от TimeStampedModel.
+
+    Добавляет:
+    1. UUIDv7 в качестве первичного ключа (сортируемый).
+    2. Логику мягкого удаления (Soft Delete).
     """
 
     # Используем UUIDv7 для сортируемых уникальных ID
@@ -27,26 +55,13 @@ class BaseModel(models.Model):
         verbose_name="ID",
     )
 
-    created_at = models.DateTimeField(
-        _("Дата создания"),
-        auto_now_add=True,
-        editable=False,
-        db_index=True,  # Индекс для сортировок
-    )
-
-    updated_at = models.DateTimeField(
-        _("Дата обновления"),
-        auto_now=True,
-        editable=False,
-    )
-
     # Поле мягкого удаления
     deleted_at = models.DateTimeField(
         _("Дата удаления"),
         null=True,
         blank=True,
         editable=False,
-        db_index=True,  # Индекс важен, так как часто будет фильтрация по IS NULL
+        db_index=True,  # Индекс нужен, так как часто будет фильтрация по IS NULL
     )
 
     # Кастомный менеджер для мягкого удаления (по умолчанию для всех моделей, наследующих BaseModel)
