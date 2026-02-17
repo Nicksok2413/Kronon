@@ -10,6 +10,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from apps.common.models import BaseModel
 from apps.common.utils.paths import RandomFileName
 from apps.common.validators import validate_image_size, validate_international_phone_number
 from apps.users.managers import CustomUserManager
@@ -41,9 +42,11 @@ class EmploymentStatus(models.TextChoices):
     PART_TIME = "part_time", "Частичная занятость"
 
 
-class Department(models.Model):
+class Department(BaseModel):
     """
     Организационная единица (Отдел).
+
+    Наследуется от BaseModel.
     Может иметь начальника и родительский отдел.
     """
 
@@ -80,7 +83,10 @@ class Department(models.Model):
 class User(AbstractUser):
     """
     Кастомная модель пользователя Kronon.
-    Использует email вместо username. Содержит только данные авторизации и позицию.
+
+    Наследуется от AbstractUser.
+    Использует email вместо username.
+    Содержит только данные авторизации и позицию.
     Личные данные вынесены в модель Profile.
     """
 
@@ -167,6 +173,7 @@ class User(AbstractUser):
 class Profile(models.Model):
     """
     Расширенный профиль сотрудника.
+
     Хранит фото, телефон, дату рождения и биографию.
     """
 

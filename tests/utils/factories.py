@@ -7,6 +7,7 @@ import random
 import factory
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
+from django.utils.text import slugify
 from factory.django import DjangoModelFactory
 
 from apps.clients.models import Client, ClientStatus, OrganizationType, TaxSystem
@@ -57,13 +58,22 @@ class ClientFactory(DjangoModelFactory):
     tax_system = factory.Iterator(TaxSystem.values)
     status = factory.Iterator(ClientStatus.values)
 
-    # JSON поле генерируем как словарь
-    contact_info = factory.LazyAttribute(
-        lambda o: {
-            "general_email": f"info@{o.name.replace(' ', '').lower()}.by",
+    # Генерация безопасного contact_info (JSON поле)
+    @factory.lazy_attribute
+    def contact_info(self):
+        # Превращаем "ЗАО «Рога и Копыта»" в "zao-roga-i-kopyta"
+        safe_name = slugify(self.name)
+
+        # Если slug пустой (все символы удалились), генерируем рандом
+        if not safe_name:
+            safe_name = f"client{random.randint(1000, 9999)}"
+
+        email = f"info@{safe_name}.by"
+
+        return {
+            "general_email": email,
             "general_phone": "+37529" + str(random.randint(1000000, 9999999)),
             "contacts": [{"role": "Директор", "full_name": "Иванов Иван Иванович", "phone": "+375291234567"}],
         }
-    )
 
     created_at = factory.Faker("date_time_this_year", tzinfo=timezone.get_current_timezone())

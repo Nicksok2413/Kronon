@@ -63,6 +63,8 @@ class ClientStatus(models.TextChoices):
 class Client(BaseModel):
     """
     Карточка клиента (Контрагента).
+
+    Наследуется от BaseModel.
     Содержит юридическую информацию, настройки налогов и ответственных.
     """
 
