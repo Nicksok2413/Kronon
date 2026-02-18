@@ -35,7 +35,7 @@ def setup_sentry(settings: SentrySettingsProtocol) -> None:
     if not sentry_dsn:
         # В режиме DEBUG отсутствие DSN - норма
         if not settings.DEBUG:
-            log.warning("SENTRY_DSN не установлен! Мониторинг отключен.")
+            log.warning("❌ SENTRY_DSN is not set (monitoring disabled)!")
         return
 
     # --- Определяем параметры Sentry ---
@@ -45,7 +45,7 @@ def setup_sentry(settings: SentrySettingsProtocol) -> None:
     # Частота семплирования для Profiling
     profiles_sample_rate = 1.0 if settings.DEBUG else 0.1  # Аналогично трейсам
 
-    log.info(f"Инициализация Sentry (Env: {settings.SENTRY_ENVIRONMENT})...")
+    log.info(f"Initializing Sentry (Env: {settings.SENTRY_ENVIRONMENT})...")
 
     try:
         sentry_sdk.init(
@@ -76,7 +76,7 @@ def setup_sentry(settings: SentrySettingsProtocol) -> None:
                 ThreadingIntegration(propagate_hub=True),
             ],
         )
-        log.success("Sentry SDK успешно инициализирован.")
+        log.success("✅ Sentry SDK successfully initialized.")
 
     except Exception as exc:
-        log.exception(f"Ошибка инициализации Sentry: {exc}")
+        log.exception(f"Sentry initialization error: {exc}")
