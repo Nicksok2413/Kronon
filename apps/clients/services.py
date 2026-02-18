@@ -18,9 +18,8 @@ async def create_client(data: ClientCreate) -> Client:
         data (ClientCreate): Валидированные входные данные из API (Pydantic схема).
 
     Returns:
-        Client: Созданный объект клиента с подгруженными связями.
+        Client: Созданный объект клиента.
     """
-    log.info(f"Start creating client. UNP: {data.unp}, name: {data.name}")
 
     # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
     # Исключаем contact_info, чтобы обработать его отдельно
@@ -45,22 +44,9 @@ async def create_client(data: ClientCreate) -> Client:
         # Глобальный хендлер превратит это в 500
         raise
 
-    # Если API не нужно подгружать связи для ответа, просто возвращаем созданный объект
-    # acreate возвращает "голый" объект (ID и базовые поля), но не делает join'ы
-    # return client
-
-    # Если API должен вернуть схему ClientOut с полными данными связей (department, accountant и т.д.)
-    # Получаем актуальные данные через Селектор с подгрузкой связей (чтобы ответ соответствовал схеме ClientOut)
-    created_client = await get_client_by_id(client_id=client.id)
-
-    # Для Mypy: созданный объект существует, но get_client_by_id возвращает Client | None
-    if not created_client:
-        # Это исключительная ситуация, которая не должна произойти в транзакции
-        log.critical(f"Client not found after creation! ID: {client.id}")
-        raise RuntimeError(f"Client not found after creation. ID: {client.id}")
-
-    # Возвращаем данные созданного клиента
-    return created_client
+    # Возвращаем созданный объект (ID и базовые поля)
+    # .acreate возвращает "чистый" объект, но не делает join'ы
+    return client
 
 
 async def update_client(client: Client, data: ClientUpdate) -> Client:
@@ -107,7 +93,7 @@ async def update_client(client: Client, data: ClientUpdate) -> Client:
         # Глобальный хендлер превратит это в 500
         raise
 
-    # Получаем актуальные данные через Селектор с подгрузкой связей (чтобы ответ соответствовал схеме ClientOut)
+    # Получаем актуальные данные через селектор с подгрузкой связей (чтобы ответ соответствовал схеме ClientOut)
     updated_client = await get_client_by_id(client_id=client.id)
 
     # Для Mypy: обновляемый объект существует, но get_client_by_id возвращает Client | None
