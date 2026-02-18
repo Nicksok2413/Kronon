@@ -20,7 +20,7 @@ async def create_client(data: ClientCreate) -> Client:
     Returns:
         Client: Созданный объект клиента с подгруженными связями.
     """
-    log.info(f"Начало создания клиента (УНП: {data.unp}, название: {data.name})")
+    log.info(f"Start creating client. UNP: {data.unp}, name: {data.name}")
 
     # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
     # Исключаем contact_info, чтобы обработать его отдельно
@@ -39,9 +39,10 @@ async def create_client(data: ClientCreate) -> Client:
     # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
     try:
         client = await Client.objects.acreate(**payload)
-        log.info(f"Клиент успешно создан (ID: {client.id})")
+        log.info(f"Client successfully created. ID: {client.id}")
     except Exception as exc:
-        log.error(f"Ошибка при создании клиента (УНП: {data.unp}): {exc}")
+        log.error(f"Error creating client. UNP: {data.unp}: {exc}")
+        # Пробрасываем ошибку дальше, чтобы её перехватил глобальный хендлер
         raise
 
     # Если API не нужно подгружать связи для ответа, просто возвращаем созданный объект
@@ -55,8 +56,8 @@ async def create_client(data: ClientCreate) -> Client:
     # Для Mypy: созданный объект существует, но get_client_by_id возвращает Client | None
     if not created_client:
         # Это исключительная ситуация, которая не должна произойти в транзакции
-        log.critical(f"Клиент (ID: {client.id}) не найден после создания!")
-        raise RuntimeError(f"Клиент (ID: {client.id}) не найден после создания")
+        log.critical(f"Client not found after creation! ID: {client.id}")
+        raise RuntimeError(f"Client not found after creation. ID: {client.id}")
 
     # Возвращаем данные созданного клиента
     return created_client
@@ -76,9 +77,9 @@ async def update_client(client: Client, data: ClientUpdate) -> Client:
     Returns:
         Client: Обновленный объект с подгруженными связями.
     """
-    # Логируем, что именно мы пытаемся обновить (ключи)
+    # Логируем какие именно ключи обновляются
     changed_fields = data.model_dump(exclude_unset=True).keys()
-    log.info(f"Обновление клиента (ID: {client.id}). Поля: {list(changed_fields)}")
+    log.info(f"Start updating client. ID: {client.id}, fields: {list(changed_fields)}")
 
     # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
     # Исключаем contact_info, чтобы обработать его отдельно
@@ -100,9 +101,10 @@ async def update_client(client: Client, data: ClientUpdate) -> Client:
     # Сохраняем (валидация полей модели вызовется здесь)
     try:
         await client.asave()
-        log.debug(f"Клиент (ID: {client.id}) сохранен в БД")
+        log.debug(f"Client successfully updated. ID: {client.id}")
     except Exception as exc:
-        log.error(f"Ошибка при сохранении клиента (ID: {client.id}): {exc}")
+        log.error(f"Error updating client. ID: {client.id}: {exc}")
+        # Пробрасываем ошибку дальше, чтобы её перехватил глобальный хендлер
         raise
 
     # Получаем актуальные данные через Селектор с подгрузкой связей (чтобы ответ соответствовал схеме ClientOut)
@@ -111,8 +113,26 @@ async def update_client(client: Client, data: ClientUpdate) -> Client:
     # Для Mypy: обновляемый объект существует, но get_client_by_id возвращает Client | None
     if not updated_client:
         # Это исключительная ситуация, которая не должна произойти в транзакции
-        log.critical(f"Клиент (ID: {client.id}) исчез после обновления!")
-        raise RuntimeError(f"Клиент (ID: {client.id}) исчез после обновления")
+        log.critical(f"Client not found after update! ID: {client.id}")
+        raise RuntimeError(f"Client not found after update. ID: {client.id}")
 
     # Возвращаем актуальные данные
     return updated_client
+
+
+async def delete_client(client: Client) -> None:
+    """
+    Выполняет мягкое удаление клиента.
+
+    Args:
+        client: Объект клиента.
+    """
+    log.info(f"Start deleting client (Soft Delete). ID: {client.id}")
+
+    try:
+        await client.adelete()
+        log.debug(f"Client successfully deleted. ID: {client.id}")
+    except Exception as exc:
+        log.error(f"Error deleting client. ID: {client.id}: {exc}")
+        # Пробрасываем ошибку дальше, чтобы её перехватил глобальный хендлер
+        raise
