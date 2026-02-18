@@ -97,7 +97,7 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
         if settings.DEBUG:
             raise exc
 
-        log.error(f"Необработанное исключение в {request.path}: {exc}", exc_info=True)
+        log.error(f"Unhandled exception at {request.path}: {exc}", exc_info=True)
 
         return api.create_response(
             request,

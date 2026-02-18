@@ -85,7 +85,7 @@ def setup_loguru(settings: LoguruSettingsProtocol) -> None:
         )
     except Exception as exc:
         # Если не удалось настроить файл (например, нет прав), пишем варнинг в консоль, но не падаем
-        logger.warning(f"Ошибка при настройке логирования в файл: {exc}")
+        logger.warning(f"Error while setting up file logging: {exc}")
 
     # Перехват стандартных логгеров Django
     # Отключаем стандартные хендлеры Django, чтобы они не писали в консоль сами
@@ -97,4 +97,4 @@ def setup_loguru(settings: LoguruSettingsProtocol) -> None:
         logging.getLogger(name).handlers = []
         logging.getLogger(name).propagate = True
 
-    logger.info(f"Loguru сконфигурирован. Уровень: {log_level}")
+    logger.info(f"✅ Loguru configured. Level: {log_level}")

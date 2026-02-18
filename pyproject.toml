@@ -50,7 +50,6 @@ dev = [
     "pytest-env (>=1.3.2,<2.0.0)",
     "pytest-cov (>=7.0.0,<8.0.0)",
     "factory-boy (>=3.3.3,<4.0.0)",
-    "faker (>=40.4.0,<41.0.0)",
     # Linters & Formatters
     "ruff (>=0.14.14,<0.15.0)",
     "pre-commit (>=4.5.1,<5.0.0)",
@@ -235,7 +234,7 @@ env = [
     # Включаем debug-режим
     "DEBUG=True",
     # Заглушка секретного ключа django
-    "SECRET_KEY=test-secret-key-for-pytest",
+    "SECRET_KEY=test-super-secret-key-for-pytest-that-is-at-least-32-characters-long",
     # Используем другую базу Redis (10), чтобы не затереть кэш разработки
     "REDIS_URL=redis://localhost:6379/10",
 ]
