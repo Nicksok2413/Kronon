@@ -234,7 +234,7 @@ env = [
     # Включаем debug-режим
     "DEBUG=True",
     # Заглушка секретного ключа django
-    "SECRET_KEY=test-secret-key-for-pytest",
+    "SECRET_KEY=test-super-secret-key-for-pytest-that-is-at-least-32-characters-long",
     # Используем другую базу Redis (10), чтобы не затереть кэш разработки
     "REDIS_URL=redis://localhost:6379/10",
 ]
