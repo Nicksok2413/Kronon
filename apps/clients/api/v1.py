@@ -6,7 +6,7 @@ API Endpoints для Клиентов (v1).
 """
 
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 from django.http import HttpRequest
 from loguru import logger as log
@@ -31,7 +31,7 @@ router = Router(auth=AsyncJWTAuth())
 @paginate(PageNumberPagination, page_size=20)
 async def list_clients(
     request: HttpRequest,
-    filters: ClientFilter = Query(...),  # noqa: B008
+    filters: Annotated[ClientFilter, Query(...)],
 ) -> SoftDeleteQuerySet[Client]:
     """
     Получить список клиентов с фильтрацией и пагинацией.
@@ -81,7 +81,7 @@ async def get_client(request: HttpRequest, client_id: uuid.UUID) -> tuple[int, C
 
     if not client:
         log.info(f"Client {client_id} not found for user {request.user.id}")
-        raise HttpError(status_code=404, message="Client not found")
+        raise HttpError(status_code=404, message="Клиент не найден")
 
     # Ninja сам преобразует Client в ClientOut
     return 200, client
@@ -152,7 +152,7 @@ async def update_client_endpoint(
     client = await get_client_by_id(client_id=client_id)
 
     if not client:
-        raise HttpError(status_code=404, message="Client not found")
+        raise HttpError(status_code=404, message="Клиент не найден")
 
     try:
         # Сервис возвращает полный объект клиента с подгрузкой связей
@@ -186,7 +186,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: uuid.UUID) -> 
     client = await get_client_by_id(client_id)
 
     if not client:
-        raise HttpError(404, "Client not found")
+        raise HttpError(status_code=404, message="Клиент не найден")
 
     try:
         await delete_client(client)
