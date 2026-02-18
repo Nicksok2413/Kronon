@@ -1,45 +1,67 @@
 """
 API Endpoints для Клиентов (v1).
 
-Предоставляет методы для чтения и управления клиентами.
-Весь ввод-вывод выполняется асинхронно.
+Предоставляет методы для чтения (GET), создания (POST), обновления (PATCH)
+и удаления (DELETE) клиентов.
 """
 
 import uuid
+from typing import TYPE_CHECKING
 
 from django.http import HttpRequest
-from ninja import Router
+from loguru import logger as log
+from ninja import Query, Router
 from ninja.errors import HttpError
+from ninja.pagination import PageNumberPagination, paginate
 from ninja_jwt.authentication import AsyncJWTAuth
 
 from apps.clients.models import Client
-from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
-from apps.clients.selectors import get_client_by_id, get_client_list
-from apps.clients.services import create_client, update_client
+from apps.clients.schemas import ClientCreate, ClientFilter, ClientOut, ClientUpdate
+from apps.clients.selectors import get_client_by_id, get_client_queryset
+from apps.clients.services import create_client, delete_client, update_client
 
-# auth=AsyncJWTAuth() - все эндпоинты в этом роутере требуют токен
+if TYPE_CHECKING:
+    from apps.common.managers import SoftDeleteQuerySet
+
+# auth=AsyncJWTAuth() - все эндпоинты в этом роутере требуют авторизацию (JWT-токен)
 router = Router(auth=AsyncJWTAuth())
 
 
 @router.get("/", response={200: list[ClientOut]})
-async def list_clients(request: HttpRequest) -> list[Client]:
+@paginate(PageNumberPagination, page_size=20)
+async def list_clients(
+    request: HttpRequest,
+    filters: ClientFilter = Query(...),  # noqa: B008
+) -> SoftDeleteQuerySet[Client]:
     """
-    Получить список всех активных клиентов.
-
-    Возвращает только тех клиентов, у которых не установлено поле `deleted_at`.
+    Получить список клиентов с фильтрацией и пагинацией.
 
     Args:
-        request (HttpRequest): Объект HTTP запроса.
+        request (HttpRequest): Объект запроса.
+        filters (ClientFilter): Параметры фильтрации из Query Params.
 
     Returns:
-        list[Client]: Список объектов активных клиентов.
+        SoftDeleteQuerySet[Client]: Отфильтрованный список клиентов (пагинация применяется декоратором).
     """
-    # Ninja сам преобразует list[Client] в list[ClientOut]
-    return await get_client_list()
+    try:
+        log.info(f"User {request.user.id} requested client list. Filters: {filters.dict(exclude_none=True)}")
+
+        # Получаем базовый QuerySet (ленивый)
+        query_set = get_client_queryset()
+
+        # Применяем фильтры (синхронно строим SQL-запрос, в БД не идем)
+        query_set = filters.filter(query_set)
+
+        return query_set
+
+    except Exception as exc:
+        log.error(f"Error fetching client list: {exc}")
+        # Глобальный хендлер превратит это в 500
+        raise
 
 
 @router.get("/{client_id}", response={200: ClientOut})
-async def get_client(request: HttpRequest, client_id: uuid.UUID) -> Client:
+async def get_client(request: HttpRequest, client_id: uuid.UUID) -> tuple[int, Client]:
     """
     Получить детальную информацию о клиенте по ID.
 
@@ -53,15 +75,16 @@ async def get_client(request: HttpRequest, client_id: uuid.UUID) -> Client:
         HttpError(404): Если клиент не найден.
 
     Returns:
-        Client: Объект клиента.
+        tuple[int, Client]: Код ответа, объект клиента.
     """
     client = await get_client_by_id(client_id=client_id)
 
     if not client:
-        raise HttpError(status_code=404, message="Клиент не найден")
+        log.info(f"Client {client_id} not found for user {request.user.id}")
+        raise HttpError(status_code=404, message="Client not found")
 
     # Ninja сам преобразует Client в ClientOut
-    return client
+    return 200, client
 
 
 @router.post("/", response={201: ClientOut})
@@ -74,17 +97,39 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
         payload (ClientCreate): Данные для создания.
 
     Returns:
-        Client: Созданный объект клиента.
+        tuple[int, Client]: Код ответа, созданный объект клиента.
     """
     # TODO: добавить проверку прав (например, только админ или lead_acc)
     # if not request.user.ahas_perm("clients.add_client"): ...
 
-    client = await create_client(data=payload)
-    return 201, client
+    log.info(f"User {request.user.id} creates client. UNP: {payload.unp}, name: {payload.name}")
+
+    try:
+        # Сервис возвращает "чистый" объект клиента (ID и базовые поля)
+        client = await create_client(data=payload)
+
+        # API должен вернуть схему ClientOut с полными данными связей (department, accountant и т.д.)
+        # Делаем рефреш через селектор с подгрузкой связей
+        full_client = await get_client_by_id(client_id=client.id)
+
+        # Теоретически невозможно, что его нет, но для Mypy:
+        if not full_client:
+            log.critical(f"Client not found after creation! ID: {client.id}")
+            raise RuntimeError(f"Client not found after creation. ID: {client.id}")
+
+        # Возвращаем созданного клиента с полными данными
+        return 201, full_client
+
+    except Exception as exc:
+        log.error(f"Unexpected error in create_client_endpoint: {exc}")
+        # Глобальный хендлер превратит это в 500
+        raise
 
 
 @router.patch("/{client_id}", response={200: ClientOut})
-async def update_client_endpoint(request: HttpRequest, client_id: uuid.UUID, payload: ClientUpdate) -> Client:
+async def update_client_endpoint(
+    request: HttpRequest, client_id: uuid.UUID, payload: ClientUpdate
+) -> tuple[int, Client]:
     """
     Частичное обновление данных клиента.
 
@@ -97,17 +142,58 @@ async def update_client_endpoint(request: HttpRequest, client_id: uuid.UUID, pay
         HttpError(404): Если клиент не найден.
 
     Returns:
-        Client: Обновленный объект клиент.
+        tuple[int, Client]: Код ответа, обновленный объект клиент.
     """
-    # Сначала находим клиента, используя селектор для поиска
+    # TODO: добавить проверку прав
+
+    log.info(f"User {request.user.id} updates client {client_id}.")
+
+    # Находим клиента, используя селектор для поиска
     client = await get_client_by_id(client_id=client_id)
 
     if not client:
-        raise HttpError(404, "Клиент не найден")
+        raise HttpError(status_code=404, message="Client not found")
 
+    try:
+        # Сервис возвращает полный объект клиента с подгрузкой связей
+        updated_client = await update_client(client=client, data=payload)
+        # Возвращаем обновленного клиента с полными данными
+        return 200, updated_client
+
+    except Exception as exc:
+        log.error(f"Error in update_client_endpoint: {exc}")
+        # Глобальный хендлер превратит это в 500
+        raise
+
+
+@router.delete("/{client_id}", response={204: None})
+async def delete_client_endpoint(request: HttpRequest, client_id: uuid.UUID) -> None:
+    """
+    Удалить клиента (Soft Delete).
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+        client_id (uuid.UUID): Уникальный идентификатор клиента (UUIDv7).
+
+    Raises:
+        HttpError(404): Если клиент не найден.
+    """
     # TODO: добавить проверку прав
 
-    # Вызываем сервис обновления
-    updated_client = await update_client(client=client, data=payload)
+    log.info(f"User {request.user.id} requests deletion of client {client_id}")
 
-    return updated_client
+    # Находим клиента, используя селектор для поиска
+    client = await get_client_by_id(client_id)
+
+    if not client:
+        raise HttpError(404, "Client not found")
+
+    try:
+        await delete_client(client)
+
+    except Exception as exc:
+        log.error(f"Error deleting client {client_id}: {exc}")
+        # Глобальный хендлер превратит это в 500
+        raise
+
+    return None
