@@ -42,7 +42,7 @@ async def create_client(data: ClientCreate) -> Client:
         log.info(f"Client successfully created. ID: {client.id}")
     except Exception as exc:
         log.error(f"Error creating client. UNP: {data.unp}: {exc}")
-        # Пробрасываем ошибку дальше, чтобы её перехватил глобальный хендлер
+        # Глобальный хендлер превратит это в 500
         raise
 
     # Если API не нужно подгружать связи для ответа, просто возвращаем созданный объект
@@ -104,7 +104,7 @@ async def update_client(client: Client, data: ClientUpdate) -> Client:
         log.debug(f"Client successfully updated. ID: {client.id}")
     except Exception as exc:
         log.error(f"Error updating client. ID: {client.id}: {exc}")
-        # Пробрасываем ошибку дальше, чтобы её перехватил глобальный хендлер
+        # Глобальный хендлер превратит это в 500
         raise
 
     # Получаем актуальные данные через Селектор с подгрузкой связей (чтобы ответ соответствовал схеме ClientOut)
@@ -134,5 +134,5 @@ async def delete_client(client: Client) -> None:
         log.debug(f"Client successfully deleted. ID: {client.id}")
     except Exception as exc:
         log.error(f"Error deleting client. ID: {client.id}: {exc}")
-        # Пробрасываем ошибку дальше, чтобы её перехватил глобальный хендлер
+        # Глобальный хендлер превратит это в 500
         raise

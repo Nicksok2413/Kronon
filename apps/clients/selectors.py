@@ -67,5 +67,5 @@ async def get_client_by_id(client_id: uuid.UUID) -> Client | None:
 
     except Exception as exc:
         log.error(f"DB Error while fetching client. ID: {client_id}: {exc}")
-        # Пробрасываем ошибку дальше, чтобы её перехватил глобальный хендлер
+        # Глобальный хендлер превратит это в 500
         raise
