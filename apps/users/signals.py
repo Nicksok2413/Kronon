@@ -31,18 +31,18 @@ def manage_user_profile(sender: type[User], instance: User, created: bool, **kwa
     try:
         if created:
             Profile.objects.create(user=instance)
-            log.info(f"Сигнал: Создан профиль для пользователя {instance.email} (ID={instance.pk})")
+            log.info(f"Signal: profile created for user {instance.email}. ID={instance.pk}")
         else:
             # Если профиль уже есть, просто сохраняем его
             # Используем hasattr, чтобы не упасть, если профиль вдруг удалили вручную
             if hasattr(instance, "profile"):
                 instance.profile.save()
-                log.debug(f"Сигнал: Обновлен профиль пользователя {instance.email}")
+                log.debug(f"Signal: profile updated for user {instance.email}")
             else:
                 # Если пользователя обновили, а профиля почему-то нет — создадим его (восстановление)
                 Profile.objects.create(user=instance)
-                log.warning(f"Сигнал: Восстановлен отсутствующий профиль для {instance.email}")
+                log.warning(f"Signal: restored missing profile for user {instance.email}")
 
     except Exception as exc:
         # Логируем ошибку, если по какой-то причине профиль не создался
-        log.exception(f"Ошибка в сигнале manage_user_profile для {instance.email}: {exc}")
+        log.exception(f"Error in signal manage_user_profile for user {instance.email}: {exc}")
