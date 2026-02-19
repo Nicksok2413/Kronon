@@ -11,8 +11,9 @@ from pydantic import BaseModel, ValidationError
 class BaseAPITest:
     """Базовый класс для асинхронных тестов API с поддержкой БД."""
 
+    @classmethod
     def validate_schema(
-        self,
+        cls,
         data: dict[str, Any] | list[dict[str, Any]],
         schema: type[BaseModel],
         many: bool = False,
@@ -40,7 +41,8 @@ class BaseAPITest:
         except ValidationError as exc:
             pytest.fail(f"API Schema Validation Error: {exc.json()}")
 
-    async def assert_status(self, response: Any, expected_status: int) -> None:
+    @classmethod
+    async def assert_status(cls, response: Any, expected_status: int) -> None:
         """
         Проверяет статус-код ответа.
 
