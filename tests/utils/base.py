@@ -18,7 +18,7 @@ class BaseAPITest:
     """
 
     @classmethod
-    def validate_schema(
+    async def validate_schema(
         cls,
         data: dict[str, Any] | list[dict[str, Any]],
         schema: type[BaseModel],
@@ -75,7 +75,7 @@ class BaseAPITest:
             )
 
     @classmethod
-    def assert_performance(cls, elapsed_time: float, max_ms: int = 500) -> None:
+    async def assert_performance(cls, elapsed_time: float, max_ms: int = 500) -> None:
         """
         Проверяет, уложился ли запрос в отведенное время.
 
@@ -84,4 +84,6 @@ class BaseAPITest:
             max_ms: Лимит в миллисекундах.
         """
         actual_ms = elapsed_time * 1000
-        assert actual_ms <= max_ms, f"API too slow! Actual: {actual_ms:.2f}ms, Limit: {max_ms}ms"
+
+        if actual_ms > max_ms:
+            pytest.fail(f"API too slow! Response took: {actual_ms:.2f}ms, Limit: {max_ms}ms")

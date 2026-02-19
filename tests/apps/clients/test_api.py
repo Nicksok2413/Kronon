@@ -54,10 +54,10 @@ class TestClientAPI(BaseAPITest):
         await self.assert_status(response=response, expected_status=201)
 
         # Время ответа API
-        self.assert_performance(end - start, max_ms=300)
+        await self.assert_performance(end - start, max_ms=300)
 
         # Валидация схемы
-        self.validate_schema(data=json_response, schema=ClientOut)
+        await self.validate_schema(data=json_response, schema=ClientOut)
 
         # Проверяем, что клиент реально создался в БД (асинхронно)
         assert await Client.objects.filter(id=json_response["id"]).aexists()
@@ -84,10 +84,10 @@ class TestClientAPI(BaseAPITest):
         await self.assert_status(response=response_page_1, expected_status=200)
 
         # Время ответа API
-        self.assert_performance(end - start, max_ms=300)
+        await self.assert_performance(end - start, max_ms=300)
 
         # Валидация схемы
-        self.validate_schema(data=json_response_page_1["items"], schema=ClientOut, many=True)
+        await self.validate_schema(data=json_response_page_1["items"], schema=ClientOut, many=True)
 
         # Проверка структуры пагинации Ninja: {items: [...], count: ...}
         assert len(json_response_page_1["items"]) == 20
@@ -104,10 +104,10 @@ class TestClientAPI(BaseAPITest):
         await self.assert_status(response=response_page_2, expected_status=200)
 
         # Время ответа API
-        self.assert_performance(end - start, max_ms=300)
+        await self.assert_performance(end - start, max_ms=300)
 
         # Валидация схемы
-        self.validate_schema(data=json_response_page_2["items"], schema=ClientOut, many=True)
+        await self.validate_schema(data=json_response_page_2["items"], schema=ClientOut, many=True)
 
         # Проверка количества элементов второй страницы
         assert len(json_response_page_2["items"]) == 5
