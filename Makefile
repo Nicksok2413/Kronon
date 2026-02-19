@@ -1,7 +1,7 @@
 # Makefile - Единая точка входа для управления проектом
 
 # .PHONY гарантирует, что make не будет путать эти команды с именами файлов
-.PHONY: help install run up down rebuild prune logs migrations migrate superuser clear_migrations lint lint-fix format types populate test check check-all clean
+.PHONY: help install run up down rebuild prune logs migrations migrate superuser clear_migrations lint lint-fix format types populate test-up test-down test check check-all clean
 
 # Команда по умолчанию, которая будет вызвана при запуске `make`
 default: help
@@ -30,14 +30,20 @@ help:
 	@echo "  superuser      	- Создать суперпользователя (администратора)"
 	@echo "  clear_migrations   - Удалить все файлы миграций (для удобства разработки)"
 	@echo ""
-	@echo "Проверка качества кода и тесты:"
+	@echo "Проверка качества кода (Ruff + mypy):"
 	@echo "  lint           	- Проверить код код с помощью Ruff"
 	@echo "  lint-fix       	- Исправить код код с помощью Ruff"
 	@echo "  format         	- Отформатировать код с помощью Ruff"
 	@echo "  types          	- Проверить статическую типизацию mypy"
+	@echo ""
+	@echo "Тесты (Pytest):"
 	@echo "  populate       	- Наполнить БД тестовыми данными (для удобства разработки)"
-	@echo "  test           	- Запустить тесты pytest"
-	@echo "  test-cov       	- Запустить тесты pytest с отчетом о покрытии кода"
+	@echo "  test-up     	  	- Запустить тестовое окружение в фоновом режиме"
+	@echo "  test-down       	- Остановить тестовое окружение"
+	@echo "  test           	- Запустить тесты pytest (тестовое окружение должно быть поднято)"
+	@echo "  test-cov       	- Запустить тесты pytest с отчетом о покрытии кода (тестовое окружение должно быть поднято)"
+	@echo ""
+	@echo "Комплексные проверки:"
 	@echo "  check          	- Запустить статический анализ (lint, types) последовательно"
 	@echo "  check-all      	- Запустить все проверки (lint, types, test) последовательно"
 	@echo "  clean          	- Очистить временные файлы (pycache, coverage, builds)"
@@ -141,12 +147,22 @@ populate:
 	# Запускаем скрипт как модуль (-m), чтобы работал импорт config.settings
 	poetry run python -m tests.seed
 
+test-up:
+	@echo "-> Запуск тестового окружения..."
+	docker compose -f docker-compose.test.yml up -d
+	@echo "-> Тестовое окружение успешно запущено."
+
+test-down:
+	@echo "-> Остановка тестового окружения..."
+	docker compose -f docker-compose.test.yml down
+	@echo "-> Тестовое окружение остановлено."
+
 test:
-	@echo "-> ${GREEN}Запуск тестов с (подключение к localhost:5432)...${RESET}"
+	@echo "-> ${GREEN}Запуск тестов с (подключение к localhost:5433)...${RESET}"
 	poetry run pytest
 
 test-cov:
-	@echo "-> ${GREEN}Запуск тестов с отчетом о покрытии (подключение к localhost:5432)...${RESET}"
+	@echo "-> ${GREEN}Запуск тестов с отчетом о покрытии (подключение к localhost:5433)...${RESET}"
 	poetry run pytest --cov=apps/ --cov-report=term-missing --cov-report=html
 
 check: lint types
