@@ -13,8 +13,8 @@ class BaseAPITest:
     """
     Базовый класс для асинхронных тестов API с поддержкой БД.
 
-    Предоставляет методы для проверки статус-кодов и валидации Pydantic-схем
-    с информативным выводом ошибок в формате JSON.
+    Предоставляет методы для проверки статус-кодов, времени ответа API
+    и валидации Pydantic-схем с информативным выводом ошибок в формате JSON.
     """
 
     @classmethod
@@ -73,3 +73,15 @@ class BaseAPITest:
                 f"\nActual:   {response.status_code}"
                 f"\nBody:     {error_msg}"
             )
+
+    @classmethod
+    def assert_performance(cls, elapsed_time: float, max_ms: int = 500) -> None:
+        """
+        Проверяет, уложился ли запрос в отведенное время.
+
+        Args:
+            elapsed_time: Время выполнения в секундах (результат time.perf_counter()).
+            max_ms: Лимит в миллисекундах.
+        """
+        actual_ms = elapsed_time * 1000
+        assert actual_ms <= max_ms, f"API too slow! Actual: {actual_ms:.2f}ms, Limit: {max_ms}ms"

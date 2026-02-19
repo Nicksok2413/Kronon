@@ -2,6 +2,7 @@
 Интеграционные тесты для API клиентов.
 """
 
+from time import perf_counter
 from typing import Any
 
 from asgiref.sync import sync_to_async
@@ -39,7 +40,9 @@ class TestClientAPI(BaseAPITest):
         }
 
         # Выполняем запрос
+        start = perf_counter()
         response = await auth_client.post(self.endpoint, data=payload, content_type="application/json")
+        end = perf_counter()
 
         json_response: dict[str, Any] = response.json()
 
@@ -49,6 +52,9 @@ class TestClientAPI(BaseAPITest):
 
         # Статус код
         await self.assert_status(response=response, expected_status=201)
+
+        # Время ответа API
+        self.assert_performance(end - start, max_ms=300)
 
         # Валидация схемы
         self.validate_schema(data=json_response, schema=ClientOut)
@@ -68,11 +74,17 @@ class TestClientAPI(BaseAPITest):
         await sync_to_async(ClientFactory.create_batch)(25)
 
         # Запрашиваем первую страницу
+        start = perf_counter()
         response_page_1 = await auth_client.get(f"{self.endpoint}?page=1")
+        end = perf_counter()
+
         json_response_page_1: dict[str, Any] = response_page_1.json()
 
         # Статус код
         await self.assert_status(response=response_page_1, expected_status=200)
+
+        # Время ответа API
+        self.assert_performance(end - start, max_ms=300)
 
         # Валидация схемы
         self.validate_schema(data=json_response_page_1["items"], schema=ClientOut, many=True)
@@ -82,11 +94,17 @@ class TestClientAPI(BaseAPITest):
         assert json_response_page_1["count"] == 25
 
         # Запрашиваем вторую страницу
+        start = perf_counter()
         response_page_2 = await auth_client.get(f"{self.endpoint}?page=2")
+        end = perf_counter()
+
         json_response_page_2: dict[str, Any] = response_page_2.json()
 
         # Статус код
         await self.assert_status(response=response_page_2, expected_status=200)
+
+        # Время ответа API
+        self.assert_performance(end - start, max_ms=300)
 
         # Валидация схемы
         self.validate_schema(data=json_response_page_2["items"], schema=ClientOut, many=True)

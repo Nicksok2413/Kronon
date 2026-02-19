@@ -16,12 +16,10 @@ jobs:
     env:
       PYTHON_VERSION: "3.14"
       POETRY_VERSION: "2.2.0"
-      SECRET_KEY: test-super-secret-key-for-ci-pipeline-that-is-at-least-32-characters-long
+      SECRET_KEY: ci-test-key-at-least-32-characters-long-for-security
       DEBUG: "True"
-
       # Формируем DATABASE_URL для автоматического подхвата в settings.py
-      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
-
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kronon_test
       # Настройки Redis
       REDIS_HOST: localhost
       REDIS_PORT: 6379
@@ -31,12 +29,11 @@ jobs:
       postgres:
         image: postgres:18.1-bookworm
         env:
-          POSTGRES_DB: test_db
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-        # Healthcheck
+          POSTGRES_DB: kronon_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
         options: >-
-          --health-cmd "pg_isready -U test_user -d test_db"
+          --health-cmd "pg_isready -U postgres -d kronon_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -45,7 +42,6 @@ jobs:
 
       redis:
         image: redis:7-alpine
-        # Healthcheck
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -58,7 +54,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
