@@ -70,7 +70,7 @@ class ClientFactory(DjangoModelFactory):
 
         # Если slug пустой (все символы удалились), генерируем рандом
         if not safe_name:
-            safe_name = f"client_{random.randint(1000, 9999)}"
+            safe_name = f"client-{random.randint(1000, 9999)}"
 
         email = f"info@{safe_name}.by"
 
