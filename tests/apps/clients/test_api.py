@@ -2,85 +2,94 @@
 Интеграционные тесты для API клиентов.
 """
 
-import pytest
+from typing import Any
+
 from asgiref.sync import sync_to_async
 from django.test import AsyncClient
-from ninja_jwt.tokens import AccessToken
 
 from apps.clients.models import Client
-from tests.utils.factories import ClientFactory, UserFactory
+from apps.clients.schemas.client import ClientOut
+from tests.utils.base import BaseAPITest
+from tests.utils.factories import ClientFactory
 
-# Маркер для доступа к БД (transaction=True важен для очистки после тестов)
-pytestmark = pytest.mark.django_db(transaction=True)
 
+class TestClientAPI(BaseAPITest):
+    """Тестирование CRUD операций API Клиентов.
 
-@pytest.fixture
-async def auth_headers() -> dict[str, str]:
+    Attributes:
+        endpoint: Базовый URL эндпоинта.
     """
-    Асинхронная фикстура для получения заголовков авторизации.
-    Создает пользователя и генерирует JWT токен.
 
-    Returns:
-        dict[str, str]: Заголовок Authorization.
-    """
-    # Оборачиваем синхронную фабрику в sync_to_async
-    # Это выполнит создание юзера в отдельном потоке, не блокируя Event Loop
-    user = await sync_to_async(UserFactory)()
+    endpoint: str = "/api/clients/"
 
-    # Генерация токена - операция CPU-bound (криптография),
-    # но иногда может лезть в БД (если включен blacklist)
-    # Безопаснее делать это явно, но AccessToken.for_user обычно синхронный и быстрый
-    # Если ninja_jwt полезет в базу - обернем и его, но пока так:
-    token = str(AccessToken.for_user(user))
+    async def test_create_client_valid(self, auth_client: AsyncClient) -> None:
+        """
+        Проверка успешного создания клиента.
 
-    return {"Authorization": f"Bearer {token}"}
+        Args:
+            auth_client: Авторизованный асинхронный клиент.
+        """
+        # Подготавливаем данные
+        payload: dict[str, Any] = {
+            "name": "Test Company",
+            "unp": "191111111",  # Валидный тестовый УНП
+            "org_type": "ooo",
+            "tax_system": "usn_no_nds",
+            "status": "onboarding",
+        }
 
+        # Выполняем запрос
+        response = await auth_client.post(self.endpoint, data=payload, content_type="application/json")
 
-@pytest.mark.asyncio
-async def test_client_create(async_client: AsyncClient, auth_headers: dict[str, str]) -> None:
-    """
-    Тест создания клиента через API (POST).
-    """
-    data = {
-        "name": "Test Company",
-        "unp": "191111111",  # Валидный тестовый УНП
-        "org_type": "ooo",
-        "tax_system": "usn_no_nds",
-        "status": "onboarding",
-    }
+        json_response: dict[str, Any] = response.json()
 
-    response = await async_client.post("/api/clients/", data=data, content_type="application/json", **auth_headers)
+        # Проверки
+        assert json_response["name"] == "Test Company"
+        assert json_response["id"] is not None
 
-    assert response.status_code == 201
-    json_resp = response.json()
-    assert json_resp["name"] == "Test Company"
-    assert json_resp["id"] is not None
+        # Статус код
+        await self.assert_status(response=response, expected_status=201)
 
-    # Проверяем, что клиент реально создался в БД (асинхронно)
-    assert await Client.objects.filter(id=json_resp["id"]).aexists()
+        # Валидация схемы
+        self.validate_schema(data=json_response, schema=ClientOut)
 
+        # Проверяем, что клиент реально создался в БД (асинхронно)
+        assert await Client.objects.filter(id=json_response["id"]).aexists()
 
-@pytest.mark.asyncio
-async def test_client_list_pagination(async_client: AsyncClient, auth_headers: dict[str, str]) -> None:
-    """
-    Тест получения списка клиентов и работы пагинации.
-    """
-    # Создаем 25 клиентов через фабрику
-    # Используем create_batch внутри sync_to_async для оптимизации
-    await sync_to_async(ClientFactory.create_batch)(25)
+    async def test_get_client_list_paginated(self, auth_client: AsyncClient) -> None:
+        """
+        Проверка получения списка клиентов с пагинацией.
 
-    # Запрашиваем первую страницу
-    response = await async_client.get("/api/clients/?page=1", **auth_headers)
-    assert response.status_code == 200
-    data = response.json()
+        Args:
+            auth_client: Авторизованный асинхронный клиент.
+        """
+        # Создаем 25 клиентов через фабрику
+        # Используем create_batch внутри sync_to_async для оптимизации
+        await sync_to_async(ClientFactory.create_batch)(25)
 
-    # Формат ответа Ninja Pagination: {items: [...], count: ...}
-    assert len(data["items"]) == 20
-    assert data["count"] == 25
+        # Запрашиваем первую страницу
+        response_page_1 = await auth_client.get(f"{self.endpoint}?page=1")
+        json_response_page_1: dict[str, Any] = response_page_1.json()
 
-    # Запрашиваем вторую страницу
-    response_page_2 = await async_client.get("/api/clients/?page=2", **auth_headers)
-    assert response_page_2.status_code == 200
-    data_page_2 = response_page_2.json()
+        # Статус код
+        await self.assert_status(response=response_page_1, expected_status=200)
 
-    assert len(data_page_2["items"]) == 5
+        # Валидация схемы
+        self.validate_schema(data=json_response_page_1["items"], schema=ClientOut, many=True)
+
+        # Проверка структуры пагинации Ninja: {items: [...], count: ...}
+        assert len(json_response_page_1["items"]) == 20
+        assert json_response_page_1["count"] == 25
+
+        # Запрашиваем вторую страницу
+        response_page_2 = await auth_client.get(f"{self.endpoint}?page=2")
+        json_response_page_2: dict[str, Any] = response_page_2.json()
+
+        # Статус код
+        await self.assert_status(response=response_page_2, expected_status=200)
+
+        # Валидация схемы
+        self.validate_schema(data=json_response_page_2["items"], schema=ClientOut, many=True)
+
+        # Проверка количества элементов второй страницы
+        assert len(json_response_page_2["items"]) == 5
