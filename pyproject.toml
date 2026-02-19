@@ -235,8 +235,10 @@ env = [
     "DEBUG=True",
     # Заглушка секретного ключа django
     "SECRET_KEY=test-super-secret-key-for-pytest-that-is-at-least-32-characters-long",
-    # Используем другую базу Redis (10), чтобы не затереть кэш разработки
-    "REDIS_URL=redis://localhost:6379/10",
+    # Подключаемся к тестовой БД напрямую (мимо PgBouncer)
+    "DATABASE_URL=postgres://postgres:postgres@localhost:5433/kronon_test",
+    # Для тестов переопределяем Redis URL (порт 6380 из docker-compose.test.yml)
+    "REDIS_URL=redis://localhost:6380",
 ]
 
 [tool.coverage.run]

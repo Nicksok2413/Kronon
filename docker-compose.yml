@@ -90,8 +90,8 @@ services:
       - MAX_CLIENT_CONN=100          # Сколько приложений может подключиться к пулеру
       - DEFAULT_POOL_SIZE=20         # Сколько реальных соединений держать открытыми к БД
       # Отключаем логи подключений чтобы PgBouncer не спамил каждым подключением (особенно от хелсчека)
-      - LOG_CONNECTIONS=0  # Отключает лог успешных логинов
-      - LOG_DISCONNECTIONS=0 # Отключает лог отключений
+      - LOG_CONNECTIONS=0            # Отключает лог успешных логинов
+      - LOG_DISCONNECTIONS=0         # Отключает лог отключений
     depends_on:
       db:
         # Запускаем только после того, как db станет healthy
@@ -116,7 +116,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M  #  Максимум 128 МБ RAM
+          memory: 128M  # Максимум 128 МБ RAM
     healthcheck:
       # Проверяет, отвечает ли Redis на команду PING
       test: ["CMD", "redis-cli", "ping"]

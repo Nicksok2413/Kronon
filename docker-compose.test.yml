@@ -1,0 +1,33 @@
+services:
+  db_test:
+    image: postgres:18.1-bookworm
+    container_name: kronon_db_test
+    # Критично для Postgres 18 при прогоне тяжелых миграций в тестах
+    shm_size: 256mb
+    # Данные в оперативной памяти для максимальной скорости тестов
+    tmpfs: /var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: kronon_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      # Ускоряем запуск: не ждем надежной записи на диск (в тестах не страшно)
+      PGOPTIONS: "-c synchronous_commit=off -c fsync=off -c full_page_writes=off"
+    ports:
+      # Пробрасываем отдельный порт для тестов
+      - "5433:5432"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"  # Максимум 1 ядро
+          memory: 1024M  # Максимум 1 ГБ RAM
+
+  redis_test:
+    image: redis:7-alpine
+    container_name: kronon_redis_test
+    ports:
+      # Пробрасываем отдельный порт для тестов
+      - "6380:6379"
+    deploy:
+      resources:
+        limits:
+          memory: 128M  # Максимум 128 МБ RAM
