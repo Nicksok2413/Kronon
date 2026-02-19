@@ -1,5 +1,6 @@
 """ """
 
+import json
 from typing import Any
 
 import pytest
@@ -9,7 +10,12 @@ from pydantic import BaseModel, ValidationError
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 class BaseAPITest:
-    """Базовый класс для асинхронных тестов API с поддержкой БД."""
+    """
+    Базовый класс для асинхронных тестов API с поддержкой БД.
+
+    Предоставляет методы для проверки статус-кодов и валидации Pydantic-схем
+    с информативным выводом ошибок в формате JSON.
+    """
 
     @classmethod
     def validate_schema(
@@ -23,14 +29,11 @@ class BaseAPITest:
 
         Args:
             data (dict[str, Any] | list[dict[str, Any]]): Данные для валидации (словарь или список).
-            schema (Type[BaseModel]): Класс Pydantic схемы.
-            many (bool): Флаг, указывающий на список объектов.
+            schema (type[BaseModel]): Класс Pydantic схемы (например, ClientOut).
+            many (bool): True, если ожидается список объектов.
 
         Returns:
-            Экземпляр схемы или список экземпляров.
-
-        Raises:
-            pytest.fail: Если данные не соответствуют схеме.
+            Валидированный объект или список объектов схемы.
         """
         try:
             if many and isinstance(data, list):
@@ -39,25 +42,34 @@ class BaseAPITest:
             return schema.model_validate(data)
 
         except ValidationError as exc:
-            pytest.fail(f"API Schema Validation Error: {exc.json()}")
+            # Выводим ошибки валидации в читаемом виде
+            error_detail = json.dumps(exc.errors(), indent=2, ensure_ascii=False)
+            pytest.fail(f"Pydantic Validation Failed:\n{error_detail}")
 
     @classmethod
     async def assert_status(cls, response: Any, expected_status: int) -> None:
         """
-        Проверяет статус-код ответа.
+        Проверяет HTTP статус-код и выводит тело ответа при несовпадении.
 
         Args:
             response (Any): Объект ответа от AsyncClient.
-            expected_status (int): Ожидаемый HTTP статус-код.
-
-        Returns:
-            None
+            expected_status (int): Ожидаемый HTTP статус-код (например, 200 или 201).
 
         Raises:
-            AssertionError: При несовпадении статусов.
+            AssertionError: Если коды не совпадают.
         """
-        content: str = response.content.decode("utf-8")
+        if response.status_code != expected_status:
+            try:
+                # Пытаемся распарсить JSON для красивого вывода
+                body = response.json()
+                error_msg = json.dumps(body, indent=2, ensure_ascii=False)
+            except (ValueError, AttributeError):
+                # Если не JSON (например, 500 ошибка с HTML), берем сырой текст
+                error_msg = response.content.decode("utf-8")
 
-        assert response.status_code == expected_status, (
-            f"Expected {expected_status}, got {response.status_code}. Body: {content}"
-        )
+            pytest.fail(
+                f"\nStatus Check Failed!"
+                f"\nExpected: {expected_status}"
+                f"\nActual:   {response.status_code}"
+                f"\nBody:     {error_msg}"
+            )
