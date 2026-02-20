@@ -141,6 +141,68 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 
 # ==============================================================================
+# AUTHENTICATION & SECURITY
+# ==============================================================================
+
+# Указываем Django использовать кастомную модель пользователя
+AUTH_USER_MODEL = "users.User"
+
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesBackend",  # Защита от перебора паролей
+    "django.contrib.auth.backends.ModelBackend",  # Стандартный вход
+    "guardian.backends.ObjectPermissionBackend",  # Объектные права
+]
+
+# Валидаторы паролей TODO: усилить для прода
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+# --- Admin credentials ---
+
+ADMIN_EMAIL: str = env("ADMIN_EMAIL", default=None)
+ADMIN_PASSWORD: str = env("ADMIN_PASSWORD", default=None)
+
+# --- Настройки Ninja JWT ---
+
+NINJA_JWT = {
+    # Access токен живет 60 минут (достаточно для комфортной работы бухгалтера)
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    # Refresh токен живет 7 дней (чтобы не логиниться каждое утро, но и не вечно)
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    # При обновлении токена выдавать новый Refresh Token
+    "ROTATE_REFRESH_TOKENS": True,
+    # Заносить старый Refresh Token в черный список (чтобы его нельзя было украсть и использовать)
+    "BLACKLIST_AFTER_ROTATION": True,
+    # Не обновлять last_login при каждом запросе (экономит лишний запрос к БД в async режиме)
+    "UPDATE_LAST_LOGIN": False,
+    # Используем секретный ключ Django для подписи
+    "ALGORITHM": "HS256",
+    "SIGNING_KEY": SECRET_KEY,
+    # Указываем, какое поле модели User использовать как ID в токене (UUID id)
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+}
+
+# --- Настройки Axes ---
+
+# Количество неудачных попыток до блокировки
+AXES_FAILURE_LIMIT = 5
+# Время "остывания" после блокировки (10 минут)
+AXES_COOLOFF_TIME = timedelta(minutes=10)
+# Блокируем по комбинации IP + Username
+AXES_LOCKOUT_PARAMETERS = ["ip_address", "username"]
+# Логировать попытки входа в БД (полезно для аудита)
+AXES_ENABLE_ACCESS_LOG = True
+
+# Если Axes будет неправильно определять IP (всегда 127.0.0.1), раскомментировать эту строку
+# AXES_CLIENT_IP_CALLABLE = "axes.handlers.proxy.get_client_ip_address"
+
+
+# ==============================================================================
 # DATABASE (PostgreSQL)
 # ==============================================================================
 
@@ -177,6 +239,7 @@ _DB_DEFAULT["DISABLE_SERVER_SIDE_CURSORS"] = _USE_PGBOUNCER
 # Оптимизация соединений (в тестах ставим 0, чтобы не плодить лишние коннекты)
 _CONN_MAX_AGE = 0 if TESTING else env.int("CONN_MAX_AGE", default=60)
 _DB_DEFAULT["CONN_MAX_AGE"] = _CONN_MAX_AGE
+
 
 # ==============================================================================
 # CACHE (Redis)
@@ -215,70 +278,6 @@ else:
 
 # Время жизни кэша по умолчанию (10 минут)
 CACHE_TTL = 60 * 10
-
-
-# ==============================================================================
-# AUTHENTICATION & SECURITY
-# ==============================================================================
-
-# Указываем Django использовать кастомную модель пользователя
-AUTH_USER_MODEL = "users.User"
-
-AUTHENTICATION_BACKENDS = [
-    "axes.backends.AxesBackend",  # Защита от перебора паролей
-    "django.contrib.auth.backends.ModelBackend",  # Стандартный вход
-    "guardian.backends.ObjectPermissionBackend",  # Объектные права
-]
-
-# Валидаторы паролей TODO: усилить для прода
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-]
-
-# --- Admin credentials ---
-
-ADMIN_EMAIL: str = env("ADMIN_EMAIL", default=None)
-ADMIN_PASSWORD: str = env("ADMIN_PASSWORD", default=None)
-
-
-# --- Настройки Ninja JWT ---
-
-NINJA_JWT = {
-    # Access токен живет 60 минут (достаточно для комфортной работы бухгалтера)
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
-    # Refresh токен живет 7 дней (чтобы не логиниться каждое утро, но и не вечно)
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    # При обновлении токена выдавать новый Refresh Token
-    "ROTATE_REFRESH_TOKENS": True,
-    # Заносить старый Refresh Token в черный список (чтобы его нельзя было украсть и использовать)
-    "BLACKLIST_AFTER_ROTATION": True,
-    # Не обновлять last_login при каждом запросе (экономит лишний запрос к БД в async режиме)
-    "UPDATE_LAST_LOGIN": False,
-    # Используем секретный ключ Django для подписи
-    "ALGORITHM": "HS256",
-    "SIGNING_KEY": SECRET_KEY,
-    # Указываем, какое поле модели User использовать как ID в токене (UUID id)
-    "USER_ID_FIELD": "id",
-    "USER_ID_CLAIM": "user_id",
-}
-
-
-# --- Настройки Axes ---
-
-# Количество неудачных попыток до блокировки
-AXES_FAILURE_LIMIT = 5
-# Время "остывания" после блокировки (10 минут)
-AXES_COOLOFF_TIME = timedelta(minutes=10)
-# Блокируем по комбинации IP + Username
-AXES_LOCKOUT_PARAMETERS = ["ip_address", "username"]
-# Логировать попытки входа в БД (полезно для аудита)
-AXES_ENABLE_ACCESS_LOG = True
-
-# Если Axes будет неправильно определять IP (всегда 127.0.0.1), раскомментировать эту строку
-# AXES_CLIENT_IP_CALLABLE = "axes.handlers.proxy.get_client_ip_address"
 
 
 # ==============================================================================
