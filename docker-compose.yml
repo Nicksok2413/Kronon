@@ -68,9 +68,9 @@ services:
     # Сервис запустится только если явно попросить профиль 'infra' или сам сервис
     profiles: ["infra"]
     environment:
-      # Хост и ПОРТ реальной БД
-      - DB_HOST=${POSTGRES_HOST:-db}
-      - DB_PORT=${POSTGRES_PORT:-5432}
+      # Хост и порт реальной БД
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-5432}
       # Порт, который будет слушать сам PgBouncer
       - LISTEN_PORT=6432
       # Доступ к БД
@@ -133,7 +133,6 @@ services:
   # Celery Worker
   celery_worker:
       <<: *app-base
-      container_name: kronon_celery
       command: celery -A config.celery:app worker -l info -c 2
 
 # --- MONITORING ---
