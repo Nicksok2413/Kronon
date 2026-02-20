@@ -1,0 +1,42 @@
+# Определяем "шаблон" для app-сервисов в проде с помощью якоря
+x-app-base: &prod-app-base
+  environment:
+    - DB_HOST=pgbouncer
+    - DB_PORT=6432
+  depends_on:
+    # На проде все app-сервисы идут через пулер
+    pgbouncer:
+      condition: service_healthy
+  deploy:
+    resources:
+      limits:
+        cpus: "0.5"
+        memory: 512M
+  restart: always
+
+services:
+  db:
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1024M
+        reservations:
+          memory: 256M  # Гарантированный резерв
+    restart: always
+
+  pgbouncer:
+    # На проде профиль не нужен, pgbouncer должен работать всегда
+    profiles: []
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: 128M
+    restart: always
+
+  app:
+    <<: *prod-app-base
+
+  celery_worker:
+    <<: *prod-app-base

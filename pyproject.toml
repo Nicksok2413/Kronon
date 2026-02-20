@@ -234,9 +234,11 @@ env = [
     # Включаем debug-режим
     "DEBUG=True",
     # Заглушка секретного ключа django
-    "SECRET_KEY=test-super-secret-key-for-pytest-that-is-at-least-32-characters-long",
-    # Используем другую базу Redis (10), чтобы не затереть кэш разработки
-    "REDIS_URL=redis://localhost:6379/10",
+    "SECRET_KEY=pytest-test-key-at-least-32-characters-long-for-security",
+    # Передаем DATABASE_URL для автоматического подхвата в settings.py (порт 5433 из docker-compose.test.yml)
+    "DATABASE_URL=postgres://postgres:postgres@localhost:5433/postgres",
+    # Передаем REDIS_URL для автоматического подхвата в settings.py (порт 6380 из docker-compose.test.yml)
+    "REDIS_URL=redis://localhost:6380",
 ]
 
 [tool.coverage.run]
