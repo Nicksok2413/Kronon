@@ -52,7 +52,7 @@ if READ_DOT_ENV_FILE:
 # ==============================================================================
 
 # Секретный ключ для подписи сессий и токенов
-SECRET_KEY: str = env("SECRET_KEY")
+SECRET_KEY: str = env.str("SECRET_KEY")
 
 # debug-режим
 DEBUG: bool = env.bool("DEBUG", default=False)
@@ -163,8 +163,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # --- Admin credentials ---
 
-ADMIN_EMAIL: str = env("ADMIN_EMAIL", default=None)
-ADMIN_PASSWORD: str = env("ADMIN_PASSWORD", default=None)
+ADMIN_EMAIL: str = env.str("ADMIN_EMAIL", default=None)
+ADMIN_PASSWORD: str = env.str("ADMIN_PASSWORD", default=None)
 
 # --- Настройки Ninja JWT ---
 
@@ -209,7 +209,7 @@ AXES_ENABLE_ACCESS_LOG = True
 # Проверка режима тестирования (стандарт для pytest-django)
 TESTING: bool = "PYTEST_CURRENT_TEST" in os.environ
 
-# Проверяем, нет ли готовой URL подключения к БД (Pytest/CI)
+# Проверяем, нет ли готовой DATABASE_URL (Pytest/CI)
 if env.str("DATABASE_URL", default=""):
     DATABASES = {"default": env.db_url("DATABASE_URL")}
 
@@ -218,23 +218,22 @@ else:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": env("DB_NAME", default="kronon_db"),
-            "USER": env("DB_USER", default="kronon_user"),
-            "PASSWORD": env("DB_PASSWORD", default="secret_password"),
-            "HOST": env("DB_HOST", default="pgbouncer"),
-            "PORT": env.int("DB_PORT", default=6432),
+            "NAME": env.str("DB_NAME", default="kronon_db"),
+            "USER": env.str("DB_USER", default="kronon_user"),
+            "PASSWORD": env.str("DB_PASSWORD", default="secret_password"),
+            "HOST": env.str("DB_HOST", default="db"),
+            "PORT": env.int("DB_PORT", default=5432),
         }
     }
 
-# Определяем, работаем ли мы через PgBouncer (порт 6432)
-# Если порт 6432 — отключаем серверные курсоры, так как пулер работает в режиме транзакций
 _DB_DEFAULT = DATABASES["default"]
-_CURRENT_PORT: int = _DB_DEFAULT.get("PORT", 6432)
-_USE_PGBOUNCER: bool = _CURRENT_PORT == 6432
 
-# Transaction Pooling (для PgBouncer)
-# В тестах (порт 5433) серверные курсоры будут включены для производительности
-_DB_DEFAULT["DISABLE_SERVER_SIDE_CURSORS"] = _USE_PGBOUNCER
+# Определяем, работаем ли мы через PgBouncer (порт 6432)
+# По умолчанию в коде — прямое соединение, PgBouncer прилетит из docker-compose.prod.yml
+# Если порт 6432 — отключаем серверные курсоры, так как пулер работает в режиме транзакций (Transaction Pooling)
+# В режиме разработки (порт 5432) и тестах (порт 5433) серверные курсоры будут включены для производительности
+_CURRENT_PORT: int = int(_DB_DEFAULT.get("PORT", 5432))
+_DB_DEFAULT["DISABLE_SERVER_SIDE_CURSORS"] = _CURRENT_PORT == 6432
 
 # Оптимизация соединений (в тестах ставим 0, чтобы не плодить лишние коннекты)
 _CONN_MAX_AGE = 0 if TESTING else env.int("CONN_MAX_AGE", default=60)
@@ -245,29 +244,26 @@ _DB_DEFAULT["CONN_MAX_AGE"] = _CONN_MAX_AGE
 # CACHE (Redis)
 # ==============================================================================
 
-REDIS_HOST: str = env("REDIS_HOST", default="redis")  # `localhost` для локальной разработки
-REDIS_PORT: int = env.int("REDIS_PORT", default=6379)
-
-# Проверка запущены ли тесты (pytest)
-# TESTING: bool = "test" in sys.argv or any(arg.startswith("pytest") for arg in sys.argv)
+# Приоритет: REDIS_URL из окружения (Docker/Pytest/CI) -> дефолт
+_REDIS_BASE_URL: str = env.str("REDIS_URL", default="redis://redis:6379")
 
 # Явно аннотируем тип переменной CACHES для mypy (Strict mode)
 CACHES: dict[str, Any]
 
 if TESTING:
-    # Если это тесты, используем DummyCache, чтобы не зависеть от Redis
+    # Если это тесты, используем DummyCache, не мучаем Redis
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.dummy.DummyCache",
         }
     }
 else:
-    # Основной кэш для разработки/продакшена (база №1)
+    # Основной кэш (база №1)
     CACHES = {
         "default": {
             "BACKEND": "django_redis.cache.RedisCache",
             # Используем базу №1 для кэша (чтобы не пересекаться с Celery)
-            "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
+            "LOCATION": f"{_REDIS_BASE_URL}/1",
             "OPTIONS": {
                 "CLIENT_CLASS": "django_redis.client.DefaultClient",
                 # Игнорировать ошибки подключения (сайт будет работать, но медленнее)
@@ -284,11 +280,11 @@ CACHE_TTL = 60 * 10
 # ASYNC TASKS (Celery)
 # ==============================================================================
 
-# URL брокера (база №2 в Redis, чтобы не пересекаться с кэшем)
-CELERY_BROKER_URL: str = env("CELERY_BROKER_URL", default=f"redis://{REDIS_HOST}:{REDIS_PORT}/2")
+# URL брокера (по умолчанию база №2 в Redis, чтобы не пересекаться с кэшем)
+CELERY_BROKER_URL: str = env.str("CELERY_BROKER_URL", default=f"{_REDIS_BASE_URL}/2")
 
-# URL для хранения результатов выполнения задач (база №2 в Redis)
-CELERY_RESULT_BACKEND: str = env("CELERY_RESULT_BACKEND", default=f"redis://{REDIS_HOST}:{REDIS_PORT}/2")
+# URL для хранения результатов выполнения задач (по умолчанию база №2 в Redis)
+CELERY_RESULT_BACKEND: str = env.str("CELERY_RESULT_BACKEND", default=f"{_REDIS_BASE_URL}/2")
 
 CELERY_TIMEZONE = "Europe/Minsk"
 CELERY_TASK_TRACK_STARTED = True
@@ -339,14 +335,14 @@ if DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 else:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_HOST: str = env("EMAIL_HOST", default="smtp.gmail.com")  # TODO: нужен реальный SMTP
+    EMAIL_HOST: str = env.str("EMAIL_HOST", default="smtp.gmail.com")  # TODO: нужен реальный SMTP
     EMAIL_PORT: int = env.int("EMAIL_PORT", default=587)
-    EMAIL_HOST_USER: str = env("EMAIL_HOST_USER", default="")
-    EMAIL_HOST_PASSWORD: str = env("EMAIL_HOST_PASSWORD", default="")
+    EMAIL_HOST_USER: str = env.str("EMAIL_HOST_USER", default="")
+    EMAIL_HOST_PASSWORD: str = env.str("EMAIL_HOST_PASSWORD", default="")
     EMAIL_USE_TLS: bool = env.bool("EMAIL_USE_TLS", default=True)
 
 # E-mail отправителя по умолчанию
-DEFAULT_FROM_EMAIL: str = env("DEFAULT_FROM_EMAIL", default="noreply@kronon.by")
+DEFAULT_FROM_EMAIL: str = env.str("DEFAULT_FROM_EMAIL", default="noreply@kronon.by")
 
 
 # ==============================================================================
@@ -383,13 +379,13 @@ LOGGING_CONFIG = None
 LOGGING: dict[str, Any] = {}
 
 # Параметры логирования
-LOG_LEVEL: str = env("LOG_LEVEL", default="INFO")
+LOG_LEVEL: str = env.str("LOG_LEVEL", default="INFO")
 LOGFILE_SIZE: int = env.int("LOGFILE_SIZE", default=10)
 LOGFILE_COUNT: int = env.int("LOGFILE_COUNT", default=5)
 
 # Параметры Sentry
-SENTRY_DSN: str | None = env("SENTRY_DSN", default=None)
-SENTRY_ENVIRONMENT: str = env("SENTRY_ENVIRONMENT", default="production")
+SENTRY_DSN: str | None = env.str("SENTRY_DSN", default=None)
+SENTRY_ENVIRONMENT: str = env.str("SENTRY_ENVIRONMENT", default="production")
 
 
 @dataclass
