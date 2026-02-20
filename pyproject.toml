@@ -235,14 +235,9 @@ env = [
     "DEBUG=True",
     # Заглушка секретного ключа django
     "SECRET_KEY=pytest-test-key-at-least-32-characters-long-for-security",
-    # Подключаемся к тестовой БД напрямую
+    # Передаем DATABASE_URL для автоматического подхвата в settings.py (порт 5433 из docker-compose.test.yml)
     "DATABASE_URL=postgres://postgres:postgres@localhost:5433/postgres",
-#    "DB_HOST=localhost",
-#    "DB_PORT=5433",
-#    "DB_NAME=postgres",
-#    "DB_USER=postgres",
-#    "DB_PASSWORD=postgres",
-    # Для тестов переопределяем Redis URL (порт 6380 из docker-compose.test.yml)
+    # Передаем REDIS_URL для автоматического подхвата в settings.py (порт 6380 из docker-compose.test.yml)
     "REDIS_URL=redis://localhost:6380",
 ]
 
