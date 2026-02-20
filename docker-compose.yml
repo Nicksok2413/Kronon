@@ -9,11 +9,11 @@ x-app-base: &app-base
     - media_volume:/app/media          # Монтируем том для медиа
     - logs_volume:/app/logs            # Монтируем том для логов
   depends_on:
-    pgbouncer:
-      # Запускаем только после того, как pgbouncer станет healthy
+    # Запускаем только после того, как db станет healthy
+    db:
       condition: service_healthy
+    # Запускаем только после того, как redis станет healthy
     redis:
-      # Запускаем только после того, как redis станет healthy
       condition: service_healthy
   restart: unless-stopped
   networks:
@@ -25,7 +25,6 @@ services:
   # Настроен для работы на сервере с 1 ГБ RAM
   db:
     image: postgres:18.1-bookworm
-    container_name: kronon_db
     # Увеличиваем лимит разделяемой памяти (важно для сложных запросов)
     shm_size: 256mb
     # Тонкая настройка производительности через флаги запуска:
@@ -52,13 +51,6 @@ services:
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data  # Монтируем том для БД
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"                           # Максимум 1 ядро
-          memory: 1024M                         # Максимум 1 ГБ RAM
-        reservations:
-          memory: 256M                          # Гарантированный резерв
     healthcheck:
       # Проверяет, готова ли БД принимать соединения (экранируем $ для shell)
       test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
@@ -73,7 +65,8 @@ services:
   # Пулер соединений (PgBouncer)
   pgbouncer:
     image: edoburu/pgbouncer:latest
-    container_name: kronon_pgbouncer
+    # Сервис запустится только если явно попросить профиль 'infra' или сам сервис
+    profiles: ["infra"]
     environment:
       # Хост и ПОРТ реальной БД
       - DB_HOST=${POSTGRES_HOST:-db}
@@ -93,11 +86,11 @@ services:
       - LOG_CONNECTIONS=0            # Отключает лог успешных логинов
       - LOG_DISCONNECTIONS=0         # Отключает лог отключений
     depends_on:
+      # Запускаем только после того, как db станет healthy
       db:
-        # Запускаем только после того, как db станет healthy
         condition: service_healthy
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -h localhost -p $${LISTEN_PORT} -U $${DB_USER} -d $${DB_NAME}" ]
+      test: [ "CMD-SHELL", "pg_isready -h localhost -p 6432 -U $${DB_USER} -d $${DB_NAME}" ]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -108,17 +101,11 @@ services:
   # Кэш и брокер сообщений (Redis)
   redis:
     image: redis:7-alpine
-    container_name: kronon_redis
     # Команда для персистентности (сохранять дамп БД каждые 60 сек, если было хотя бы 1 изменение)
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data  # Монтируем том для сохранения dump.rdb
-    deploy:
-      resources:
-        limits:
-          memory: 128M  # Максимум 128 МБ RAM
     healthcheck:
-      # Проверяет, отвечает ли Redis на команду PING
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 3s
@@ -131,7 +118,6 @@ services:
   # --- APPLICATION ---
   app:
     <<: *app-base
-    container_name: kronon_web
     # Команда перехватывается в Entrypoint и модифицируется
     command: gunicorn
     volumes:
@@ -160,7 +146,7 @@ services:
 #
 #  grafana:
 #
-#    celery-exporter:
+#  celery-exporter:
 #
 
 # --- STORAGE & NETWORKING ---
