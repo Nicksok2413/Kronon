@@ -1,7 +1,12 @@
 # Makefile - Единая точка входа для управления проектом
 
+# Переменные для удобства
+COMPOSE_DEV = docker compose
+COMPOSE_TEST = docker compose -f docker-compose.test.yml
+COMPOSE_INFRA = docker compose --profile infra
+
 # .PHONY гарантирует, что make не будет путать эти команды с именами файлов
-.PHONY: help install run up down rebuild prune logs migrations migrate superuser clear_migrations lint lint-fix format types populate test-up test-down test check check-all clean
+.PHONY: help install run up down rebuild infra-up prune logs migrations migrate superuser clear_migrations lint lint-fix format types populate test-up test-down test test-clean check check-all clean
 
 # Команда по умолчанию, которая будет вызвана при запуске `make`
 default: help
@@ -21,6 +26,7 @@ help:
 	@echo "  up             	- Запустить все сервисы в фоновом режиме"
 	@echo "  down           	- Остановить все сервисы"
 	@echo "  rebuild        	- Пересобрать образы и запустить сервисы"
+	@echo "  infra-up        	- Запустить все сервисы вместе с PgBouncer (профиль infra) в фоновом режиме"
 	@echo "  prune          	- Остановить сервисы и УДАЛИТЬ ВСЕ ДАННЫЕ (БД, логи)"
 	@echo "  logs           	- Показать логи всех сервисов"
 	@echo ""
@@ -41,6 +47,7 @@ help:
 	@echo "  test-up     	  	- Запустить тестовое окружение в фоновом режиме"
 	@echo "  test-down       	- Остановить тестовое окружение"
 	@echo "  test           	- Запустить тесты pytest (тестовое окружение должно быть поднято)"
+	@echo "  test-clean        	- Запустить тесты pytest с полной очисткой базы (тестовое окружение должно быть поднято)"
 	@echo "  test-cov       	- Запустить тесты pytest с отчетом о покрытии кода (тестовое окружение должно быть поднято)"
 	@echo ""
 	@echo "Комплексные проверки:"
@@ -67,32 +74,37 @@ run:
 # ------------------------------------------------------------------------------
 up:
 	@echo "-> Запуск всех сервисов в фоновом режиме..."
-	docker compose up -d
+	$(COMPOSE_DEV) up -d
 	@echo "-> Сервисы успешно запущены."
 
 down:
 	@echo "-> Остановка всех сервисов..."
-	docker compose down
+	$(COMPOSE_DEV) down
 	@echo "-> Все сервисы остановлены."
 
 rebuild: down
 	@echo "-> Пересборка и запуск сервисов..."
-	docker compose up -d --build
+	$(COMPOSE_DEV) up -d --build
 	@echo "-> Сервисы успешно пересобраны и запущены."
+
+infra-up:
+	@echo "-> Запуск всех сервисов (вместе с PgBouncer) в фоновом режиме..."
+	$(COMPOSE_INFRA) up -d
+	@echo "-> Сервисы успешно запущены. Теперь можно подключиться к порту 6432."
 
 prune:
 	@echo "ВНИМАНИЕ: Эта команда остановит контейнеры и УДАЛИТ ВСЕ ДАННЫЕ В ТОМАХ (volumes)."
 	@read -p "Вы уверены, что хотите продолжить? [y/N] " confirm && \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
 		echo "-> Начинаем полную очистку..."; \
-		docker compose down -v; \
+		$(COMPOSE_DEV) down -v; \
 		echo "-> Окружение полностью очищено."; \
 	else \
 		echo "-> Очистка отменена."; \
 	fi
 
 logs:
-	docker compose logs -f
+	$(COMPOSE_DEV) logs -f
 
 # ------------------------------------------------------------------------------
 # Управление миграциями БД
@@ -124,7 +136,7 @@ clear_migrations:
 	fi
 
 # ------------------------------------------------------------------------------
-# Проверка качества кода и тесты
+# Проверка качества кода (Ruff + mypy)
 # ------------------------------------------------------------------------------
 lint:
 	@echo '-> ${GREEN}Проверка кода с помощью Ruff linter...${RESET}'
@@ -142,6 +154,10 @@ types:
 	@echo "-> ${GREEN}Проверка типов с помощью mypy...${RESET}"
 	poetry run mypy .
 
+# ------------------------------------------------------------------------------
+# Тесты (Pytest)
+# ------------------------------------------------------------------------------
+
 populate:
 	@echo "-> Наполнение БД тестовыми данными..."
 	# Запускаем скрипт как модуль (-m), чтобы работал импорт config.settings
@@ -149,17 +165,25 @@ populate:
 
 test-up:
 	@echo "-> Запуск тестового окружения..."
-	docker compose -f docker-compose.test.yml up -d
+	$(COMPOSE_TEST) up -d db_test redis_test
+	@echo "-> Ожидание готовности БД..."
+	@sleep 3
 	@echo "-> Тестовое окружение успешно запущено."
 
 test-down:
 	@echo "-> Остановка тестового окружения..."
-	docker compose -f docker-compose.test.yml down
+	$(COMPOSE_TEST) down
 	@echo "-> Тестовое окружение остановлено."
 
 test:
+	$(MAKE) test-up
 	@echo "-> ${GREEN}Запуск тестов с (подключение к localhost:5433)...${RESET}"
 	poetry run pytest
+	$(COMPOSE_TEST) stop
+
+test-clean:
+	$(COMPOSE_TEST) down -v
+	$(MAKE) test
 
 test-cov:
 	@echo "-> ${GREEN}Запуск тестов с отчетом о покрытии (подключение к localhost:5433)...${RESET}"
