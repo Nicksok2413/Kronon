@@ -18,22 +18,21 @@ jobs:
       POETRY_VERSION: "2.2.0"
       SECRET_KEY: ci-test-key-at-least-32-characters-long-for-security
       DEBUG: "True"
-      # Формируем DATABASE_URL для автоматического подхвата в settings.py
+      # Передаем DATABASE_URL для автоматического подхвата в settings.py
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kronon_test
-      # Настройки Redis
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
+      # Передаем REDIS_URL для автоматического подхвата в settings.py
+      REDIS_URL: redis://localhost:6379
 
     # Поднимаем сервисы для тестов
     services:
       postgres:
         image: postgres:18.1-bookworm
         env:
-          POSTGRES_DB: kronon_test
+          POSTGRES_DB: postgres
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         options: >-
-          --health-cmd "pg_isready -U postgres -d kronon_test"
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
