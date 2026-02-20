@@ -68,16 +68,15 @@ services:
     # Сервис запустится только если явно попросить профиль 'infra' или сам сервис
     profiles: ["infra"]
     environment:
-      # Хост и порт реальной БД
-      - DB_HOST=${DB_HOST:-db}
-      - DB_PORT=${DB_PORT:-5432}
-      # Порт, который будет слушать сам PgBouncer
-      - LISTEN_PORT=6432
       # Доступ к БД
+      - DB_HOST=db
+      - DB_PORT=5432
       - DB_NAME=${DB_NAME:-kronon_db}
       - DB_USER=${DB_USER:-kronon_user}
       - DB_PASSWORD=${DB_PASSWORD}
       - ADMIN_USERS=${DB_USER:-kronon_db}
+      # Порт, который будет слушать сам PgBouncer
+      - LISTEN_PORT=6432
       # Настройки пулинга
       - POOL_MODE=transaction        # Самый эффективный режим для Django/Celery
       - MAX_CLIENT_CONN=100          # Сколько приложений может подключиться к пулеру
