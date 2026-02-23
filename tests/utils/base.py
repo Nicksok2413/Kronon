@@ -1,4 +1,6 @@
-""" """
+"""
+Базовый класс для асинхронных тестов API
+"""
 
 import json
 from typing import Any
@@ -63,7 +65,7 @@ class BaseAPITest:
                 # Пытаемся распарсить JSON для красивого вывода
                 body = response.json()
                 error_msg = json.dumps(body, indent=2, ensure_ascii=False)
-            except (ValueError, AttributeError):
+            except ValueError, AttributeError:
                 # Если не JSON (например, 500 ошибка с HTML), берем сырой текст
                 error_msg = response.content.decode("utf-8")
 
