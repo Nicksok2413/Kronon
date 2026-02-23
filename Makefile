@@ -157,7 +157,6 @@ types:
 # ------------------------------------------------------------------------------
 # Тесты (Pytest)
 # ------------------------------------------------------------------------------
-
 populate:
 	@echo "-> Наполнение БД тестовыми данными..."
 	# Запускаем скрипт как модуль (-m), чтобы работал импорт config.settings
@@ -165,9 +164,7 @@ populate:
 
 test-up:
 	@echo "-> Запуск тестового окружения..."
-	$(COMPOSE_TEST) up -d db_test redis_test
-	@echo "-> Ожидание готовности БД..."
-	@sleep 3
+	$(COMPOSE_TEST) up -d
 	@echo "-> Тестовое окружение успешно запущено."
 
 test-down:
@@ -179,7 +176,7 @@ test:
 	$(MAKE) test-up
 	@echo "-> ${GREEN}Запуск тестов с (подключение к localhost:5433)...${RESET}"
 	poetry run pytest
-	$(COMPOSE_TEST) stop
+	$(MAKE) test-down
 
 test-clean:
 	$(COMPOSE_TEST) down -v
