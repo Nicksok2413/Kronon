@@ -92,6 +92,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",  # Для GIN индексов и Trigram
     # --- Сторонние библиотеки ---
     "ninja",  # Быстрый API (FastAPI-like)
     "ninja_extra",  # База для контроллеров
@@ -100,7 +101,10 @@ INSTALLED_APPS = [
     "guardian",  # Объектные права доступа (Object Level Permissions)
     "axes",  # Защита от подбора паролей (brute-force protection)
     "corsheaders",  # CORS (для React)
+    "pgtrigger",  # Триггеры для моделей
+    "pghistory",  # Журнал изменений (Audit Log)
     # --- Приложения проекта Kronon ---
+    "apps.common",  # Общие утилиты
     "apps.users",  # Пользователи, Отделы, Авторизация
     "apps.clients",  # Клиенты
 ]
@@ -368,6 +372,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Настройки для Guardian (анонимный пользователь не нужен)
 ANONYMOUS_USER_NAME = None
+
+# Настройки для PgHistory
+PGHISTORY_OBJ_FIELD = "obj"  # Ссылка на объект в таблице истории
 
 
 # ==============================================================================
