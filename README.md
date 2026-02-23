@@ -81,6 +81,31 @@ kronon/
 └── manage.py           # Точка входа
 ```
 
+### Схема окружений
+
+```mermaid
+graph TD
+    subgraph "Local Development (Port 5432)"
+        A[App: runserver] -->|Direct| B[(Postgres: kronon_db)]
+        A -->|Cache| C[(Redis: DB 1)]
+    end
+
+    subgraph "Parallel Testing (Port 5433)"
+        T[Pytest-xdist] -->|Workers| D[(Postgres: RAM Disk)]
+        D -->|Auto-create| D1[(test_db_gw0)]
+        D -->|Auto-create| D2[(test_db_gw1)]
+    end
+
+    subgraph "Production (Port 6432)"
+        P[Gunicorn/Uvicorn] -->|Pool| E[PgBouncer]
+        E -->|Transaction| F[(Postgres: Prod)]
+    end
+```
+### Key Features:
+*   **Isolation:** Среды полностью разделены по портам (5432 vs 5433), что исключает затирание данных при тестах.
+*   **Performance:** Тестовая база работает в RAM (tmpfs) с отключенным fsync, что дает хороший буст скорости.
+*   **Scalability:** Готовность к Production через PgBouncer и лимиты ресурсов Docker.
+
 ---
 
 ## 💻 Локальный запуск (DX)
