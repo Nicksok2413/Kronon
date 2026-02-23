@@ -24,7 +24,7 @@ repos:
   # -------------------------------------------------------------------------
   # Хуки для Ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.14
+    rev: v0.15.2
     hooks:
       # Запуск линтера (аналог `ruff check --fix`)
       - id: ruff-check
