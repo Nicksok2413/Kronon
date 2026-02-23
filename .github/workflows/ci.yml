@@ -97,4 +97,4 @@ jobs:
 
       # 4. Тесты
       - name: Run Tests (Pytest)
-        run: poetry run pytest
+        run: poetry run pytest -n auto --dist loadscope

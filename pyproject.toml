@@ -49,6 +49,7 @@ dev = [
     "pytest-asyncio (>=1.3.0,<2.0.0)",
     "pytest-env (>=1.5.0,<2.0.0)",
     "pytest-cov (>=7.0.0,<8.0.0)",
+    "pytest-xdist (>=3.8.0,<4.0.0)",
     "factory-boy (>=3.3.3,<4.0.0)",
     # Linters & Formatters
     "ruff (>=0.15.2,<0.16.0)",
@@ -220,8 +221,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 # Опции запуска
-# --reuse-db ускоряет тесты: не удаляет тестовую БД между прогонами, а просто очищает таблицы
-addopts = "--reuse-db"
+# --reuse-db: ускоряет тесты, не удаляет тестовую БД между прогонами, а просто очищает таблицы
+# -n auto: автоматическое определение ядер процессора
+# --dist loadscope: чтобы тесты внутри одного класса выполнялись на одном воркере, сохраняя логику BaseAPITest
+addopts = "--reuse-db -n auto --dist loadscope"
 
 # Игнорируем предупреждения о deprecation (опционально, чтобы вывод был чище)
 filterwarnings = [
