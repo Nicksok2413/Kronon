@@ -22,7 +22,7 @@ class DepartmentFactory(DjangoModelFactory):
         model = Department
         django_get_or_create = ("name",)
 
-    name = factory.Faker("job")  # Генерируем случайные названия
+    name: str = factory.Faker("job")  # Генерируем случайные названия
 
 
 class UserFactory(DjangoModelFactory):
@@ -31,17 +31,17 @@ class UserFactory(DjangoModelFactory):
     class Meta:
         model = User
 
-    email = factory.Faker("email")
-    first_name = factory.Faker("first_name", locale="ru_RU")
-    last_name = factory.Faker("last_name", locale="ru_RU")
+    email: str = factory.Faker("email")
+    first_name: str = factory.Faker("first_name", locale="ru_RU")
+    last_name: str = factory.Faker("last_name", locale="ru_RU")
     # Хешируем пароль сразу, чтобы можно было войти
-    password = factory.LazyFunction(lambda: make_password("password"))
+    password: str = factory.LazyFunction(lambda: make_password("password"))
 
-    role = factory.Iterator(UserRole.values)
-    department = factory.SubFactory(DepartmentFactory)
+    role: str = factory.Iterator(UserRole.values)
+    department: str = factory.SubFactory(DepartmentFactory)
 
-    is_active = True
-    is_staff = True  # Чтобы пускало в админку
+    is_active: bool = True
+    is_staff: bool = True  # Чтобы пускало в админку
 
 
 class ClientFactory(DjangoModelFactory):
@@ -50,13 +50,17 @@ class ClientFactory(DjangoModelFactory):
     class Meta:
         model = Client
 
-    name = factory.Faker("company", locale="ru_RU")
-    full_legal_name = factory.LazyAttribute(lambda o: f"OOO {o.name}")
-    unp = factory.LazyFunction(generate_valid_unp)
+    name: str = factory.Faker("company", locale="ru_RU")
+    unp: str = factory.LazyFunction(generate_valid_unp)
 
-    org_type = factory.Iterator(OrganizationType.values)
-    tax_system = factory.Iterator(TaxSystem.values)
-    status = factory.Iterator(ClientStatus.values)
+    org_type: str = factory.Iterator(OrganizationType.values)
+    tax_system: str = factory.Iterator(TaxSystem.values)
+    status: str = factory.Iterator(ClientStatus.values)
+
+    @factory.lazy_attribute
+    def full_legal_name(self) -> str:
+        """Генерирует полное название на основе типа организации."""
+        return f"{self.org_type.upper()} {self.name}"
 
     # Генерация безопасного contact_info (JSON поле)
     @factory.lazy_attribute
@@ -66,7 +70,7 @@ class ClientFactory(DjangoModelFactory):
 
         # Если slug пустой (все символы удалились), генерируем рандом
         if not safe_name:
-            safe_name = f"client{random.randint(1000, 9999)}"
+            safe_name = f"client-{random.randint(1000, 9999)}"
 
         email = f"info@{safe_name}.by"
 

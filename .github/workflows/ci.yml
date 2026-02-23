@@ -16,49 +16,44 @@ jobs:
     env:
       PYTHON_VERSION: "3.14"
       POETRY_VERSION: "2.2.0"
-      SECRET_KEY: test-super-secret-key-for-ci-pipeline-that-is-at-least-32-characters-long
+      SECRET_KEY: "ci-test-key-at-least-32-characters-long-for-security"
       DEBUG: "True"
-
-      # Формируем DATABASE_URL для автоматического подхвата в settings.py
-      DATABASE_URL: postgresql://test_user:test_password@localhost:5432/test_db
-
-      # Настройки Redis
-      REDIS_HOST: localhost
-      REDIS_PORT: 6379
+      # Передаем DATABASE_URL для автоматического подхвата в settings.py
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5433/kronon_test"
+      # Передаем REDIS_URL для автоматического подхвата в settings.py
+      REDIS_URL: "redis://localhost:6380"
 
     # Поднимаем сервисы для тестов
     services:
       postgres:
         image: postgres:18.1-bookworm
         env:
-          POSTGRES_DB: test_db
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-        # Healthcheck
+          POSTGRES_DB: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
         options: >-
-          --health-cmd "pg_isready -U test_user -d test_db"
+          --health-cmd "pg_isready -U postgres"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 5432:5432
+          - 5433:5432
 
       redis:
         image: redis:7-alpine
-        # Healthcheck
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 6379:6379
+          - 6380:6379
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -73,23 +68,18 @@ jobs:
 
       # Настраиваем кэширование виртуального окружения
       - name: Load cached venv
-        # Даем ID этому шагу, чтобы ссылаться на него
-        id: cached-poetry-dependencies
         uses: actions/cache@v4
         with:
           # Путь к директории, которую нужно кэшировать
           path: .venv
           # Ключ кэша: он будет уникальным для комбинации ОС, версии Python и содержимого poetry.lock
           key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
-          # Ключи для восстановления, если точного совпадения нет
-          restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
 
       # Устанавливаем зависимости
       - name: Install dependencies
-        # Запускаем этот шаг, только если кэш не был найден
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: |
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction --no-root
 
       # 1. Линтинг
       - name: Lint & format check (Ruff)
@@ -107,4 +97,4 @@ jobs:
 
       # 4. Тесты
       - name: Run Tests (Pytest)
-        run: poetry run pytest
+        run: poetry run pytest -n auto --dist loadscope

@@ -1,0 +1,25 @@
+services:
+  db_test:
+    image: postgres:18.1-bookworm
+    container_name: kronon_db_test
+    # Критично для Postgres 18 при прогоне тяжелых миграций в тестах
+    shm_size: 256mb
+    # Отключаем синхронизацию с диском для скорости тестов
+    command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off
+    # Данные в оперативной памяти для максимальной скорости тестов
+    tmpfs: /var/lib/postgresql
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PGDATA: /var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+    ports:
+      - "5433:5432"  # Пробрасываем отдельный порт для тестов
+
+  redis_test:
+    image: redis:7-alpine
+    container_name: kronon_redis_test
+    ports:
+      - "6380:6379"  # Пробрасываем отдельный порт для тестов

@@ -11,6 +11,11 @@ import django
 from loguru import logger as log
 
 # Настройка окружения Django
+
+# Умное определение хоста: если мы не в докере, стучимся в localhost
+if not os.environ.get("DB_HOST") and not os.path.exists("/.dockerenv"):
+    os.environ["DB_HOST"] = "localhost"
+
 # Нужно указать, где лежат настройки, перед импортом моделей
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django.setup()
@@ -33,7 +38,7 @@ def create_structure() -> None:
         department = DepartmentFactory(name=name)
         departments.append(department)
 
-    log.info(f"Создано отделов: {len(departments)}")
+    log.info(f"Departments created: {len(departments)}")
 
     # Сотрудники
     users = []
@@ -56,7 +61,7 @@ def create_structure() -> None:
             user.save()
             users.append(user)
 
-    log.info(f"Создано сотрудников: {len(users)}")
+    log.info(f"Employees created: {len(users)}")
 
     # Клиенты
     clients_count = 10
@@ -67,20 +72,20 @@ def create_structure() -> None:
 
         ClientFactory(accountant=accountant, payroll_accountant=payroll_accountant, department=accountant.department)
 
-    log.info(f"Создано клиентов: {clients_count}")
+    log.info(f"Clients created: {clients_count}")
 
 
 if __name__ == "__main__":
     if not settings.DEBUG:
-        log.error("⚠️ ВНИМАНИЕ: Попытка запустить сидинг на PRODUCTION-окружении! Прерывание.")
+        log.error("⚠️ WARNING: Attempting to run seeding on a PRODUCTION environment! Terminated.")
         sys.exit(1)
 
-    log.info("Начинаем наполнение базы данных...")
+    log.info("Start seeding DB...")
 
     try:
         with transaction.atomic():
             create_structure()
-        log.success("БД успешно наполнена тестовыми данными.")
+        log.success("DB successfully seeded with test data.")
     except Exception as exc:
-        log.exception(f"Ошибка при наполнении БД: {exc}")
+        log.exception(f"Error seeding DB: {exc}")
         sys.exit(1)

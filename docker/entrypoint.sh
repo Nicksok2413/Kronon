@@ -15,23 +15,23 @@ import time
 try:
     # Безопасно формируем строку подключения, которая корректно экранирует спецсимволы
     conn_str = psycopg.conninfo.make_conninfo(
-        dbname=os.environ.get("DB_NAME"),
-        user=os.environ.get("DB_USER"),
-        password=os.environ.get("DB_PASSWORD"),
-        host=os.environ.get("DB_HOST"),
-        port=os.environ.get("DB_PORT"),
+        dbname=os.environ.get("DB_NAME", "kronon_db"),
+        user=os.environ.get("DB_USER", "kronon_user"),
+        password=os.environ.get("DB_PASSWORD", "secret_password"),
+        host=os.environ.get("DB_HOST", "db"),
+        port=os.environ.get("DB_PORT", "5432"),
     )
 
     connection = None
     print("Попытка подключения к БД...")
 
-    for attempt in range(30):
+    for attempt in range(1, 33):
         try:
             connection = psycopg.connect(conn_str, connect_timeout=2)
-            print(f"   Попытка {attempt+1}/30: PostgreSQL запущен - соединение установлено.")
+            print(f"   Попытка {attempt}/30: PostgreSQL запущен - соединение установлено.")
             break
         except psycopg.OperationalError as exc:
-            print(f"   Попытка {attempt+1}/30: PostgreSQL недоступен, ожидание... ({exc})")
+            print(f"   Попытка {attempt}/30: PostgreSQL недоступен, ожидание... ({exc})")
             time.sleep(1)
 
     if connection is None:
