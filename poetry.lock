@@ -700,6 +700,37 @@ pyjwt = [
 crypto = ["cryptography (>=3.3.1)"]
 
 [[package]]
+name = "django-pghistory"
+version = "3.9.2"
+description = "History tracking for Django and Postgres"
+optional = false
+python-versions = "<4,>=3.10.0"
+groups = ["main"]
+files = [
+    {file = "django_pghistory-3.9.2-py3-none-any.whl", hash = "sha256:1623633af429837567dd11469823b9bb3c3f908cc117d60f097d23f3f0622fa2"},
+    {file = "django_pghistory-3.9.2.tar.gz", hash = "sha256:1d07b75b61501a209330e7fb43fad2b2482f7f0399a36fa91aa7600a03025921"},
+]
+
+[package.dependencies]
+django = ">=4.2"
+django-pgtrigger = ">=4.15.0"
+
+[[package]]
+name = "django-pgtrigger"
+version = "4.17.0"
+description = "Postgres trigger support integrated with Django models."
+optional = false
+python-versions = "<4,>=3.10.0"
+groups = ["main"]
+files = [
+    {file = "django_pgtrigger-4.17.0-py3-none-any.whl", hash = "sha256:06048cdeb57e20987fd0bf7dd673512a1413a08868eea248d70dbb970e967175"},
+    {file = "django_pgtrigger-4.17.0.tar.gz", hash = "sha256:55d297a756b5b6a8e0c533d3323fda1589c699e7d14aa3fff7fa7d774c46363c"},
+]
+
+[package.dependencies]
+django = ">=4.2"
+
+[[package]]
 name = "django-redis"
 version = "6.0.0"
 description = "Full featured redis cache backend for Django."
@@ -1471,6 +1502,7 @@ files = [
 
 [package.dependencies]
 psycopg-binary = {version = "3.3.3", optional = true, markers = "implementation_name != \"pypy\" and extra == \"binary\""}
+psycopg-pool = {version = "*", optional = true, markers = "extra == \"pool\""}
 tzdata = {version = "*", markers = "sys_platform == \"win32\""}
 
 [package.extras]
@@ -1546,6 +1578,24 @@ files = [
     {file = "psycopg_binary-3.3.3-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:e7800e6c6b5dc4b0ca7cc7370f770f53ac83886b76afda0848065a674231e856"},
     {file = "psycopg_binary-3.3.3-cp314-cp314-win_amd64.whl", hash = "sha256:165f22ab5a9513a3d7425ffb7fcc7955ed8ccaeef6d37e369d6cc1dff1582383"},
 ]
+
+[[package]]
+name = "psycopg-pool"
+version = "3.3.0"
+description = "Connection Pool for Psycopg"
+optional = false
+python-versions = ">=3.10"
+groups = ["main"]
+files = [
+    {file = "psycopg_pool-3.3.0-py3-none-any.whl", hash = "sha256:2e44329155c410b5e8666372db44276a8b1ebd8c90f1c3026ebba40d4bc81063"},
+    {file = "psycopg_pool-3.3.0.tar.gz", hash = "sha256:fa115eb2860bd88fce1717d75611f41490dec6135efb619611142b24da3f6db5"},
+]
+
+[package.dependencies]
+typing-extensions = ">=4.6"
+
+[package.extras]
+test = ["anyio (>=4.0)", "mypy (>=1.14)", "pproxy (>=2.7)", "pytest (>=6.2.5)", "pytest-cov (>=3.0)", "pytest-randomly (>=3.5)"]
 
 [[package]]
 name = "pycparser"
@@ -2658,4 +2708,4 @@ dev = ["black (>=19.3b0) ; python_version >= \"3.6\"", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14,<4.0"
-content-hash = "0b614fb0e10ddb56262ff31aee392c65dfc7583330db9b0861d8eb6eb562f1d5"
+content-hash = "271bab60103c66e867d98814c6db0d147067a11e929d1dc70f001f888aa68448"
