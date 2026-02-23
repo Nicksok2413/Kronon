@@ -16,12 +16,12 @@ jobs:
     env:
       PYTHON_VERSION: "3.14"
       POETRY_VERSION: "2.2.0"
-      SECRET_KEY: ci-test-key-at-least-32-characters-long-for-security
+      SECRET_KEY: "ci-test-key-at-least-32-characters-long-for-security"
       DEBUG: "True"
       # Передаем DATABASE_URL для автоматического подхвата в settings.py
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/kronon_test
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/kronon_test"
       # Передаем REDIS_URL для автоматического подхвата в settings.py
-      REDIS_URL: redis://localhost:6379
+      REDIS_URL: "redis://localhost:6379"
 
     # Поднимаем сервисы для тестов
     services:
