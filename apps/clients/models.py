@@ -4,16 +4,18 @@
 
 from typing import TYPE_CHECKING
 
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from pghistory import track as pghistory_track
 
+from apps.clients.types import ContactInfo
 from apps.common.models import BaseModel
 from apps.common.validators import validate_unp
 from apps.users.models import Department, User, UserRole
 
 if TYPE_CHECKING:
     from apps.clients.schemas.contacts import ClientContactInfoUpdate
-    from apps.clients.types import ContactInfo
 
 
 class OrganizationType(models.TextChoices):
@@ -60,12 +62,15 @@ class ClientStatus(models.TextChoices):
     LEAD = "lead", "Потенциальный"
 
 
+@pghistory_track()
 class Client(BaseModel):
     """
     Карточка клиента (Контрагента).
 
     Наследуется от BaseModel.
     Содержит юридическую информацию, настройки налогов и ответственных.
+    Использует GIN индексы для быстрого поиска по подстроке (Trigram).
+    Использует системное версионирование через pgHistory (триггеры).
     """
 
     # Основная информация
@@ -208,6 +213,17 @@ class Client(BaseModel):
         verbose_name = _("Клиент")
         verbose_name_plural = _("Клиенты")
 
+        # Индексы для оптимизации поиска
+        indexes = [
+            # Комбинированный GIN индекс для быстрого поиска (Trigram)
+            # Позволяет делать ILIKE '%запрос%' по любому из трех полей очень быстро
+            GinIndex(
+                name="client_search_gin_trgm_idx",
+                fields=["name", "full_legal_name", "unp"],
+                opclasses=["gin_trgm_ops", "gin_trgm_ops", "gin_trgm_ops"],
+            ),
+        ]
+
     def __str__(self) -> str:
         return f"{self.name} (УНП: {self.unp})"
 
@@ -219,7 +235,6 @@ class Client(BaseModel):
         Returns:
             ContactInfo: Объект с данными.
         """
-        from apps.clients.types import ContactInfo
 
         # Если данных нет или это не словарь, создаем пустую схему
         if not isinstance(self.contact_info, dict) or not self.contact_info:

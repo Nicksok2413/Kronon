@@ -94,10 +94,12 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     # TODO: добавить проверку прав (например, только админ или lead_acc)
     # if not request.user.ahas_perm("clients.add_client"): ...
 
-    log.info(f"User {request.user.id} initiates client creation.")
+    user_id = request.user.id
+
+    log.info(f"User {user_id} initiates client creation.")
 
     # Вызываем сервис создания
-    client = await create_client(data=payload)
+    client = await create_client(data=payload, user_id=user_id)
 
     # Возвращаем созданного клиента
     return 201, client
@@ -123,7 +125,9 @@ async def update_client_endpoint(
     """
     # TODO: добавить проверку прав
 
-    log.info(f"User {request.user.id} initiates update for client {client_id}")
+    user_id = request.user.id
+
+    log.info(f"User {user_id} initiates update for client {client_id}")
 
     # Находим клиента, используя селектор для поиска
     client = await get_client_by_id(client_id=client_id)
@@ -133,7 +137,7 @@ async def update_client_endpoint(
         raise HttpError(status_code=404, message="Клиент не найден")
 
     # Вызываем сервис обновления
-    updated_client = await update_client(client=client, data=payload)
+    updated_client = await update_client(client=client, data=payload, user_id=user_id)
 
     # Возвращаем обновленного клиента
     return 200, updated_client
@@ -156,17 +160,19 @@ async def delete_client_endpoint(request: HttpRequest, client_id: uuid.UUID) -> 
     """
     # TODO: добавить проверку прав
 
-    log.info(f"User {request.user.id} initiates deletion of client {client_id}")
+    user_id = request.user.id
+
+    log.info(f"User {user_id} initiates deletion of client {client_id}")
 
     # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id)
+    client = await get_client_by_id(client_id=client_id)
 
     # Проверяем существование клиента
     if not client:
         raise HttpError(status_code=404, message="Клиент не найден")
 
     # Вызываем сервис удаления
-    await delete_client(client)
+    await delete_client(client=client, user_id=user_id)
 
     # Возвращаем код ответа
     return 204, None
