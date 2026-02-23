@@ -69,22 +69,21 @@ jobs:
       # Настраиваем кэширование виртуального окружения
       - name: Load cached venv
         # Даем ID этому шагу, чтобы ссылаться на него
-        id: cached-poetry-dependencies
+        # id: cached-poetry-dependencies
         uses: actions/cache@v4
         with:
           # Путь к директории, которую нужно кэшировать
           path: .venv
           # Ключ кэша: он будет уникальным для комбинации ОС, версии Python и содержимого poetry.lock
           key: venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('**/poetry.lock') }}
-          # Ключи для восстановления, если точного совпадения нет
-          restore-keys: |
-            venv-${{ runner.os }}-${{ env.PYTHON_VERSION }}-
 
       # Устанавливаем зависимости
       - name: Install dependencies
         # Запускаем этот шаг, только если кэш не был найден
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        # if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: |
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction --no-root
 
       # 1. Линтинг
       - name: Lint & format check (Ruff)
