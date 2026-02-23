@@ -19,9 +19,9 @@ jobs:
       SECRET_KEY: "ci-test-key-at-least-32-characters-long-for-security"
       DEBUG: "True"
       # Передаем DATABASE_URL для автоматического подхвата в settings.py
-      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/kronon_test"
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5433/kronon_test"
       # Передаем REDIS_URL для автоматического подхвата в settings.py
-      REDIS_URL: "redis://localhost:6379"
+      REDIS_URL: "redis://localhost:6380"
 
     # Поднимаем сервисы для тестов
     services:
@@ -37,7 +37,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 5432:5432
+          - 5433:5432
 
       redis:
         image: redis:7-alpine
@@ -47,7 +47,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 6379:6379
+          - 6380:6379
 
     steps:
       - name: Checkout code
