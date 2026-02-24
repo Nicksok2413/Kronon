@@ -125,6 +125,27 @@ sequenceDiagram
     DB-->>Django: Success
     Django-->>User: 200 OK (Data Updated & Logged)
 ```
+
+```mermaid
+sequenceDiagram
+    participant S as Service Layer
+    participant C as pghistory.context
+    participant DB as PostgreSQL (Triggers)
+    participant Log as ClientEvent Table
+
+    Note over S: Начинаем обновление Клиента
+    S->>C: Enter Context (user_id=019c..., ip='1.2.3.4')
+    C->>C: Store in Async ContextVar
+
+    S->>DB: UPDATE clients SET status='active'
+
+    Note over DB: Триггер срабатывает внутри транзакции
+    DB->>Log: INSERT Event + Link to Context metadata
+
+    S->>C: Exit Context
+    Note over S: Транзакция COMMIT
+```
+
 #### Key Features:
 *   **Reliability:** Триггеры Postgres сработают всегда.
 *   **Atomic Operations:** Аудит записывается в той же транзакции, что и данные. Нет риска, что данные обновились, а лог не записался.

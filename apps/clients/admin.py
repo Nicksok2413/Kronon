@@ -75,3 +75,8 @@ class ClientAdmin(admin.ModelAdmin[Client]):
         "payroll_accountant",
         "hr_specialist",
     ]
+
+
+# Админка истории изменений
+# Самый надежный способ получить класс модели события:
+ClientEventModel = Client._meta.get_field("events").related_model

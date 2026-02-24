@@ -4,8 +4,8 @@
 
 from uuid import UUID
 
-from ninja import Schema
-from pydantic import EmailStr, Field
+from ninja import Field, Schema
+from pydantic import EmailStr
 
 from apps.users.models import UserRole
 

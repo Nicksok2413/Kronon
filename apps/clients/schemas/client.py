@@ -5,8 +5,8 @@
 from datetime import datetime
 from uuid import UUID
 
-from ninja import Schema
-from pydantic import ConfigDict, Field
+from ninja import Field, Schema
+from pydantic import ConfigDict
 
 from apps.clients.models import ClientStatus, OrganizationType, TaxSystem
 from apps.clients.schemas.contacts import ClientContactInfo, ClientContactInfoUpdate

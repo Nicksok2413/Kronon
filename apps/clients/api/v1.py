@@ -183,7 +183,9 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
 @router.get("/{client_id}/history", response={200, list[ClientHistoryOut]})
 async def get_client_history(request: HttpRequest, client_id: UUID):
     """
-    Получить журнал изменений по клиенту.
+    Получить журнал аудита (историю изменений) клиента.
+
+    Возвращает список снимков состояния объекта, отсортированный от новых к старым.
     Доступно только администраторам.
 
     Args:

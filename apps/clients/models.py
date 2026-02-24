@@ -18,6 +18,15 @@ if TYPE_CHECKING:
     from apps.clients.schemas.contacts import ClientContactInfoUpdate
 
 
+class ClientStatus(models.TextChoices):
+    """Статус обслуживания клиента."""
+
+    ACTIVE = "active", "На обслуживании"
+    ONBOARDING = "onboarding", "Подключение (Договор)"
+    ARCHIVED = "archived", "Архив (Расторгнут)"
+    LEAD = "lead", "Потенциальный"
+
+
 class OrganizationType(models.TextChoices):
     """Типы организаций (РБ)."""
 
@@ -51,15 +60,6 @@ class TaxSystem(models.TextChoices):
 
     # Особые
     PVT = "pvt", "Парк высоких технологий (ПВТ)"
-
-
-class ClientStatus(models.TextChoices):
-    """Статус обслуживания клиента."""
-
-    ACTIVE = "active", "На обслуживании"
-    ONBOARDING = "onboarding", "Подключение (Договор)"
-    ARCHIVED = "archived", "Архив (Расторгнут)"
-    LEAD = "lead", "Потенциальный"
 
 
 @pghistory_track()
@@ -97,6 +97,14 @@ class Client(BaseModel):
         validators=[validate_unp],
     )
 
+    status = models.CharField(
+        _("Статус"),
+        max_length=20,
+        choices=ClientStatus.choices,
+        default=ClientStatus.ONBOARDING,
+        db_index=True,
+    )
+
     org_type = models.CharField(
         _("Тип организации"),
         max_length=10,
@@ -110,14 +118,6 @@ class Client(BaseModel):
         max_length=20,
         choices=TaxSystem.choices,
         default=TaxSystem.USN_NO_NDS,
-    )
-
-    status = models.CharField(
-        _("Статус"),
-        max_length=20,
-        choices=ClientStatus.choices,
-        default=ClientStatus.ONBOARDING,
-        db_index=True,
     )
 
     # Обслуживающий отдел
