@@ -14,13 +14,13 @@ from apps.clients.schemas.client import ClientCreate, ClientUpdate
 from apps.clients.selectors import get_client_by_id
 
 
-async def create_client(data: ClientCreate, user_id: UUID) -> Client:
+async def create_client(data: ClientCreate, user_id: UUID | None = None) -> Client:
     """
     Создает нового клиента в системе.
 
     Args:
         data (ClientCreate): Валидированные входные данные из API.
-        user_id (UUID): ID пользователя, инициирующего создание клиента (для аудита).
+        user_id (UUID | None): ID пользователя, инициирующего создание клиента (для аудита) или None.
 
     Returns:
         Client: Созданный объект с подгруженными связями.
@@ -72,7 +72,7 @@ async def create_client(data: ClientCreate, user_id: UUID) -> Client:
         raise
 
 
-async def update_client(client: Client, data: ClientUpdate, user_id: UUID) -> Client:
+async def update_client(client: Client, data: ClientUpdate, user_id: UUID | None = None) -> Client:
     """
     Выполняет частичное обновление данных клиента (PATCH).
 
@@ -82,7 +82,7 @@ async def update_client(client: Client, data: ClientUpdate, user_id: UUID) -> Cl
     Args:
         client (Client): Объект клиента (уже полученный из БД).
         data (ClientUpdate): Данные для обновления.
-        user_id (UUID): ID пользователя, инициирующего обновление клиента (для аудита).
+        user_id (UUID | None): ID пользователя, инициирующего обновление клиента (для аудита) или None.
 
     Returns:
         Client: Обновленный объект с подгруженными связями.
@@ -135,13 +135,13 @@ async def update_client(client: Client, data: ClientUpdate, user_id: UUID) -> Cl
         raise
 
 
-async def delete_client(client: Client, user_id: UUID) -> None:
+async def delete_client(client: Client, user_id: UUID | None = None) -> None:
     """
     Выполняет мягкое удаление клиента.
 
     Args:
         client (Client): Объект клиента.
-        user_id (UUID): ID пользователя, инициирующего удаление клиента (для аудита).
+        user_id (UUID | None): ID пользователя, инициирующего удаление клиента (для аудита) или None.
     """
     log.info(f"Start deleting client {client.id} (Soft Delete).")
 
