@@ -10,6 +10,7 @@ from django.test import AsyncClient
 
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientOut
+from apps.clients.schemas.history import ClientHistoryOut
 from tests.utils.base import BaseAPITest
 from tests.utils.factories import ClientFactory
 
@@ -111,3 +112,45 @@ class TestClientAPI(BaseAPITest):
 
         # Проверка количества элементов второй страницы
         assert len(json_response_page_2["items"]) == 5
+
+
+class TestClientHistory(BaseAPITest):
+    """ """
+
+    async def test_history_logging(self, auth_client: AsyncClient, api_user) -> None:
+        """
+
+        Args:
+            auth_client: Авторизованный асинхронный клиент.
+        """
+        # Создаем клиента
+        client = await sync_to_async(ClientFactory)()
+
+        # Формируем эндпойнт
+        endpoint: str = f"/api/clients/{client.id}/history"
+
+        # Делаем изменение через API
+        patch_data = {"name": "Updated Name"}
+
+        # Обновляем клиента
+        await auth_client.patch(f"/api/clients/{client.id}/", data=patch_data)
+
+        # Проверяем историю
+        start = perf_counter()
+        response = await auth_client.get(endpoint)
+        end = perf_counter()
+
+        json_response = response.json()
+
+        # Проверки
+        assert len(json_response) >= 1
+        assert json_response[0]["history_data"]["name"] == "Updated Name"
+
+        # Статус код
+        await self.assert_status(response=response, expected_status=200)
+
+        # Время ответа API
+        await self.assert_performance(end - start, max_ms=300)
+
+        # Валидация схемы
+        await self.validate_schema(data=json_response, schema=ClientHistoryOut)
