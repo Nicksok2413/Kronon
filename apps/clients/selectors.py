@@ -5,7 +5,7 @@
 Используют асинхронный подход для неблокирующего ввода-вывода.
 """
 
-import uuid
+from uuid import UUID
 
 from loguru import logger as log
 
@@ -40,14 +40,14 @@ def get_client_queryset() -> SoftDeleteQuerySet[Client]:
     )  # Гарантируем сортировку
 
 
-async def get_client_by_id(client_id: uuid.UUID) -> Client | None:
+async def get_client_by_id(client_id: UUID) -> Client | None:
     """
     Асинхронно получает детальную информацию о клиенте по ID.
 
     Использует оптимизированный QuerySet.
 
     Args:
-        client_id (uuid.UUID): Уникальный идентификатор клиента (UUIDv7).
+        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Returns:
         Client | None: Объект клиента или None, если не найден/удален.

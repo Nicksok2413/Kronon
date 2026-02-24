@@ -2,8 +2,8 @@
 Схемы данных (DTO) для Клиентов.
 """
 
-import uuid
 from datetime import datetime
+from uuid import UUID
 
 from ninja import Schema
 from pydantic import ConfigDict, Field
@@ -34,13 +34,13 @@ class ClientCreate(Schema):
     status: ClientStatus = Field(default=ClientStatus.ONBOARDING, description="Статус клиента")
 
     # Обслуживающий отдел
-    department_id: uuid.UUID | None = Field(default=None, description="ID обслуживающего отдела")
+    department_id: UUID | None = Field(default=None, description="ID обслуживающего отдела")
 
     # Ответственные
-    accountant_id: uuid.UUID | None = Field(default=None, description="ID Ведущего бухгалтера")
-    primary_accountant_id: uuid.UUID | None = Field(default=None, description="ID Бухгалтера по первичной документации")
-    payroll_accountant_id: uuid.UUID | None = Field(default=None, description="ID Бухгалтера по заработной плате")
-    hr_specialist_id: uuid.UUID | None = Field(default=None, description="ID Специалиста по кадрам")
+    accountant_id: UUID | None = Field(default=None, description="ID Ведущего бухгалтера")
+    primary_accountant_id: UUID | None = Field(default=None, description="ID Бухгалтера по первичной документации")
+    payroll_accountant_id: UUID | None = Field(default=None, description="ID Бухгалтера по заработной плате")
+    hr_specialist_id: UUID | None = Field(default=None, description="ID Специалиста по кадрам")
 
     # Вложенная схема для контактов
     # Фронтенд будет слать JSON: {"contact_info": {"contacts": [{"role": "Директор", ...}]}}
@@ -75,22 +75,22 @@ class ClientUpdate(Schema):
     status: ClientStatus | None = Field(default=None, description="Обновить статус клиента")
 
     # Обслуживающий отдел
-    department_id: uuid.UUID | None = Field(default=None, description="Обновить ID обслуживающего отдела")
+    department_id: UUID | None = Field(default=None, description="Обновить ID обслуживающего отдела")
 
     # Ответственные
-    accountant_id: uuid.UUID | None = Field(
+    accountant_id: UUID | None = Field(
         default=None,
         description="Обновить ID Ведущего бухгалтера",
     )
-    primary_accountant_id: uuid.UUID | None = Field(
+    primary_accountant_id: UUID | None = Field(
         default=None,
         description="Обновить ID Бухгалтера по первичной документации",
     )
-    payroll_accountant_id: uuid.UUID | None = Field(
+    payroll_accountant_id: UUID | None = Field(
         default=None,
         description="Обновить ID Бухгалтера по заработной плате",
     )
-    hr_specialist_id: uuid.UUID | None = Field(
+    hr_specialist_id: UUID | None = Field(
         default=None,
         description="Обновить ID Специалиста по кадрам",
     )
@@ -113,7 +113,7 @@ class ClientOut(Schema):
     # Брать данные из ORM объектов (в Ninja Schema включено по умолчанию)
     # model_config = ConfigDict(from_attributes=True)
 
-    id: uuid.UUID = Field(..., description="Уникальный идентификатор клиента (UUIDv7)")
+    id: UUID = Field(..., description="Уникальный идентификатор клиента (UUIDv7)")
 
     # Enum поля автоматически сериализуются в строки (значения)
     status: ClientStatus = Field(..., description="Текущий статус")
