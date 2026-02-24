@@ -86,6 +86,7 @@ if env.bool("USE_X_FORWARDED_HOST", default=True):
 
 INSTALLED_APPS = [
     # --- Встроенные приложения Django ---
+    "pghistory.admin",  # Интеграция журнала изменений (Audit Log) в админку
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
