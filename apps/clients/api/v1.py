@@ -5,8 +5,8 @@ API Endpoints для Клиентов (v1).
 и удаления (DELETE) клиентов.
 """
 
-import uuid
 from typing import Annotated
+from uuid import UUID
 
 from django.http import HttpRequest
 from loguru import logger as log
@@ -18,6 +18,7 @@ from ninja_jwt.authentication import AsyncJWTAuth
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
+from apps.clients.schemas.history import ClientHistoryOut
 from apps.clients.selectors import get_client_by_id, get_client_queryset
 from apps.clients.services import create_client, delete_client, update_client
 from apps.common.managers import SoftDeleteQuerySet
@@ -55,13 +56,13 @@ async def list_clients(
 
 
 @router.get("/{client_id}", response={200: ClientOut})
-async def get_client(request: HttpRequest, client_id: uuid.UUID) -> tuple[int, Client]:
+async def get_client(request: HttpRequest, client_id: UUID) -> tuple[int, Client]:
     """
     Получить детальную информацию о клиенте по ID.
 
     Args:
         request (HttpRequest): Объект HTTP запроса.
-        client_id (uuid.UUID): Уникальный идентификатор клиента (UUIDv7).
+        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
         HttpError(404): Если клиент не найден.
@@ -94,6 +95,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     # TODO: добавить проверку прав (например, только админ или lead_acc)
     # if not request.user.ahas_perm("clients.add_client"): ...
 
+    # Получает ID пользователя из запроса
     user_id = request.user.id
 
     log.info(f"User {user_id} initiates client creation.")
@@ -106,15 +108,13 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
 
 
 @router.patch("/{client_id}", response={200: ClientOut})
-async def update_client_endpoint(
-    request: HttpRequest, client_id: uuid.UUID, payload: ClientUpdate
-) -> tuple[int, Client]:
+async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload: ClientUpdate) -> tuple[int, Client]:
     """
     Частичное обновление данных клиента.
 
     Args:
         request (HttpRequest): Объект HTTP запроса.
-        client_id (uuid.UUID): Уникальный идентификатор клиента (UUIDv7).
+        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
         payload (ClientUpdate): Данные для обновления.
 
     Raises:
@@ -125,6 +125,7 @@ async def update_client_endpoint(
     """
     # TODO: добавить проверку прав
 
+    # Получает ID пользователя из запроса
     user_id = request.user.id
 
     log.info(f"User {user_id} initiates update for client {client_id}")
@@ -144,13 +145,13 @@ async def update_client_endpoint(
 
 
 @router.delete("/{client_id}", response={204: None})
-async def delete_client_endpoint(request: HttpRequest, client_id: uuid.UUID) -> tuple[int, None]:
+async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple[int, None]:
     """
     Удалить клиента (Soft Delete).
 
     Args:
         request (HttpRequest): Объект HTTP запроса.
-        client_id (uuid.UUID): Уникальный идентификатор клиента (UUIDv7).
+        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
         HttpError(404): Если клиент не найден.
@@ -160,6 +161,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: uuid.UUID) -> 
     """
     # TODO: добавить проверку прав
 
+    # Получает ID пользователя из запроса
     user_id = request.user.id
 
     log.info(f"User {user_id} initiates deletion of client {client_id}")
@@ -176,3 +178,43 @@ async def delete_client_endpoint(request: HttpRequest, client_id: uuid.UUID) -> 
 
     # Возвращаем код ответа
     return 204, None
+
+
+@router.get("/{client_id}/history", response={200, list[ClientHistoryOut]})
+async def get_client_history(request: HttpRequest, client_id: UUID):
+    """
+    Получить журнал изменений по клиенту.
+    Доступно только администраторам.
+
+    Args:
+        request (HttpRequest): Объект запроса.
+        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+
+    Raises:
+        HttpError(403): При попытке доступа не эндпойнту без соответствующих прав.
+
+    Returns:
+        list[ClientHistoryOut]: Список записей изменений клиента.
+    """
+
+    # Проверяем доступ (например, историю видит только Админ)
+    if not request.user.is_staff:
+        raise HttpError(status_code=403, message="Журнал аудита доступен только администраторам.")
+
+    # Находим клиента, используя селектор для поиска
+    client = await get_client_by_id(client_id=client_id)
+
+    # Проверяем существование клиента
+    if not client:
+        raise HttpError(status_code=404, message="Клиент не найден")
+
+    # Возвращаем историю, отсортированную от новых к старым
+    return client.events.order_by("-history_created_at")
+
+    # # Получаем историю (синхронно, так как simple-history пока не полностью async)
+    # # Используем select_related для юзера, который сделал изменение
+    # # all()[:20] - берем последние 20 изменений
+    # history_qs = client.history.select_related("history_user").order_by("-history_date")[:50]
+    #
+    # # Преобразуем в список асинхронно (для совместимости с async view)
+    # return [h async for h in history_qs]
