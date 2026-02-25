@@ -373,12 +373,13 @@ DEFAULT_PHONE_REGION = "BY"  # по умолчанию `Беларусь`
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Настройки для Guardian (анонимный пользователь не нужен)
+# --- Настройки для Guardian ---
+# Анонимный пользователь не нужен
 ANONYMOUS_USER_NAME = None
 
-# Настройки для PgHistory
-PGHISTORY_OBJ_FIELD = "obj"  # Ссылка на объект в таблице истории
-
+# --- Настройки для PgHistory ---
+# Глобальная модель для админки событий всех моделей, чтобы видеть колонки user и url
+PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
 
 # ==============================================================================
 # LOGURU & SENTRY CONFIGURATION
