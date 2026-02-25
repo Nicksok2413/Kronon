@@ -43,7 +43,7 @@ class TestClientAPI(BaseAPITest):
         # Выполняем запрос
         start = perf_counter()
         response = await auth_client.post(self.endpoint, data=payload, content_type="application/json")
-        end = perf_counter()
+        elapsed_time = perf_counter() - start
 
         json_response: dict[str, Any] = response.json()
 
@@ -55,7 +55,7 @@ class TestClientAPI(BaseAPITest):
         await self.assert_status(response=response, expected_status=201)
 
         # Время ответа API
-        await self.assert_performance(end - start, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
         # Валидация схемы
         await self.validate_schema(data=json_response, schema=ClientOut)
@@ -77,7 +77,7 @@ class TestClientAPI(BaseAPITest):
         # Запрашиваем первую страницу
         start = perf_counter()
         response_page_1 = await auth_client.get(f"{self.endpoint}?page=1")
-        end = perf_counter()
+        elapsed_time = perf_counter() - start
 
         json_response_page_1: dict[str, Any] = response_page_1.json()
 
@@ -85,7 +85,7 @@ class TestClientAPI(BaseAPITest):
         await self.assert_status(response=response_page_1, expected_status=200)
 
         # Время ответа API
-        await self.assert_performance(end - start, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
         # Валидация схемы
         await self.validate_schema(data=json_response_page_1["items"], schema=ClientOut, many=True)
@@ -97,7 +97,7 @@ class TestClientAPI(BaseAPITest):
         # Запрашиваем вторую страницу
         start = perf_counter()
         response_page_2 = await auth_client.get(f"{self.endpoint}?page=2")
-        end = perf_counter()
+        elapsed_time = perf_counter() - start
 
         json_response_page_2: dict[str, Any] = response_page_2.json()
 
@@ -105,7 +105,7 @@ class TestClientAPI(BaseAPITest):
         await self.assert_status(response=response_page_2, expected_status=200)
 
         # Время ответа API
-        await self.assert_performance(end - start, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
         # Валидация схемы
         await self.validate_schema(data=json_response_page_2["items"], schema=ClientOut, many=True)
@@ -138,7 +138,7 @@ class TestClientHistory(BaseAPITest):
         # Проверяем историю
         start = perf_counter()
         response = await auth_client.get(endpoint)
-        end = perf_counter()
+        elapsed_time = perf_counter() - start
 
         json_response = response.json()
 
@@ -150,7 +150,7 @@ class TestClientHistory(BaseAPITest):
         await self.assert_status(response=response, expected_status=200)
 
         # Время ответа API
-        await self.assert_performance(end - start, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
         # Валидация схемы
         await self.validate_schema(data=json_response, schema=ClientHistoryOut)
