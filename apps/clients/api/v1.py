@@ -8,6 +8,7 @@ API Endpoints для Клиентов (v1).
 from typing import Annotated
 from uuid import UUID
 
+import pghistory
 from django.http import HttpRequest
 from loguru import logger as log
 from ninja import Query, Router
@@ -18,7 +19,7 @@ from ninja_jwt.authentication import AsyncJWTAuth
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
-from apps.clients.schemas.history import ClientHistoryOut
+from apps.clients.schemas.history import ClientHistoryItem
 from apps.clients.selectors import get_client_by_id, get_client_queryset
 from apps.clients.services import create_client, delete_client, update_client
 from apps.common.managers import SoftDeleteQuerySet
@@ -180,8 +181,8 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     return 204, None
 
 
-@router.get("/{client_id}/history", response={200, list[ClientHistoryOut]})
-async def get_client_history(request: HttpRequest, client_id: UUID):
+@router.get("/{client_id}/history", response={200, list[ClientHistoryItem]})
+async def get_client_history(request: HttpRequest, client_id: UUID) -> list[ClientHistoryItem]:
     """
     Получить журнал аудита (историю изменений) клиента.
 
@@ -189,14 +190,15 @@ async def get_client_history(request: HttpRequest, client_id: UUID):
     Доступно только администраторам.
 
     Args:
-        request (HttpRequest): Объект запроса.
+        request (HttpRequest): Объект HTTP запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
         HttpError(403): При попытке доступа не эндпойнту без соответствующих прав.
+        HttpError(404): Если клиент не найден.
 
     Returns:
-        list[ClientHistoryOut]: Список записей изменений клиента.
+        list[ClientHistoryItem]: Список записей изменений клиента.
     """
 
     # Проверяем доступ (например, историю видит только Админ)
@@ -211,12 +213,9 @@ async def get_client_history(request: HttpRequest, client_id: UUID):
         raise HttpError(status_code=404, message="Клиент не найден")
 
     # Возвращаем историю, отсортированную от новых к старым
-    return client.events.order_by("-history_created_at")
+    events = pghistory.models.Events.objects.filter(pgh_obj_id=client_id, pgh_obj_model="clients.Client").order_by(
+        "-pgh_created_at"
+    )
 
-    # # Получаем историю (синхронно, так как simple-history пока не полностью async)
-    # # Используем select_related для юзера, который сделал изменение
-    # # all()[:20] - берем последние 20 изменений
-    # history_qs = client.history.select_related("history_user").order_by("-history_date")[:50]
-    #
     # # Преобразуем в список асинхронно (для совместимости с async view)
-    # return [h async for h in history_qs]
+    return [event async for event in events]
