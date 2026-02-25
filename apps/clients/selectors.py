@@ -5,8 +5,10 @@
 Используют асинхронный подход для неблокирующего ввода-вывода.
 """
 
+from typing import Any
 from uuid import UUID
 
+import pghistory.models
 from loguru import logger as log
 
 from apps.clients.models import Client
@@ -69,3 +71,54 @@ async def get_client_by_id(client_id: UUID) -> Client | None:
         log.error(f"DB Error while fetching client. ID: {client_id}: {exc}")
         # Глобальный хендлер превратит это в 500
         raise
+
+
+async def get_client_history_qs(client_id: UUID) -> list[dict[str, Any]]:
+    """
+    Получает агрегированную историю изменений клиента с вычисленными диффами.
+
+    Использует глобальную модель `pghistory.models.Events` для доступа к `pgh_diff`.
+
+    Args:
+        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+
+    Returns:
+        list[dict[str, Any]]: Список словарей событий, готовых для сериализации в ClientHistoryOut.
+    """
+    # Используем глобальную модель Events, фильтруем вручную по модели и ID
+    # tracks() работает с объектами, а у нас ID + async, проще фильтровать сырым образом
+
+    events_queryset = (
+        pghistory.models.Events.objects.filter(
+            pgh_obj_model="clients.Client",
+            pgh_obj_id=client_id,
+        )
+        .select_related("pgh_context")
+        .order_by("-pgh_created_at")
+    )
+
+    events_data = []
+
+    # Итерируемся асинхронно
+    async for event in events_queryset:
+        # Собираем словарь, который Pydantic превратит в схему
+        snapshot_data = event.pgh_data or {}  # pgh_data - JSON поле со снэпшотом модели
+
+        # Собираем контекст
+        context_data = None
+
+        if event.pgh_context:
+            context_data = {"metadata": event.pgh_context.metadata}
+
+        events_data.append(
+            {
+                "pgh_id": event.pgh_id,
+                "pgh_created_at": event.pgh_created_at,
+                "pgh_label": event.pgh_label,
+                "pgh_diff": event.pgh_diff,
+                "pgh_context": context_data,
+                **snapshot_data,  # Распаковываем pgh_data в верхний уровень для схемы
+            }
+        )
+
+    return events_data
