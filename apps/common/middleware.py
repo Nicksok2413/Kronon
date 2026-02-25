@@ -21,10 +21,10 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         Базовый метод добавляет 'user' (ID) и 'url' (эндпойнт).
 
         Добавляем:
+            'app_source': источник изменения (API/Web),
             'ip': IP адрес,
-            'method': HTTP-метод,
-            'app_source': источник (API/Web),
-            'user_email': email пользователя.
+            'method': HTTP метод,
+            'user_email': Email пользователя.
         """
         # Базовый контекст
         base_context = super().get_context(request)
@@ -42,8 +42,8 @@ class KrononHistoryMiddleware(HistoryMiddleware):
 
         # Обновляем словарь контекста
         return base_context | {
+            "app_source": "API/Web",
             "ip": ip,
             "method": request.method,
-            "app_source": "API/Web",
             "user_email": user_email,
         }
