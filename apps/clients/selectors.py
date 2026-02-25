@@ -101,14 +101,14 @@ async def get_client_history_list(client_id: UUID) -> list[dict[str, Any]]:
 
     # Итерируемся асинхронно
     async for event in events_queryset:
-        # Собираем словарь, который Pydantic превратит в схему
-        snapshot_data = event.pgh_data or {}  # pgh_data - JSON поле со снэпшотом модели
-
         # Собираем контекст
         context_data = None
 
         if event.pgh_context:
             context_data = {"metadata": event.pgh_context.metadata}
+
+        # Собираем словарь, который Pydantic превратит в схему ClientSnapshot
+        snapshot_data = event.pgh_data or {}  # pgh_data - JSON поле со снэпшотом модели
 
         events_data.append(
             {
@@ -117,7 +117,7 @@ async def get_client_history_list(client_id: UUID) -> list[dict[str, Any]]:
                 "pgh_label": event.pgh_label,
                 "pgh_diff": event.pgh_diff,
                 "pgh_context": context_data,
-                **snapshot_data,  # Распаковываем pgh_data в верхний уровень для схемы
+                "snapshot": snapshot_data,
             }
         )
 
