@@ -4,10 +4,10 @@
 
 from typing import TYPE_CHECKING
 
+import pghistory
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from pghistory import track as pghistory_track
 
 from apps.clients.types import ContactInfo
 from apps.common.models import BaseModel
@@ -49,20 +49,19 @@ class TaxSystem(models.TextChoices):
     # Упрощенная система налогообложения
     USN_NO_NDS = "usn_no_nds", "УСН без НДС (6%)"
     USN_NDS = "usn_nds", "УСН с НДС"
-
     # Общая система налогообложения
     OSN = "osn", "Общая система налогообложения (ОСН)"
-
     # Для ИП
     IP_EDINY = "ip_ediny", "Единый налог"
     IP_PODOHODNY = "ip_podohodny", "Подоходный налог (ОСН для ИП)"
     NPD = "npd", "Налог на профессиональный доход (НПД)"
-
     # Особые
     PVT = "pvt", "Парк высоких технологий (ПВТ)"
 
 
-@pghistory_track()
+@pghistory.track(
+    model_name="ClientEvent",  # Явно задаем имя модели событий для предсказуемости
+)
 class Client(BaseModel):
     """
     Карточка клиента (Контрагента).
@@ -215,7 +214,7 @@ class Client(BaseModel):
 
         # Индексы для оптимизации поиска
         indexes = [
-            # Комбинированный GIN индекс для быстрого поиска (Trigram)
+            # GIN индекс для Trigram поиска
             # Позволяет делать ILIKE '%запрос%' по любому из трех полей очень быстро
             GinIndex(
                 name="client_search_gin_trgm_idx",
@@ -291,3 +290,68 @@ class Client(BaseModel):
         self.contact_info = {**current_data, **updates}
 
         return None
+
+
+# Прокси-модель для админки
+class ClientEventProxy(Client.pgh_event_models["events"]):  # type: ignore
+    """
+    Прокси-модель для отображения событий аудита Клиента в админке.
+
+    Использует pghistory.ProxyField для маппинга данных из JSON-контекста
+    в поля модели, доступные для ORM (сортировка, фильтрация).
+    """
+
+    # --- Проксируем поля из метаданных контекста ---
+
+    # Источник изменения (API/Web, Celery, CLI)
+    app_source = pghistory.ProxyField(
+        "pgh_context__metadata__app_source",
+        models.CharField(max_length=50, null=True, blank=True, verbose_name=_("Источник изменения")),
+    )
+
+    # IP адрес
+    ip_address = pghistory.ProxyField(
+        "pgh_context__metadata__ip",
+        models.GenericIPAddressField(null=True, blank=True, verbose_name=_("IP Адрес")),
+    )
+
+    # HTTP метод
+    method = pghistory.ProxyField(
+        "pgh_context__metadata__method",
+        models.CharField(max_length=10, null=True, blank=True, verbose_name=_("HTTP Метод")),
+    )
+
+    #  Email пользователя
+    user_email = pghistory.ProxyField(
+        "pgh_context__metadata__user_email",
+        models.CharField(max_length=254, null=True, blank=True, verbose_name=_("Email пользователя")),
+    )
+
+    # ID пользователя
+    user_id = pghistory.ProxyField(
+        "pgh_context__metadata__user",
+        models.TextField(null=True, blank=True, verbose_name=_("ID пользователя")),
+    )
+
+    # URL запроса
+    url = pghistory.ProxyField(
+        "pgh_context__metadata__url",
+        models.TextField(null=True, blank=True, verbose_name=_("URL")),
+    )
+
+    # Для Celery
+    celery_task = pghistory.ProxyField(
+        "pgh_context__metadata__celery_task",
+        models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Celery Task")),
+    )
+
+    # Для CLI (manage.py)
+    command = pghistory.ProxyField(
+        "pgh_context__metadata__command",
+        models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Команда")),
+    )
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Журнал изменений клиента")
+        verbose_name_plural = _("Журнал изменений клиентов")
