@@ -5,7 +5,7 @@
 from django.contrib import admin
 from pghistory.admin import EventModelAdmin
 
-from apps.clients.models import Client, ClientEventProxy
+from apps.clients.models import Client, ClientEvent
 
 
 @admin.register(Client)
@@ -78,12 +78,11 @@ class ClientAdmin(admin.ModelAdmin[Client]):
     ]
 
 
-@admin.register(ClientEventProxy)
+@admin.register(ClientEvent)
 class ClientEventAdmin(EventModelAdmin):
     """
     Админка для просмотра аудита изменений (History).
     Наследуется от EventModelAdmin для корректного отображения Diff.
-    Работает с Proxy-моделью для доступа к полям контекста.
     """
 
     # Отображаем стандартные поля pghistory + прокси поля
@@ -91,24 +90,24 @@ class ClientEventAdmin(EventModelAdmin):
         "pgh_created_at",
         "pgh_label",
         "client_info",
-        "user_email",  # Proxy field
-        "ip_address",  # Proxy field
-        "app_source",  # Proxy field
+        "user_email",  # Proxy field из модели
+        "app_source",  # Proxy field из модели
+        "ip_address",  # Proxy field из модели
     ]
 
-    list_filter = ["pgh_label", "app_source", "method"]
+    list_filter = ["pgh_label", "app_source"]
 
     # Поиск
     search_fields = [
         "pgh_obj__name",
         "pgh_obj__unp",
-        "user_email",  # Proxy field
-        "ip_address",  # Proxy field
+        "user_email",
+        "ip_address",
     ]
 
     ordering = ["-pgh_created_at"]
 
-    def client_info(self, obj: ClientEventProxy) -> str:
+    def client_info(self, obj: ClientEvent) -> str:
         """
         Отображает информацию об объекте (snapshot).
 

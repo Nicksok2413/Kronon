@@ -59,9 +59,6 @@ class TaxSystem(models.TextChoices):
     PVT = "pvt", "Парк высоких технологий (ПВТ)"
 
 
-@pghistory.track(
-    model_name="ClientEvent",  # Явно задаем имя модели событий для предсказуемости
-)
 class Client(BaseModel):
     """
     Карточка клиента (Контрагента).
@@ -292,13 +289,31 @@ class Client(BaseModel):
         return None
 
 
-# Прокси-модель для админки
-class ClientEventProxy(Client.pgh_event_models["events"]):  # type: ignore
-    """
-    Прокси-модель для отображения событий аудита Клиента в админке.
+# Создаем базовый класс для модели событий.
+# Это аналог того, что делает декоратор @track, но явно.
+BaseClientEvent = pghistory.create_event_model(
+    Client,
+    # Трекеры по умолчанию (Insert, Update)
+    pghistory.InsertEvent(),
+    pghistory.UpdateEvent(),
+    # Явно задаем имя модели событий и имя связи
+    model_name="ClientEvent",
+    obj_field=pghistory.ObjForeignKey(
+        related_name="events",
+        # Если клиента удалят физически, история должна остаться
+        on_delete=models.DO_NOTHING,
+        # Отключаем constraint БД, чтобы не было ошибки целостности при удалении родителя
+        db_constraint=False,
+    ),
+)
 
-    Использует pghistory.ProxyField для маппинга данных из JSON-контекста
-    в поля модели, доступные для ORM (сортировка, фильтрация).
+
+class ClientEvent(BaseClientEvent):  # type: ignore
+    """
+    Модель для хранения истории изменений клиентов.
+
+    Включает в себя snapshot полей модели Client + метаданные аудита.
+    Использует pghistory.ProxyField для удобного доступа к JSON-контексту в Админке.
     """
 
     # --- Проксируем поля из метаданных контекста ---
@@ -352,6 +367,6 @@ class ClientEventProxy(Client.pgh_event_models["events"]):  # type: ignore
     )
 
     class Meta:
-        proxy = True
         verbose_name = _("Журнал изменений клиента")
         verbose_name_plural = _("Журнал изменений клиентов")
+        ordering = ["-pgh_created_at"]
