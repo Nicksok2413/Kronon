@@ -73,7 +73,7 @@ async def get_client_by_id(client_id: UUID) -> Client | None:
         raise
 
 
-async def get_client_history_qs(client_id: UUID) -> list[dict[str, Any]]:
+async def get_client_history_list(client_id: UUID) -> list[dict[str, Any]]:
     """
     Получает агрегированную историю изменений клиента с вычисленными диффами.
 
