@@ -5,10 +5,9 @@ API Endpoints для Клиентов (v1).
 и удаления (DELETE) клиентов.
 """
 
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
-import pghistory
 from django.http import HttpRequest
 from loguru import logger as log
 from ninja import Query, Router
@@ -19,8 +18,8 @@ from ninja_jwt.authentication import AsyncJWTAuth
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
-from apps.clients.schemas.history import ClientHistoryItem
-from apps.clients.selectors import get_client_by_id, get_client_queryset
+from apps.clients.schemas.history import ClientHistoryOut
+from apps.clients.selectors import get_client_by_id, get_client_history_list, get_client_queryset
 from apps.clients.services import create_client, delete_client, update_client
 from apps.common.managers import SoftDeleteQuerySet
 
@@ -181,12 +180,12 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     return 204, None
 
 
-@router.get("/{client_id}/history", response={200, list[ClientHistoryItem]})
-async def get_client_history(request: HttpRequest, client_id: UUID) -> list[ClientHistoryItem]:
+@router.get("/{client_id}/history", response={200, list[ClientHistoryOut]})
+async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict[str, Any]]:
     """
     Получить журнал аудита (историю изменений) клиента.
 
-    Возвращает список снимков состояния объекта, отсортированный от новых к старым.
+    Возвращает список событий с диффами (разницами изменений) и контекстом.
     Доступно только администраторам.
 
     Args:
@@ -198,24 +197,21 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[Clie
         HttpError(404): Если клиент не найден.
 
     Returns:
-        list[ClientHistoryItem]: Список записей изменений клиента.
+        list[dict[str, Any]]: Список событий изменения клиента.
     """
 
     # Проверяем доступ (например, историю видит только Админ)
     if not request.user.is_staff:
         raise HttpError(status_code=403, message="Журнал аудита доступен только администраторам.")
 
-    # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id=client_id)
+    # Проверяем существование клиента (сам объект нам не нужен, поэтому .aexists для скорости)
+    client_exists = await Client.objects.filter(id=client_id).aexists()
 
-    # Проверяем существование клиента
-    if not client:
+    if not client_exists:
         raise HttpError(status_code=404, message="Клиент не найден")
 
-    # Возвращаем историю, отсортированную от новых к старым
-    events = pghistory.models.Events.objects.filter(pgh_obj_id=client_id, pgh_obj_model="clients.Client").order_by(
-        "-pgh_created_at"
-    )
+    # Получаем данные через селектор
+    history_data = await get_client_history_list(client_id=client_id)
 
-    # # Преобразуем в список асинхронно (для совместимости с async view)
-    return [event async for event in events]
+    # Возвращаем данные (Ninja провалидирует через response=list[ClientHistoryOut])
+    return history_data
