@@ -29,9 +29,9 @@ class ClientCreate(Schema):
     # Regex паттерн проверяет, что это ровно 9 цифр
     unp: str = Field(..., pattern=r"^\d{9}$", description="УНП")
 
+    status: ClientStatus = Field(default=ClientStatus.ONBOARDING, description="Статус клиента")
     org_type: OrganizationType = Field(default=OrganizationType.OOO, description="Тип организации")
     tax_system: TaxSystem = Field(default=TaxSystem.USN_NO_NDS, description="Система налогообложения")
-    status: ClientStatus = Field(default=ClientStatus.ONBOARDING, description="Статус клиента")
 
     # Обслуживающий отдел
     department_id: UUID | None = Field(default=None, description="ID обслуживающего отдела")
