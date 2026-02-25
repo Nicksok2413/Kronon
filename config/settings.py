@@ -118,9 +118,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    # HistoryMiddleware собирает context (url, user) для синхронных запросов (Admin, Django Views)
-    # Для Ninja API дополним контекст вручную в сервисах
-    "pghistory.middleware.HistoryMiddleware",
+    # Кастомный middleware для сбора контекста (расширяет pghistory.middleware.HistoryMiddleware)
+    "apps.common.middleware.KrononHistoryMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",  # Middleware безопасности Axes
