@@ -112,6 +112,8 @@ logs:
 migrations:
 	@echo "-> Создание новых миграций..."
 	poetry run python manage.py makemigrations
+	@echo "-> Добавляем зависимость на pg_trgm для приложений, где есть GinIndex..."
+	poetry run python manage.py add_trigram_dependency
 	@echo "-> Миграции успешно созданы."
 
 migrate:
