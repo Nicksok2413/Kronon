@@ -117,7 +117,7 @@ class TestClientAPI(BaseAPITest):
 class TestClientHistory(BaseAPITest):
     """ """
 
-    async def test_history_logging(self, auth_client: AsyncClient, api_user) -> None:
+    async def test_history_logging(self, auth_client: AsyncClient) -> None:
         """
 
         Args:

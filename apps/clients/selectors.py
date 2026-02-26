@@ -88,24 +88,17 @@ async def get_client_history_list(client_id: UUID) -> list[dict[str, Any]]:
     # Используем глобальную модель Events, фильтруем вручную по модели и ID
     # tracks() работает с объектами, а у нас ID + async, проще фильтровать сырым образом
 
-    events_queryset = (
-        pghistory.models.Events.objects.filter(
-            pgh_obj_model="clients.Client",
-            pgh_obj_id=client_id,
-        )
-        .select_related("pgh_context")
-        .order_by("-pgh_created_at")
-    )
+    events_queryset = pghistory.models.Events.objects.filter(
+        pgh_obj_model="clients.Client",
+        pgh_obj_id=client_id,
+    ).order_by("-pgh_created_at")
 
     events_data = []
 
     # Итерируемся асинхронно
     async for event in events_queryset:
         # Собираем контекст
-        context_data = None
-
-        if event.pgh_context:
-            context_data = {"metadata": event.pgh_context.metadata}
+        context_data = event.pgh_context or {}  # pgh_context - JSON поле с денормализованным контекстом
 
         # Собираем словарь, который Pydantic превратит в схему ClientSnapshot
         snapshot_data = event.pgh_data or {}  # pgh_data - JSON поле со снэпшотом модели

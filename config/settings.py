@@ -13,6 +13,7 @@ from typing import Any
 
 from django_stubs_ext import monkeypatch as type_hinting_patch
 from environ import Env
+from pghistory import ContextJSONField
 
 # Импортируем функции настройки Loguru и Sentry
 from config.core.logging import setup_loguru
@@ -299,6 +300,18 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # Максимум 30 минут на зада
 
 
 # ==============================================================================
+# PGHISTORY CONFIGURATION
+# ==============================================================================
+
+# Денормализация контекста: храним контекст в JSONField прямо в таблице события, а не в центральной таблице
+# Это значительно повышает производительность и упрощает SQL-запросы (избавляет от JOIN)
+PGHISTORY_CONTEXT_FIELD = ContextJSONField()
+
+# Глобальная модель для админки событий всех моделей, чтобы видеть колонки user и url
+PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
+
+
+# ==============================================================================
 # INTERNATIONALIZATION
 # ==============================================================================
 
@@ -377,9 +390,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Анонимный пользователь не нужен
 ANONYMOUS_USER_NAME = None
 
-# --- Настройки для PgHistory ---
-# Глобальная модель для админки событий всех моделей, чтобы видеть колонки user и url
-PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
 
 # ==============================================================================
 # LOGURU & SENTRY CONFIGURATION

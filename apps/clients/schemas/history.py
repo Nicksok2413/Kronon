@@ -15,7 +15,7 @@ class HistoryContextMetadata(Schema):
     """Метаданные контекста из pgh_context."""
 
     user: str | None = Field(default=None, description="ID пользователя")
-    email: str | None = Field(default=None, description="Email пользователя")
+    user_email: str | None = Field(default=None, description="Email пользователя")
     app_source: str | None = Field(default=None, description="Источник изменения (API, Celery, CLI)")
     ip_address: str | None = Field(default=None, description="IP адрес инициатора")
     method: str | None = Field(default=None, description="HTTP метод")

@@ -22,7 +22,7 @@ class KrononHistoryMiddleware(HistoryMiddleware):
 
         Добавляем:
             'app_source': источник изменения (API/Web),
-            'ip': IP адрес,
+            'ip_address': IP адрес,
             'method': HTTP метод,
             'user_email': Email пользователя.
         """
@@ -30,12 +30,12 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         base_context = super().get_context(request)
 
         # Получаем IP (с учетом прокси)
-        ip = request.META.get("HTTP_X_FORWARDED_FOR")
+        ip_address = request.META.get("HTTP_X_FORWARDED_FOR")
 
-        if ip:
-            ip = ip.split(",")[0]
+        if ip_address:
+            ip_address = ip_address.split(",")[0]
         else:
-            ip = request.META.get("REMOTE_ADDR")
+            ip_address = request.META.get("REMOTE_ADDR")
 
         # Полезно сохранить email, чтобы он остался в истории при удалении юзера
         user_email = getattr(request.user, "email", None) if request.user.is_authenticated else None
@@ -43,7 +43,7 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         # Обновляем словарь контекста
         return base_context | {
             "app_source": "API/Web",
-            "ip": ip,
+            "ip_address": ip_address,
             "method": request.method,
             "user_email": user_email,
         }

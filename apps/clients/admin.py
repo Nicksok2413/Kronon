@@ -2,7 +2,10 @@
 Админка для клиентов и журнала аудита.
 """
 
+from typing import Any
+
 from django.contrib import admin
+from django.http import HttpRequest
 from pghistory.admin import EventModelAdmin
 
 from apps.clients.models import Client, ClientEvent
@@ -87,37 +90,68 @@ class ClientEventAdmin(EventModelAdmin):
 
     # Отображаем стандартные поля pghistory + прокси поля
     list_display = [
-        "pgh_obj",
-        "pgh_label",
-        # "client_info",
-        "user_email",  # Proxy field из модели
-        "app_source",  # Proxy field из модели
-        "ip_address",  # Proxy field из модели
         "pgh_created_at",
+        "pgh_label",
+        "client_info",
+        "get_user_info",  # Используем проксированный FK
+        "app_source",
+        "ip_address",
     ]
 
     list_filter = ["pgh_label", "app_source"]
 
-    # Поиск
+    # Делаем JOIN таблицы пользователей, чтобы не было N+1 запросов при отрисовке списка
+    list_select_related = ["user"]
+
+    # Поиск по имени/унп клиента, email автора изменений и по IP адресу
     search_fields = [
         "pgh_obj__name",
         "pgh_obj__unp",
-        "user_email",
+        "user__email",  # Поиск через FK работает нативно
+        "user_email",  # Поиск по JSON на случай удаленного юзера
         "ip_address",
     ]
 
-    ordering = ["-pgh_created_at"]
+    @admin.display(description="Клиент (Snapshot)")
+    def client_info(self, obj: ClientEvent) -> str:
+        """
+        Отображает информацию об клиенте.
 
-    # def client_info(self, obj: ClientEvent) -> str:
-    #     """
-    #     Отображает информацию об объекте (snapshot).
-    #
-    #     Args:
-    #         obj: Объект события.
-    #
-    #     Returns:
-    #         str: Строковое представление клиента на момент события.
-    #     """
-    #     return f"{obj.name} ({obj.unp})"
-    #
-    # client_info.short_description = "Клиент (Snapshot)"
+        Args:
+            obj: Объект события.
+
+        Returns:
+            str: Строковое представление клиента на момент события.
+        """
+        return f"{obj.name} ({obj.unp})"
+
+    @admin.display(description="Автор изменения", ordering="user__email")
+    def get_user_info(self, obj: ClientEvent) -> str:
+        """
+        Показывает ФИО и Email автора изменения клиента (или Email из контекста, если удален).
+
+        Args:
+            obj: Объект события.
+
+        Returns:
+            str: Строковое представление автора изменения клиента.
+        """
+        # Если юзер есть в БД - берем его актуальные данные
+        if obj.user_id and obj.user:
+            return f"{obj.user.full_name_rus} ({obj.user.email})"
+
+        # Если юзера удалили, берем email из JSON-слепка истории
+        if obj.user_email:
+            return f"Удален ({obj.user_email})"
+
+        return "System / Unknown"
+
+    # --- Делаем историю неизменяемой ---
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj: Any | None = None) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any | None = None) -> bool:
+        return False
