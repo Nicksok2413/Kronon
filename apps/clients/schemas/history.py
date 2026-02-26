@@ -14,25 +14,14 @@ from apps.clients.models import ClientStatus, OrganizationType, TaxSystem
 class HistoryContextMetadata(Schema):
     """Метаданные контекста из pgh_context."""
 
-    user_id: str | None = Field(default=None, description="ID пользователя")
-    user_email: str | None = Field(default=None, description="Email пользователя")
-
+    user: str | None = Field(default=None, description="ID пользователя")
+    email: str | None = Field(default=None, description="Email пользователя")
     app_source: str | None = Field(default=None, description="Источник изменения (API, Celery, CLI)")
-
-    # Web context
     ip_address: str | None = Field(default=None, description="IP адрес инициатора")
     method: str | None = Field(default=None, description="HTTP метод")
     url: str | None = Field(default=None, description="URL запроса")
-
-    # System context
     celery_task: str | None = Field(default=None, description="Имя задачи Celery")
     command: str | None = Field(default=None, description="Команда CLI")
-
-
-class HistoryContextOut(Schema):
-    """Обертка контекста."""
-
-    metadata: HistoryContextMetadata = Field(..., description="Метаданные события")
 
 
 class ClientSnapshot(Schema):
@@ -85,7 +74,7 @@ class ClientHistoryOut(Schema):
     pgh_diff: dict[str, list[Any]] | None = Field(default=None, description="Разница изменений (Old -> New)")
 
     # Контекст
-    pgh_context: HistoryContextOut | None = Field(default=None, description="Контекст изменения")
+    pgh_context: HistoryContextMetadata | None = Field(default=None, description="Денормализованный контекст")
 
     # Snapshot данных (вложенная схема)
     snapshot: ClientSnapshot = Field(..., description="Состояние объекта после изменения")
