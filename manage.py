@@ -23,6 +23,10 @@ def main() -> None:
 
     # --- PGHISTORY CONTEXT INSTRUMENTATION ---
     # Игнорируем runserver (слишком много шума), миграции (конфликты схем) и тесты
+
+    # Явная типизация для mypy
+    history_context: pghistory_context | ExitStack[bool | None]
+
     if (
         len(sys.argv) > 1
         and not sys.argv[1].startswith("runserver")

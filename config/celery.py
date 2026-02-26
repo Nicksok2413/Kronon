@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from celery import Celery, Task
 
@@ -15,7 +16,7 @@ class PghistoryTask(Task):
     Автоматически добавляет имя задачи в контекст аудита.
     """
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: Any, **kwargs: Any):  # type: ignore
         # В БД в поле pgh_context будет: {"app_source": "Celery", "celery_task": "..."}
         with pghistory_context(app_source="Celery", celery_task=self.name):
             return super().__call__(*args, **kwargs)

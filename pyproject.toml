@@ -136,6 +136,11 @@ exclude = [
     "tests/"
 ]
 
+# Отключаем django-manager-missing, так как она неприменима к pghistory
+[[tool.mypy.overrides]]
+module = "apps.clients.models"
+disable_error_code = ["django-manager-missing"]
+
 [tool.django-stubs]
 # Конфигурация плагина Django-stubs
 django_settings_module = "config.settings"  # Указываем путь к настройкам Django

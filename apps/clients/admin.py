@@ -87,12 +87,13 @@ class ClientEventAdmin(EventModelAdmin):
 
     # Отображаем стандартные поля pghistory + прокси поля
     list_display = [
-        "pgh_created_at",
+        "pgh_obj",
         "pgh_label",
-        "client_info",
+        # "client_info",
         "user_email",  # Proxy field из модели
         "app_source",  # Proxy field из модели
         "ip_address",  # Proxy field из модели
+        "pgh_created_at",
     ]
 
     list_filter = ["pgh_label", "app_source"]
@@ -107,16 +108,16 @@ class ClientEventAdmin(EventModelAdmin):
 
     ordering = ["-pgh_created_at"]
 
-    def client_info(self, obj: ClientEvent) -> str:
-        """
-        Отображает информацию об объекте (snapshot).
-
-        Args:
-            obj: Объект события.
-
-        Returns:
-            str: Строковое представление клиента на момент события.
-        """
-        return f"{obj.name} ({obj.unp})"
-
-    client_info.short_description = "Клиент (Snapshot)"
+    # def client_info(self, obj: ClientEvent) -> str:
+    #     """
+    #     Отображает информацию об объекте (snapshot).
+    #
+    #     Args:
+    #         obj: Объект события.
+    #
+    #     Returns:
+    #         str: Строковое представление клиента на момент события.
+    #     """
+    #     return f"{obj.name} ({obj.unp})"
+    #
+    # client_info.short_description = "Клиент (Snapshot)"

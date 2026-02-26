@@ -289,13 +289,9 @@ class Client(BaseModel):
         return None
 
 
-# Создаем базовый класс для модели событий.
-# Это аналог того, что делает декоратор @track, но явно.
+# Создаем базовый класс для модели событий (аналог декоратора pghistory.track)
 BaseClientEvent = pghistory.create_event_model(
     Client,
-    # Трекеры по умолчанию (Insert, Update)
-    pghistory.InsertEvent(),
-    pghistory.UpdateEvent(),
     # Явно задаем имя модели событий и имя связи
     model_name="ClientEvent",
     obj_field=pghistory.ObjForeignKey(
@@ -326,7 +322,7 @@ class ClientEvent(BaseClientEvent):  # type: ignore
 
     # IP адрес
     ip_address = pghistory.ProxyField(
-        "pgh_context__metadata__ip",
+        "pgh_context__metadata__ip_address",
         models.GenericIPAddressField(null=True, blank=True, verbose_name=_("IP Адрес")),
     )
 
@@ -369,4 +365,3 @@ class ClientEvent(BaseClientEvent):  # type: ignore
     class Meta:
         verbose_name = _("Журнал изменений клиента")
         verbose_name_plural = _("Журнал изменений клиентов")
-        ordering = ["-pgh_created_at"]
