@@ -180,7 +180,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     return 204, None
 
 
-@router.get("/{client_id}/history", response={200, list[ClientHistoryOut]})
+@router.get("/{client_id}/history", response={200: list[ClientHistoryOut]})
 async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict[str, Any]]:
     """
     Получить журнал аудита (историю изменений) клиента.
