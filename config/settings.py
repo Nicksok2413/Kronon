@@ -105,6 +105,7 @@ INSTALLED_APPS = [
     "corsheaders",  # CORS (для React)
     "pgtrigger",  # Триггеры для моделей
     "pghistory",  # Журнал изменений (Audit Log)
+    "rangefilter",  # Фильтр по дате для админки
     # --- Приложения проекта Kronon ---
     "apps.common",  # Общие утилиты
     "apps.users",  # Пользователи, Отделы, Авторизация
