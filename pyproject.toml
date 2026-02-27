@@ -37,6 +37,7 @@ dependencies = [
     "loguru (>=0.7.3,<0.8.0)",
     "sentry-sdk[celery,django,loguru] (>=2.53.0,<3.0.0)",
     "django-cors-headers (>=4.9.0,<5.0.0)",
+    "django-admin-rangefilter (>=0.13.5,<0.14.0)",
     "phonenumberslite (>=9.0.24,<10.0.0)",
     # Важно для Mypy + Django (Runtime-патчи)
     "django-stubs-ext (>=5.2.9,<6.0.0)",
