@@ -9,6 +9,7 @@ from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from pydantic import ValidationError
 
 from apps.clients.types import ContactInfo
 from apps.common.models import BaseModel
@@ -239,9 +240,9 @@ class Client(BaseModel):
 
         try:
             return ContactInfo.model_validate(self.contact_info)
-        except Exception:
+        except ValidationError:
             # Модель молча возвращает пустой объект, если данные битые
-            # Если будет нужно дебажить битые данные, будет это делать скриптами проверки
+            # Если будет нужно дебажить битые данные, нужно будет делать скрипты проверки
             return ContactInfo()
 
     def set_contact_data(self, data: ContactInfo) -> None:
