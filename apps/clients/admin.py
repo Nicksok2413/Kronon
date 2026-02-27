@@ -35,7 +35,7 @@ class ClientEventAdmin(EventModelAdmin):
     ordering = ("-pgh_created_at",)
 
     # Отображаем стандартные поля pghistory + прокси поля
-    list_display = (
+    list_display = [
         "pgh_created_at",
         "pgh_label",
         "client_info",
@@ -43,13 +43,13 @@ class ClientEventAdmin(EventModelAdmin):
         "get_user_info",  # Используем проксированный FK
         "app_source",
         "ip_address",
-    )
+    ]
 
-    list_filter = (
+    list_filter = [
         "pgh_label",
         "app_source",
         ("pgh_created_at", DateTimeRangeFilter),  # Фильтрация по дате (UI с календарём) на уровне БД
-    )
+    ]
 
     # Делаем JOIN таблицы пользователей, чтобы не было N+1 запросов при отрисовке списка
     list_select_related = ("pgh_context__user",)
@@ -129,9 +129,9 @@ class ClientEventAdmin(EventModelAdmin):
         return False
 
 
-class ClientEventInline(admin.TabularInline):
+class ClientEventInline(admin.TabularInline[ClientEvent, Client]):
     """
-    TODO: add description
+    Инлайн для отображения истории в карточке клиента.
     """
 
     model = ClientEvent
