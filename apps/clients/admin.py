@@ -157,7 +157,7 @@ class ClientEventAdmin(EventModelAdmin):
         return "System / Unknown"
 
     @admin.display(description="Тип")
-    def colored_label(self, obj: ClientEvent):
+    def colored_label(self, obj: ClientEvent) -> str:
         """
         Цвета для типов событий.
 

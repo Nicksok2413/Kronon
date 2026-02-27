@@ -2,10 +2,10 @@
 API Endpoints для Клиентов (v1).
 
 Предоставляет методы для чтения (GET), создания (POST), обновления (PATCH)
-и удаления (DELETE) клиентов.
+и удаления (DELETE) клиентов. А так же историю изменения клиентов (GET).
 """
 
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 from django.http import HttpRequest
@@ -181,7 +181,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
 
 
 @router.get("/{client_id}/history", response={200: list[ClientHistoryOut]})
-async def get_client_history(request: HttpRequest, client_id: UUID) -> list[ClientHistoryOut]:
+async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict[str, Any]]:
     """
     Получить журнал аудита (историю изменений) клиента.
 
@@ -213,5 +213,5 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[Clie
     # Получаем данные через селектор
     history_data = await get_client_history_queryset(client_id=client_id)
 
-    # Возвращаем данные
+    # Возвращаем данные (# Ninja сам преобразует словари в ClientHistoryOut)
     return history_data

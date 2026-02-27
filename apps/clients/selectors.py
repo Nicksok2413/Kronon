@@ -5,13 +5,13 @@
 Используют асинхронный подход для неблокирующего ввода-вывода.
 """
 
+from typing import Any
 from uuid import UUID
 
 import pghistory.models
 from loguru import logger as log
 
 from apps.clients.models import Client
-from apps.clients.schemas.history import ClientHistoryOut
 from apps.common.managers import SoftDeleteQuerySet
 
 
@@ -73,7 +73,7 @@ async def get_client_by_id(client_id: UUID) -> Client | None:
         raise
 
 
-async def get_client_history_queryset(client_id: UUID) -> list[ClientHistoryOut]:
+async def get_client_history_queryset(client_id: UUID) -> list[dict[str, Any]]:
     """
     Получает агрегированную историю изменений клиента с вычисленными диффами.
 
@@ -103,6 +103,7 @@ async def get_client_history_queryset(client_id: UUID) -> list[ClientHistoryOut]
         # Собираем словарь, который Pydantic превратит в схему ClientSnapshot
         snapshot_data = event.pgh_data or {}  # pgh_data - JSON поле со снэпшотом модели
 
+        # Собираем полный словарь событий
         events_data.append(
             {
                 "pgh_id": event.pgh_id,
@@ -114,4 +115,5 @@ async def get_client_history_queryset(client_id: UUID) -> list[ClientHistoryOut]
             }
         )
 
+    # Возвращаем список словарей событий
     return events_data
