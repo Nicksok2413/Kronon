@@ -5,9 +5,11 @@
 from typing import Any
 
 from django.contrib import admin
+from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils.html import format_html
 from pghistory.admin import EventModelAdmin
+from rangefilter.filters import DateTimeRangeFilter
 
 from apps.clients.models import Client, ClientEvent
 
@@ -89,6 +91,16 @@ class ClientEventAdmin(EventModelAdmin):
     Наследуется от EventModelAdmin для корректного отображения Diff.
     """
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet[ClientEvent]:
+        """
+        Переопределяем метод получения queryset.
+        Django по умолчанию тянет тяжелый pgh_data.
+        Откладываем (.defer) загрузку pgh_data, так как не используем его в list_display.
+        Это дает буст к производительности.
+        """
+        queryset = super().get_queryset(request)
+        return queryset.defer("pgh_data")
+
     # Отображаем стандартные поля pghistory + прокси поля
     list_display = [
         "pgh_created_at",
@@ -99,7 +111,11 @@ class ClientEventAdmin(EventModelAdmin):
         "ip_address",
     ]
 
-    list_filter = ["pgh_label", "app_source"]
+    list_filter = [
+        "pgh_label",
+        "app_source",
+        ("pgh_created_at", DateTimeRangeFilter),  # Фильтрация по дате (UI с календарём) на уровне БД
+    ]
 
     # Делаем JOIN таблицы пользователей, чтобы не было N+1 запросов при отрисовке списка
     # list_select_related = ["user"]
@@ -124,28 +140,12 @@ class ClientEventAdmin(EventModelAdmin):
 
     @admin.display(description="Клиент (Snapshot)")
     def client_info(self, obj: ClientEvent) -> str:
-        """
-        Отображает информацию об клиенте.
-
-        Args:
-            obj: Объект события.
-
-        Returns:
-            str: Строковое представление клиента на момент события.
-        """
+        """Отображает информацию об клиенте на момент события."""
         return f"{obj.name} ({obj.unp})"
 
     @admin.display(description="Автор изменения", ordering="user__email")
     def get_user_info(self, obj: ClientEvent) -> str:
-        """
-        Показывает ФИО и Email автора изменения клиента (или Email из контекста, если удален).
-
-        Args:
-            obj: Объект события.
-
-        Returns:
-            str: Строковое представление автора изменения клиента.
-        """
+        """Показывает ФИО и Email автора изменения клиента (или Email из контекста, если удален)."""
         # Если юзер есть в БД - берем его актуальные данные
         if obj.user_id and obj.user:
             return f"{obj.user.full_name_rus} ({obj.user.email})"
