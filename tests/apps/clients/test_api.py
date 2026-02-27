@@ -133,7 +133,9 @@ class TestClientHistory(BaseAPITest):
         patch_data = {"name": "Updated Name"}
 
         # Обновляем клиента
-        await auth_client.patch(f"/api/clients/{client.id}/", data=patch_data)
+        patch_response = await auth_client.patch(f"/api/clients/{client.id}/", data=patch_data)
+
+        assert patch_response.status_code == 200
 
         # Проверяем историю
         start = perf_counter()
@@ -141,10 +143,13 @@ class TestClientHistory(BaseAPITest):
         elapsed_time = perf_counter() - start
 
         json_response = response.json()
+        print(json_response)
+
+        update_event = next(event for event in json_response if event["pgh_label"] == "update" and event["pgh_diff"])
 
         # Проверки
         assert len(json_response) >= 1
-        assert json_response[0]["history_data"]["name"] == "Updated Name"
+        assert update_event["pgh_diff"]["name"][1] == "Updated Name"
 
         # Статус код
         await self.assert_status(response=response, expected_status=200)
