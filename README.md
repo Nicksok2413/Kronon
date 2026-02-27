@@ -81,7 +81,7 @@ kronon/
 └── manage.py           # Точка входа
 ```
 
-### Схема окружений
+### Environment Diagram
 
 ```mermaid
 graph TD
@@ -101,10 +101,66 @@ graph TD
         E -->|Transaction| F[(Postgres: Prod)]
     end
 ```
-### Key Features:
+#### Key Features:
 *   **Isolation:** Среды полностью разделены по портам (5432 vs 5433), что исключает затирание данных при тестах.
 *   **Performance:** Тестовая база работает в RAM (tmpfs) с отключенным fsync, что дает хороший буст скорости.
 *   **Scalability:** Готовность к Production через PgBouncer и лимиты ресурсов Docker.
+
+### 🔒 Data Integrity and Audit
+```mermaid
+sequenceDiagram
+    participant User as Пользователь/API
+    participant Django as Django App
+    participant DB as PostgreSQL (Triggers)
+    participant History as Audit Log (ClientEventProxy)
+
+    User->>Django: POST /api/clients/ (Update Name)
+    Django->>DB: UPDATE "clients_client" SET name='New Name'
+
+    Note over DB: Транзакция БД началась
+    DB->>DB: Вызов триггера pghistory
+    DB->>History: INSERT INTO "clients_clientevent" (old_data, new_data, user_id)
+    Note over DB: Транзакция БД завершена
+
+    DB-->>Django: Success
+    Django-->>User: 200 OK (Data Updated & Logged)
+```
+
+```mermaid
+sequenceDiagram
+    participant S as Service Layer
+    participant C as pghistory.context
+    participant DB as PostgreSQL (Triggers)
+    participant Log as ClientEventProxy Table
+
+    Note over S: Начинаем обновление Клиента
+    S->>C: Enter Context (user_id=019c..., ip='1.2.3.4')
+    C->>C: Store in Async ContextVar
+
+    S->>DB: UPDATE clients SET status='active'
+
+    Note over DB: Триггер срабатывает внутри транзакции
+    DB->>Log: INSERT Event + Link to Context metadata
+
+    S->>C: Exit Context
+    Note over S: Транзакция COMMIT
+```
+
+#### Key Features:
+*   **Reliability:** Триггеры Postgres сработают всегда.
+*   **Atomic Operations:** Аудит записывается в той же транзакции, что и данные. Нет риска, что данные обновились, а лог не записался.
+*   **Performance:** Логирование происходит на стороне БД, не нагружая Python-воркеры тяжелой логикой сериализации.
+
+### 🕵 Triagram search
+```mermaid
+graph LR
+    subgraph "Search Engine (PostgreSQL 18)"
+        Input[User Search Query] --> Query[ILIKE %query%]
+        Query --> Index{GIN Trigram Index}
+        Index -->|Fast Scan| Result[Matched Clients]
+    end
+```
+**High Performance:** Молниеносный поиск по клиентам, благодаря GIN-индексам на основе Trigram.
 
 ---
 

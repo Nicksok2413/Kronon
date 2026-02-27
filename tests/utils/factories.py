@@ -8,14 +8,13 @@ import factory
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from django.utils.text import slugify
-from factory.django import DjangoModelFactory
 
 from apps.clients.models import Client, ClientStatus, OrganizationType, TaxSystem
 from apps.users.models import Department, User, UserRole
 from tests.utils.unp import generate_valid_unp
 
 
-class DepartmentFactory(DjangoModelFactory):
+class DepartmentFactory(factory.django.DjangoModelFactory):
     """Фабрика для отделов."""
 
     class Meta:
@@ -25,7 +24,7 @@ class DepartmentFactory(DjangoModelFactory):
     name: str = factory.Faker("job")  # Генерируем случайные названия
 
 
-class UserFactory(DjangoModelFactory):
+class UserFactory(factory.django.DjangoModelFactory):
     """Фабрика для сотрудников."""
 
     class Meta:
@@ -44,7 +43,7 @@ class UserFactory(DjangoModelFactory):
     is_staff: bool = True  # Чтобы пускало в админку
 
 
-class ClientFactory(DjangoModelFactory):
+class ClientFactory(factory.django.DjangoModelFactory):
     """Фабрика для клиентов."""
 
     class Meta:

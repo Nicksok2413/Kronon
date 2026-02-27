@@ -2,10 +2,10 @@
 Схемы данных (DTO) для Пользователей и Отделов.
 """
 
-import uuid
+from uuid import UUID
 
-from ninja import Schema
-from pydantic import EmailStr, Field
+from ninja import Field, Schema
+from pydantic import EmailStr
 
 from apps.users.models import UserRole
 
@@ -15,7 +15,7 @@ class DepartmentOut(Schema):
     Схема вывода информации об отделе (краткая).
     """
 
-    id: uuid.UUID = Field(..., description="Уникальный идентификатор отдела (UUIDv7)")
+    id: UUID = Field(..., description="Уникальный идентификатор отдела (UUIDv7)")
     name: str = Field(..., description="Название отдела")
 
 
@@ -25,7 +25,7 @@ class UserOut(Schema):
     Используется для отображения ответственных лиц.
     """
 
-    id: uuid.UUID = Field(..., description="Уникальный идентификатор сотрудника (UUIDv7)")
+    id: UUID = Field(..., description="Уникальный идентификатор сотрудника (UUIDv7)")
     email: EmailStr = Field(..., description="Email сотрудника")
     last_name: str | None = Field(default=None, description="Фамилия сотрудника")
     first_name: str | None = Field(default=None, description="Имя сотрудника")

@@ -4,16 +4,28 @@
 
 from typing import TYPE_CHECKING
 
+import pghistory
+from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from apps.clients.types import ContactInfo
 from apps.common.models import BaseModel
 from apps.common.validators import validate_unp
 from apps.users.models import Department, User, UserRole
 
 if TYPE_CHECKING:
     from apps.clients.schemas.contacts import ClientContactInfoUpdate
-    from apps.clients.types import ContactInfo
+
+
+class ClientStatus(models.TextChoices):
+    """Статус обслуживания клиента."""
+
+    ACTIVE = "active", "На обслуживании"
+    ONBOARDING = "onboarding", "Подключение (Договор)"
+    ARCHIVED = "archived", "Архив (Расторгнут)"
+    LEAD = "lead", "Потенциальный"
 
 
 class OrganizationType(models.TextChoices):
@@ -38,26 +50,14 @@ class TaxSystem(models.TextChoices):
     # Упрощенная система налогообложения
     USN_NO_NDS = "usn_no_nds", "УСН без НДС (6%)"
     USN_NDS = "usn_nds", "УСН с НДС"
-
     # Общая система налогообложения
     OSN = "osn", "Общая система налогообложения (ОСН)"
-
     # Для ИП
     IP_EDINY = "ip_ediny", "Единый налог"
     IP_PODOHODNY = "ip_podohodny", "Подоходный налог (ОСН для ИП)"
     NPD = "npd", "Налог на профессиональный доход (НПД)"
-
     # Особые
     PVT = "pvt", "Парк высоких технологий (ПВТ)"
-
-
-class ClientStatus(models.TextChoices):
-    """Статус обслуживания клиента."""
-
-    ACTIVE = "active", "На обслуживании"
-    ONBOARDING = "onboarding", "Подключение (Договор)"
-    ARCHIVED = "archived", "Архив (Расторгнут)"
-    LEAD = "lead", "Потенциальный"
 
 
 class Client(BaseModel):
@@ -66,6 +66,8 @@ class Client(BaseModel):
 
     Наследуется от BaseModel.
     Содержит юридическую информацию, настройки налогов и ответственных.
+    Использует GIN индексы для быстрого поиска по подстроке (Trigram).
+    Использует системное версионирование через pgHistory (триггеры).
     """
 
     # Основная информация
@@ -92,6 +94,14 @@ class Client(BaseModel):
         validators=[validate_unp],
     )
 
+    status = models.CharField(
+        _("Статус"),
+        max_length=20,
+        choices=ClientStatus.choices,
+        default=ClientStatus.ONBOARDING,
+        db_index=True,
+    )
+
     org_type = models.CharField(
         _("Тип организации"),
         max_length=10,
@@ -105,14 +115,6 @@ class Client(BaseModel):
         max_length=20,
         choices=TaxSystem.choices,
         default=TaxSystem.USN_NO_NDS,
-    )
-
-    status = models.CharField(
-        _("Статус"),
-        max_length=20,
-        choices=ClientStatus.choices,
-        default=ClientStatus.ONBOARDING,
-        db_index=True,
     )
 
     # Обслуживающий отдел
@@ -208,6 +210,17 @@ class Client(BaseModel):
         verbose_name = _("Клиент")
         verbose_name_plural = _("Клиенты")
 
+        # Индексы для оптимизации поиска
+        indexes = [
+            # GIN индекс для Trigram поиска
+            # Позволяет делать ILIKE '%запрос%' по любому из трех полей очень быстро
+            GinIndex(
+                name="client_search_gin_trgm_idx",
+                fields=["name", "full_legal_name", "unp"],
+                opclasses=["gin_trgm_ops", "gin_trgm_ops", "gin_trgm_ops"],
+            ),
+        ]
+
     def __str__(self) -> str:
         return f"{self.name} (УНП: {self.unp})"
 
@@ -219,7 +232,6 @@ class Client(BaseModel):
         Returns:
             ContactInfo: Объект с данными.
         """
-        from apps.clients.types import ContactInfo
 
         # Если данных нет или это не словарь, создаем пустую схему
         if not isinstance(self.contact_info, dict) or not self.contact_info:
@@ -276,3 +288,96 @@ class Client(BaseModel):
         self.contact_info = {**current_data, **updates}
 
         return None
+
+
+# Создаем базовый класс для модели событий (аналог декоратора pghistory.track)
+BaseClientEvent = pghistory.create_event_model(
+    Client,
+    pghistory.InsertEvent(),
+    pghistory.UpdateEvent(),
+    pghistory.DeleteEvent(),
+    # Явно задаем имя модели событий и имя связи
+    model_name="ClientEvent",
+    obj_field=pghistory.ObjForeignKey(
+        related_name="events",
+        # Если клиента удалят физически, история должна остаться
+        on_delete=models.DO_NOTHING,
+        # Отключаем constraint БД, чтобы не было ошибки целостности при удалении родителя
+        db_constraint=False,
+    ),
+)
+
+
+class ClientEvent(BaseClientEvent):  # type: ignore[valid-type, misc]
+    """
+    Модель для хранения истории изменений клиентов.
+
+    Использует pghistory.ProxyField для удобного доступа к JSON-контексту в админке.
+    """
+
+    # --- Проксируем поля из контекста ---
+
+    # Проксируем пользователя как Foreign Key (Django сделает LEFT JOIN в админке автоматически)
+    # Это позволяет обращаться к user.email так, будто это настоящая SQL связь
+    # Так как денормализация (ContextJSONField) включена, путь к контексту: pgh_context__user
+    user = pghistory.ProxyField(
+        "pgh_context__user",
+        models.ForeignKey(
+            settings.AUTH_USER_MODEL,
+            null=True,
+            blank=True,
+            # Если пользователя удалят физически, история должна остаться
+            on_delete=models.DO_NOTHING,
+            # Отключаем constraint БД, чтобы не было ошибки целостности при удалении родителя
+            db_constraint=False,
+            verbose_name=_("Пользователь"),
+            help_text=_("Сотрудник, внесший изменения"),
+        ),
+    )
+
+    # Неизменяемый слепок email из контекста (спасет, если юзера удалят из БД)
+    user_email = pghistory.ProxyField(
+        "pgh_context__user_email",
+        models.CharField(max_length=254, null=True, blank=True, verbose_name=_("Email пользователя (исторический)")),
+    )
+
+    # Источник изменения (API/Web, Celery, CLI)
+    app_source = pghistory.ProxyField(
+        "pgh_context__app_source",
+        models.CharField(max_length=50, null=True, blank=True, verbose_name=_("Источник изменения")),
+    )
+
+    # IP адрес
+    ip_address = pghistory.ProxyField(
+        "pgh_context__ip_address",
+        models.GenericIPAddressField(null=True, blank=True, verbose_name=_("IP Адрес")),
+    )
+
+    # HTTP метод
+    method = pghistory.ProxyField(
+        "pgh_context__method",
+        models.CharField(max_length=10, null=True, blank=True, verbose_name=_("HTTP Метод")),
+    )
+
+    # URL запроса
+    url = pghistory.ProxyField(
+        "pgh_context__url",
+        models.TextField(null=True, blank=True, verbose_name=_("URL")),
+    )
+
+    # Для Celery
+    celery_task = pghistory.ProxyField(
+        "pgh_context__celery_task",
+        models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Celery Task")),
+    )
+
+    # Для CLI (manage.py)
+    command = pghistory.ProxyField(
+        "pgh_context__command",
+        models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Команда")),
+    )
+
+    class Meta:
+        verbose_name = _("Журнал изменений клиента")
+        verbose_name_plural = _("Журнал изменений клиентов")
+        ordering = ["-pgh_created_at"]

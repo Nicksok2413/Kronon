@@ -2,11 +2,11 @@
 API Endpoints для Клиентов (v1).
 
 Предоставляет методы для чтения (GET), создания (POST), обновления (PATCH)
-и удаления (DELETE) клиентов.
+и удаления (DELETE) клиентов. А так же историю изменения клиентов (GET).
 """
 
-import uuid
-from typing import Annotated
+from typing import Annotated, Any
+from uuid import UUID
 
 from django.http import HttpRequest
 from loguru import logger as log
@@ -18,7 +18,8 @@ from ninja_jwt.authentication import AsyncJWTAuth
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
-from apps.clients.selectors import get_client_by_id, get_client_queryset
+from apps.clients.schemas.history import ClientHistoryOut
+from apps.clients.selectors import get_client_by_id, get_client_history_queryset, get_client_queryset
 from apps.clients.services import create_client, delete_client, update_client
 from apps.common.managers import SoftDeleteQuerySet
 
@@ -55,13 +56,13 @@ async def list_clients(
 
 
 @router.get("/{client_id}", response={200: ClientOut})
-async def get_client(request: HttpRequest, client_id: uuid.UUID) -> tuple[int, Client]:
+async def get_client(request: HttpRequest, client_id: UUID) -> tuple[int, Client]:
     """
     Получить детальную информацию о клиенте по ID.
 
     Args:
         request (HttpRequest): Объект HTTP запроса.
-        client_id (uuid.UUID): Уникальный идентификатор клиента (UUIDv7).
+        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
         HttpError(404): Если клиент не найден.
@@ -94,25 +95,26 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     # TODO: добавить проверку прав (например, только админ или lead_acc)
     # if not request.user.ahas_perm("clients.add_client"): ...
 
-    log.info(f"User {request.user.id} initiates client creation.")
+    # Получает ID пользователя из запроса
+    user_id = request.user.id
+
+    log.info(f"User {user_id} initiates client creation.")
 
     # Вызываем сервис создания
-    client = await create_client(data=payload)
+    client = await create_client(data=payload, user_id=user_id)
 
     # Возвращаем созданного клиента
     return 201, client
 
 
 @router.patch("/{client_id}", response={200: ClientOut})
-async def update_client_endpoint(
-    request: HttpRequest, client_id: uuid.UUID, payload: ClientUpdate
-) -> tuple[int, Client]:
+async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload: ClientUpdate) -> tuple[int, Client]:
     """
     Частичное обновление данных клиента.
 
     Args:
         request (HttpRequest): Объект HTTP запроса.
-        client_id (uuid.UUID): Уникальный идентификатор клиента (UUIDv7).
+        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
         payload (ClientUpdate): Данные для обновления.
 
     Raises:
@@ -123,7 +125,10 @@ async def update_client_endpoint(
     """
     # TODO: добавить проверку прав
 
-    log.info(f"User {request.user.id} initiates update for client {client_id}")
+    # Получает ID пользователя из запроса
+    user_id = request.user.id
+
+    log.info(f"User {user_id} initiates update for client {client_id}")
 
     # Находим клиента, используя селектор для поиска
     client = await get_client_by_id(client_id=client_id)
@@ -133,20 +138,20 @@ async def update_client_endpoint(
         raise HttpError(status_code=404, message="Клиент не найден")
 
     # Вызываем сервис обновления
-    updated_client = await update_client(client=client, data=payload)
+    updated_client = await update_client(client=client, data=payload, user_id=user_id)
 
     # Возвращаем обновленного клиента
     return 200, updated_client
 
 
 @router.delete("/{client_id}", response={204: None})
-async def delete_client_endpoint(request: HttpRequest, client_id: uuid.UUID) -> tuple[int, None]:
+async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple[int, None]:
     """
     Удалить клиента (Soft Delete).
 
     Args:
         request (HttpRequest): Объект HTTP запроса.
-        client_id (uuid.UUID): Уникальный идентификатор клиента (UUIDv7).
+        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
         HttpError(404): Если клиент не найден.
@@ -156,17 +161,57 @@ async def delete_client_endpoint(request: HttpRequest, client_id: uuid.UUID) -> 
     """
     # TODO: добавить проверку прав
 
-    log.info(f"User {request.user.id} initiates deletion of client {client_id}")
+    # Получает ID пользователя из запроса
+    user_id = request.user.id
+
+    log.info(f"User {user_id} initiates deletion of client {client_id}")
 
     # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id)
+    client = await get_client_by_id(client_id=client_id)
 
     # Проверяем существование клиента
     if not client:
         raise HttpError(status_code=404, message="Клиент не найден")
 
     # Вызываем сервис удаления
-    await delete_client(client)
+    await delete_client(client=client, user_id=user_id)
 
     # Возвращаем код ответа
     return 204, None
+
+
+@router.get("/{client_id}/history", response={200: list[ClientHistoryOut]})
+async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict[str, Any]]:
+    """
+    Получить журнал аудита (историю изменений) клиента.
+
+    Возвращает список событий с диффами (разницами изменений) и контекстом.
+    Доступно только администраторам.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+
+    Raises:
+        HttpError(403): При попытке доступа не эндпойнту без соответствующих прав.
+        HttpError(404): Если клиент не найден.
+
+    Returns:
+        list[dict[str, Any]]: Список событий изменения клиента.
+    """
+
+    # Проверяем доступ (например, историю видит только Админ)
+    if not request.user.is_staff:
+        raise HttpError(status_code=403, message="Журнал аудита доступен только администраторам.")
+
+    # Проверяем существование клиента (сам объект нам не нужен, поэтому .aexists для скорости)
+    client_exists = await Client.objects.filter(id=client_id).aexists()
+
+    if not client_exists:
+        raise HttpError(status_code=404, message="Клиент не найден")
+
+    # Получаем данные через селектор
+    history_data = await get_client_history_queryset(client_id=client_id)
+
+    # Возвращаем данные (# Ninja сам преобразует словари в ClientHistoryOut)
+    return history_data

@@ -2,8 +2,8 @@
 Схемы данных (DTO) для контактной информации.
 """
 
-from ninja import Schema
-from pydantic import EmailStr, Field
+from ninja import Field, Schema
+from pydantic import EmailStr
 
 from apps.clients.types import ContactInfo, ContactPerson
 from apps.common.types import PhoneNumber

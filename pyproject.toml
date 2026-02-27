@@ -14,14 +14,15 @@ requires-python = ">=3.14,<4.0"
 dependencies = [
     # Core Framework
     "django (>=6.0.2,<7.0.0)",
+    "django-environ (>=0.13.0,<0.14.0)",
     "django-ninja (>=1.5.3,<2.0.0)",
     "django-ninja-extra (>=0.31.0,<0.32.0)",
-    "django-environ (>=0.13.0,<0.14.0)",
+    "django-pghistory (>=3.9.2,<4.0.0)",
     "gunicorn (>=25.1.0,<26.0.0)",
     "uvicorn[standard] (>=0.41.0,<0.42.0)",
     "whitenoise (>=6.11.0,<7.0.0)",
     # Database & Cache
-    "psycopg[binary] (>=3.3.3,<4.0.0)",
+    "psycopg[binary,pool] (>=3.3.0,<4.0.0)",
     "redis (>=7.2.0,<8.0.0)",
     "django-redis (>=6.0.0,<7.0.0)",
     # Asynchronous Tasks
@@ -36,6 +37,7 @@ dependencies = [
     "loguru (>=0.7.3,<0.8.0)",
     "sentry-sdk[celery,django,loguru] (>=2.53.0,<3.0.0)",
     "django-cors-headers (>=4.9.0,<5.0.0)",
+    "django-admin-rangefilter (>=0.13.5,<0.14.0)",
     "phonenumberslite (>=9.0.24,<10.0.0)",
     # Важно для Mypy + Django (Runtime-патчи)
     "django-stubs-ext (>=5.2.9,<6.0.0)",
@@ -134,6 +136,11 @@ exclude = [
     "migrations/",
     "tests/"
 ]
+
+# Отключаем django-manager-missing в моделях, так как она неприменима к pghistory
+[[tool.mypy.overrides]]
+module = "apps.*.models"
+disable_error_code = ["django-manager-missing"]
 
 [tool.django-stubs]
 # Конфигурация плагина Django-stubs

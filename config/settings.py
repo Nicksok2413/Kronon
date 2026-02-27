@@ -13,6 +13,7 @@ from typing import Any
 
 from django_stubs_ext import monkeypatch as type_hinting_patch
 from environ import Env
+from pghistory import ContextJSONField
 
 # Импортируем функции настройки Loguru и Sentry
 from config.core.logging import setup_loguru
@@ -86,12 +87,14 @@ if env.bool("USE_X_FORWARDED_HOST", default=True):
 
 INSTALLED_APPS = [
     # --- Встроенные приложения Django ---
+    "pghistory.admin",  # Интеграция журнала изменений (Audit Log) в админку
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",  # Для GIN индексов и Trigram
     # --- Сторонние библиотеки ---
     "ninja",  # Быстрый API (FastAPI-like)
     "ninja_extra",  # База для контроллеров
@@ -100,7 +103,11 @@ INSTALLED_APPS = [
     "guardian",  # Объектные права доступа (Object Level Permissions)
     "axes",  # Защита от подбора паролей (brute-force protection)
     "corsheaders",  # CORS (для React)
+    "pgtrigger",  # Триггеры для моделей
+    "pghistory",  # Журнал изменений (Audit Log)
+    "rangefilter",  # Фильтр по дате для админки
     # --- Приложения проекта Kronon ---
+    "apps.common",  # Общие утилиты
     "apps.users",  # Пользователи, Отделы, Авторизация
     "apps.clients",  # Клиенты
 ]
@@ -113,6 +120,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # Кастомный middleware для сбора контекста (расширяет pghistory.middleware.HistoryMiddleware)
+    "apps.common.middleware.KrononHistoryMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",  # Middleware безопасности Axes
@@ -292,6 +301,18 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # Максимум 30 минут на зада
 
 
 # ==============================================================================
+# PGHISTORY CONFIGURATION
+# ==============================================================================
+
+# Денормализация контекста: храним контекст в JSONField прямо в таблице события, а не в центральной таблице
+# Это значительно повышает производительность и упрощает SQL-запросы (избавляет от JOIN)
+PGHISTORY_CONTEXT_FIELD = ContextJSONField()
+
+# Глобальная модель для админки событий всех моделей, чтобы видеть колонки user и url
+PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
+
+
+# ==============================================================================
 # INTERNATIONALIZATION
 # ==============================================================================
 
@@ -366,7 +387,8 @@ DEFAULT_PHONE_REGION = "BY"  # по умолчанию `Беларусь`
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Настройки для Guardian (анонимный пользователь не нужен)
+# --- Настройки для Guardian ---
+# Анонимный пользователь не нужен
 ANONYMOUS_USER_NAME = None
 
 

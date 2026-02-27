@@ -4,25 +4,29 @@
 Отвечают за создание, обновление и удаление данных.
 """
 
+from uuid import UUID
+
 from loguru import logger as log
+from pghistory import context as pghistory_context
 
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientUpdate
 from apps.clients.selectors import get_client_by_id
 
 
-async def create_client(data: ClientCreate) -> Client:
+async def create_client(data: ClientCreate, user_id: UUID | None = None) -> Client:
     """
     Создает нового клиента в системе.
 
     Args:
         data (ClientCreate): Валидированные входные данные из API.
+        user_id (UUID | None): ID пользователя, инициирующего создание клиента (для аудита) или None.
 
     Returns:
         Client: Созданный объект с подгруженными связями.
     """
     # Логируем бизнес-контекст операции
-    log.info(f"Start creating client. UNP: {data.unp}, Name: {data.name}")
+    log.info(f"User {user_id} creating client. UNP: {data.unp}, Name: {data.name}")
 
     try:
         # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
@@ -40,8 +44,15 @@ async def create_client(data: ClientCreate) -> Client:
 
         # Создаем объект
         # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
-        client = await Client.objects.acreate(**payload)
-        log.info(f"Client created successfully. ID: {client.id}")
+        # Оборачиваем в контекст pghistory для записи автора
+        # pghistory работает через contextvars, это безопасно в async
+        # Это операция в памяти Python (установка переменной контекста)
+        # Она не делает запросов в БД в момент входа (__enter__), а просто говорит:
+        # "Следующий запрос в БД должен быть помечен этим юзером"
+        with pghistory_context(user=user_id):
+            client = await Client.objects.acreate(**payload)
+
+        log.info(f"Client created. ID: {client.id}")
 
         # .acreate возвращает "чистый" объект (ID и базовые поля), а схема ClientOut требует вложенных объектов
         # Делаем рефреш через селектор с подгрузкой связей (department, accountant и т.д.) для корректного ответа API
@@ -57,11 +68,11 @@ async def create_client(data: ClientCreate) -> Client:
 
     except Exception as exc:
         # Логируем контекст ошибки перед тем, как она уйдет в глобальный хендлер
-        log.error(f"Failed to create client (UNP: {data.unp}). Error: {exc}")
+        log.error(f"Error creating client (UNP: {data.unp}): {exc}")
         raise
 
 
-async def update_client(client: Client, data: ClientUpdate) -> Client:
+async def update_client(client: Client, data: ClientUpdate, user_id: UUID | None = None) -> Client:
     """
     Выполняет частичное обновление данных клиента (PATCH).
 
@@ -71,13 +82,14 @@ async def update_client(client: Client, data: ClientUpdate) -> Client:
     Args:
         client (Client): Объект клиента (уже полученный из БД).
         data (ClientUpdate): Данные для обновления.
+        user_id (UUID | None): ID пользователя, инициирующего обновление клиента (для аудита) или None.
 
     Returns:
         Client: Обновленный объект с подгруженными связями.
     """
     # Логируем, какие поля меняются
     changed_fields = data.model_dump(exclude_unset=True).keys()
-    log.info(f"Start updating client {client.id}. Fields: {list(changed_fields)}")
+    log.info(f"User {user_id} updating client {client.id}. Fields: {list(changed_fields)}")
 
     try:
         # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
@@ -98,9 +110,13 @@ async def update_client(client: Client, data: ClientUpdate) -> Client:
             # Метод модели сам вызовет model_dump(mode="json")
             client.patch_contact_data(contact_info_update)
 
-        # Сохраняем
-        await client.asave()
-        log.debug(f"Client {client.id} saved to DB.")
+        # Сохраняем изменения
+        # Оборачиваем в контекст pghistory для записи автора
+        # pghistory работает через contextvars, это безопасно в async
+        with pghistory_context(user=user_id):
+            await client.asave()
+
+        log.debug(f"Client updated: {client.id}")
 
         # Делаем рефреш через селектор с подгрузкой связей (актуальные связи и updated_at) для корректного ответа API
         updated_client = await get_client_by_id(client_id=client.id)
@@ -115,24 +131,30 @@ async def update_client(client: Client, data: ClientUpdate) -> Client:
 
     except Exception as exc:
         # Логируем контекст ошибки перед тем, как она уйдет в глобальный хендлер
-        log.error(f"Failed to update client {client.id}. Error: {exc}")
+        log.error(f"Error updating client {client.id}: {exc}")
         raise
 
 
-async def delete_client(client: Client) -> None:
+async def delete_client(client: Client, user_id: UUID | None = None) -> None:
     """
     Выполняет мягкое удаление клиента.
 
     Args:
         client (Client): Объект клиента.
+        user_id (UUID | None): ID пользователя, инициирующего удаление клиента (для аудита) или None.
     """
     log.info(f"Start deleting client {client.id} (Soft Delete).")
 
     try:
-        await client.adelete()
-        log.info(f"Client {client.id} successfully marked as deleted.")
+        # Оборачиваем в контекст pghistory для записи автора
+        # pghistory работает через contextvars, это безопасно в async
+        # Soft delete - это UPDATE запрос (ставит deleted_at), поэтому pghistory зафиксирует это изменение
+        with pghistory_context(user=user_id):
+            await client.adelete()
+
+        log.info(f"Client {client.id} marked as deleted.")
 
     except Exception as exc:
         # Логируем контекст ошибки перед тем, как она уйдет в глобальный хендлер
-        log.error(f"Failed to delete client {client.id}. Error: {exc}")
+        log.error(f"Error deleting client {client.id}: {exc}")
         raise
