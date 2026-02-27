@@ -88,10 +88,22 @@ async def get_client_history_queryset(client_id: UUID) -> list[dict[str, Any]]:
     # Используем глобальную модель Events, фильтруем вручную по модели и ID
     # tracks() работает с объектами, а у нас ID + async, проще фильтровать сырым образом
 
-    events_queryset = pghistory.models.Events.objects.filter(
-        pgh_obj_model="clients.Client",
-        pgh_obj_id=client_id,
-    ).order_by("-pgh_created_at")
+    events_queryset = (
+        pghistory.models.Events.objects.filter(
+            pgh_obj_model="clients.Client",
+            pgh_obj_id=client_id,
+        )
+        # Берем только нужные поля
+        .only(
+            "pgh_id",
+            "pgh_created_at",
+            "pgh_label",
+            "pgh_diff",
+            "pgh_context",
+            "pgh_data",
+        )
+        .order_by("-pgh_created_at")
+    )
 
     events_data = []
 
