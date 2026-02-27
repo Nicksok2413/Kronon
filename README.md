@@ -112,7 +112,7 @@ sequenceDiagram
     participant User as Пользователь/API
     participant Django as Django App
     participant DB as PostgreSQL (Triggers)
-    participant History as Audit Log (ClientEvent)
+    participant History as Audit Log (ClientEventProxy)
 
     User->>Django: POST /api/clients/ (Update Name)
     Django->>DB: UPDATE "clients_client" SET name='New Name'
@@ -131,7 +131,7 @@ sequenceDiagram
     participant S as Service Layer
     participant C as pghistory.context
     participant DB as PostgreSQL (Triggers)
-    participant Log as ClientEvent Table
+    participant Log as ClientEventProxy Table
 
     Note over S: Начинаем обновление Клиента
     S->>C: Enter Context (user_id=019c..., ip='1.2.3.4')

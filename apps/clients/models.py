@@ -295,6 +295,7 @@ BaseClientEvent = pghistory.create_event_model(
     Client,
     pghistory.InsertEvent(),
     pghistory.UpdateEvent(),
+    pghistory.DeleteEvent(),
     # Явно задаем имя модели событий и имя связи
     model_name="ClientEvent",
     obj_field=pghistory.ObjForeignKey(
@@ -314,15 +315,17 @@ class ClientEvent(BaseClientEvent):  # type: ignore[valid-type, misc]
     Использует pghistory.ProxyField для удобного доступа к JSON-контексту в админке.
     """
 
-    # --- Проксируем поля из метаданных контекста ---
+    # --- Проксируем поля из контекста ---
 
     # Проксируем пользователя как Foreign Key (Django сделает LEFT JOIN в админке автоматически)
-    # Это позволяет обращаться к event.user.email так, будто это настоящая SQL связь
-    # Так как денормализация (ContextJSONField) включена, путь к контексту стал короче: pgh_context__user
+    # Это позволяет обращаться к user.email так, будто это настоящая SQL связь
+    # Так как денормализация (ContextJSONField) включена, путь к контексту: pgh_context__user
     user = pghistory.ProxyField(
         "pgh_context__user",
         models.ForeignKey(
             settings.AUTH_USER_MODEL,
+            null=True,
+            blank=True,
             # Если пользователя удалят физически, история должна остаться
             on_delete=models.DO_NOTHING,
             # Отключаем constraint БД, чтобы не было ошибки целостности при удалении родителя
@@ -332,7 +335,7 @@ class ClientEvent(BaseClientEvent):  # type: ignore[valid-type, misc]
         ),
     )
 
-    # Неизменяемый слепок email (спасет, если юзера удалят из БД)
+    # Неизменяемый слепок email из контекста (спасет, если юзера удалят из БД)
     user_email = pghistory.ProxyField(
         "pgh_context__user_email",
         models.CharField(max_length=254, null=True, blank=True, verbose_name=_("Email пользователя (исторический)")),

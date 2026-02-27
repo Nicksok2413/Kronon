@@ -6,6 +6,7 @@ from typing import Any
 
 from django.contrib import admin
 from django.http import HttpRequest
+from django.utils.html import format_html
 from pghistory.admin import EventModelAdmin
 
 from apps.clients.models import Client, ClientEvent
@@ -101,7 +102,8 @@ class ClientEventAdmin(EventModelAdmin):
     list_filter = ["pgh_label", "app_source"]
 
     # Делаем JOIN таблицы пользователей, чтобы не было N+1 запросов при отрисовке списка
-    list_select_related = ["user"]
+    # list_select_related = ["user"]
+    list_select_related = ["pgh_context__user"]
 
     # Поиск по имени/унп клиента, email автора изменений и по IP адресу
     search_fields = [
@@ -111,6 +113,14 @@ class ClientEventAdmin(EventModelAdmin):
         "user_email",  # Поиск по JSON на случай удаленного юзера
         "ip_address",
     ]
+
+    # Явно запрещаем массовые действия
+    actions = None
+
+    # Немного ускорит админку на больших объёмах
+    list_per_page = 50
+
+    ordering = ["-pgh_created_at"]
 
     @admin.display(description="Клиент (Snapshot)")
     def client_info(self, obj: ClientEvent) -> str:
@@ -146,7 +156,25 @@ class ClientEventAdmin(EventModelAdmin):
 
         return "System / Unknown"
 
-    # --- Делаем историю неизменяемой ---
+    @admin.display(description="Тип")
+    def colored_label(self, obj: ClientEvent):
+        """
+        Цвета для типов событий.
+
+        Зеленый - Создание нового клиента.
+        Оранжевый - Обновление клиента.
+        Красный - Удаление клиента.
+        Черный - По умолчанию.
+        """
+        colors = {
+            "insert": "green",
+            "update": "orange",
+            "delete": "red",
+        }
+        color = colors.get(obj.pgh_label, "black")
+        return format_html('<b style="color:{}">{}</b>', color, obj.pgh_label)
+
+    # --- Делаем историю неизменяемой (Read-only) ---
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
 

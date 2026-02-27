@@ -5,7 +5,7 @@ API Endpoints для Клиентов (v1).
 и удаления (DELETE) клиентов.
 """
 
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from django.http import HttpRequest
@@ -19,7 +19,7 @@ from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
 from apps.clients.schemas.history import ClientHistoryOut
-from apps.clients.selectors import get_client_by_id, get_client_history_list, get_client_queryset
+from apps.clients.selectors import get_client_by_id, get_client_history_queryset, get_client_queryset
 from apps.clients.services import create_client, delete_client, update_client
 from apps.common.managers import SoftDeleteQuerySet
 
@@ -181,7 +181,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
 
 
 @router.get("/{client_id}/history", response={200: list[ClientHistoryOut]})
-async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict[str, Any]]:
+async def get_client_history(request: HttpRequest, client_id: UUID) -> list[ClientHistoryOut]:
     """
     Получить журнал аудита (историю изменений) клиента.
 
@@ -211,7 +211,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
         raise HttpError(status_code=404, message="Клиент не найден")
 
     # Получаем данные через селектор
-    history_data = await get_client_history_list(client_id=client_id)
+    history_data = await get_client_history_queryset(client_id=client_id)
 
-    # Возвращаем данные (Ninja провалидирует через response=list[ClientHistoryOut])
+    # Возвращаем данные
     return history_data
