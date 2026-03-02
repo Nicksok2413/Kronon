@@ -156,8 +156,12 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Указываем Django использовать кастомную модель пользователя
 AUTH_USER_MODEL = "users.User"
 
-# API-ключ для межсервисного взаимодействия или вебхуков
-INTERNAL_API_KEY: str | None = env.str("INTERNAL_API_KEY", default=None)
+# API-ключ для межсервисного взаимодействия
+INTERNAL_API_KEY: str = env.str("INTERNAL_API_KEY", default=None)
+
+# В проде ключ обязан быть
+if not DEBUG and not INTERNAL_API_KEY:
+    raise ValueError("КРИТИЧЕСКАЯ ОШИБКА: INTERNAL_API_KEY обязан быть задан в production!")
 
 AUTHENTICATION_BACKENDS = [
     "axes.backends.AxesBackend",  # Защита от перебора паролей
