@@ -42,14 +42,14 @@ async def create_client(data: ClientCreate, user_id: UUID | None = None) -> Clie
         # Добавляем обработанный JSON в payload
         payload["contact_info"] = contact_info_json
 
-        # Создаем объект
-        # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
         # Оборачиваем в контекст pghistory для записи автора
         # pghistory работает через contextvars, это безопасно в async
         # Это операция в памяти Python (установка переменной контекста)
         # Она не делает запросов в БД в момент входа (__enter__), а просто говорит:
         # "Следующий запрос в БД должен быть помечен этим юзером"
         with pghistory_context(user=user_id):
+            # Создаем объект
+            # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
             client = await Client.objects.acreate(**payload)
 
         log.info(f"Client created. ID: {client.id}")
@@ -148,8 +148,8 @@ async def delete_client(client: Client, user_id: UUID | None = None) -> None:
     try:
         # Оборачиваем в контекст pghistory для записи автора
         # pghistory работает через contextvars, это безопасно в async
-        # Soft delete - это UPDATE запрос (ставит deleted_at), поэтому pghistory зафиксирует это изменение
         with pghistory_context(user=user_id):
+            # Soft delete - это UPDATE запрос (ставит deleted_at), поэтому pghistory зафиксирует это изменение
             await client.adelete()
 
         log.info(f"Client {client.id} marked as deleted.")
