@@ -156,6 +156,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Указываем Django использовать кастомную модель пользователя
 AUTH_USER_MODEL = "users.User"
 
+# API-ключ для межсервисного взаимодействия или вебхуков
+INTERNAL_API_KEY: str | None = env.str("INTERNAL_API_KEY", default=None)
+
 AUTHENTICATION_BACKENDS = [
     "axes.backends.AxesBackend",  # Защита от перебора паролей
     "django.contrib.auth.backends.ModelBackend",  # Стандартный вход
