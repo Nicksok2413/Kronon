@@ -19,3 +19,15 @@ class ErrorOut(Schema):
         default=None,
         description="Детали ошибки (например, список невалидных полей)",
     )
+
+
+# Стандартный набор ответов с ошибками (для DRY)
+STANDARD_ERRORS = {
+    400: ErrorOut,
+    401: ErrorOut,
+    403: ErrorOut,
+    404: ErrorOut,
+    409: ErrorOut,
+    422: ErrorOut,
+    500: ErrorOut,
+}
