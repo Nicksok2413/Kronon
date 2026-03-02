@@ -11,9 +11,9 @@ from apps.clients.models import Client
 from apps.users.models import UserRole
 
 
-def require_admin(request: HttpRequest) -> None:
+async def require_admin(request: HttpRequest) -> None:
     """
-    Разрешает доступ только Директору или Staff.
+    Разрешает доступ только Директору, Staff (RBAC) или Системному API Ключу.
 
     Args:
         request (HttpRequest): Объект входящего запроса.
@@ -21,15 +21,22 @@ def require_admin(request: HttpRequest) -> None:
     Raises:
         HttpError(403): Если прав нет.
     """
-    user = request.user
+    # Если авторизация по API-ключу, у системы абсолютные права
+    if request.auth == "system_api":
+        return None
+
+    # Для обычных JWT пользователей
+    user = await request.auser()
 
     if not user.is_staff and user.role != UserRole.DIRECTOR:
-        raise HttpError(status_code=403, message="Доступ запрещен: требуются права администратора.")
+        raise HttpError(status_code=403, message="Доступ запрещен. Требуются права администратора.")
+
+    return None
 
 
 async def check_client_access(request: HttpRequest, client: Client) -> None:
     """
-    Проверяет, имеет ли текущий пользователь право управлять данным клиентом.
+    Проверяет, имеет ли текущий пользователь право управлять данным клиентом (OLP).
 
     Логика:
     1. Администраторы и Директора могут редактировать/удалять всё.
@@ -44,7 +51,12 @@ async def check_client_access(request: HttpRequest, client: Client) -> None:
     Raises:
         HttpError(403): Если прав нет.
     """
-    user = request.user
+    # Если авторизация по API-ключу, у системы абсолютные права
+    if request.auth == "system_api":
+        return None
+
+    # Для обычных JWT пользователей
+    user = await request.auser()
 
     # Суперпользователи, директора и главбухи имеют полный доступ к клиентам
     if user.is_staff or user.role in (UserRole.DIRECTOR, UserRole.CHIEF_ACCOUNTANT):
@@ -63,21 +75,4 @@ async def check_client_access(request: HttpRequest, client: Client) -> None:
         return None
 
     # Иначе - отказ
-    raise HttpError(
-        status_code=403,
-        message=f"У вас нет прав на редактирование клиента {client.name}. Вы не назначены ответственным сотрудником.",
-    )
-
-
-# def has_api_key(request: HttpRequest) -> None:
-#     """
-#     Проверяет внутренний API-ключ (для межсервисного взаимодействия).
-#
-#     Args:
-#         request (HttpRequest): Объект HTTP запроса.
-#     """
-#     api_key = request.headers.get("X-API-Key")
-#
-#     # settings.INTERNAL_API_KEY
-#     if api_key != "secret-key":
-#         raise HttpError(403, "Неверный API-ключ.")
+    raise HttpError(status_code=403, message=f"У вас нет прав на редактирование клиента {client.name}.")
