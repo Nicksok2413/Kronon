@@ -21,13 +21,20 @@ from apps.clients.schemas.filters import ClientFilter
 from apps.clients.schemas.history import ClientHistoryOut
 from apps.clients.selectors import get_client_by_id, get_client_history_queryset, get_client_queryset
 from apps.clients.services import create_client, delete_client, update_client
+
+# from apps.common.auth import AsyncApiKeyAuth
 from apps.common.managers import SoftDeleteQuerySet
+from apps.common.permissions import check_client_access, require_admin
+from apps.common.schemas import ErrorOut
 
 # auth=AsyncJWTAuth() - все эндпоинты в этом роутере требуют авторизацию (JWT-токен)
 router = Router(auth=AsyncJWTAuth())
 
+# Эндпоинты доступны как по JWT, так и по API Ключу (для скриптов)
+# router = Router(auth=[AsyncJWTAuth(), AsyncApiKeyAuth()])
 
-@router.get("/", response={200: list[ClientOut]})
+
+@router.get("/", response={200: list[ClientOut], 401: ErrorOut, 403: ErrorOut})
 @paginate(PageNumberPagination, page_size=20)
 async def list_clients(
     request: HttpRequest,
@@ -37,12 +44,14 @@ async def list_clients(
     Получить список клиентов с фильтрацией и пагинацией.
 
     Args:
-        request (HttpRequest): Объект запроса.
+        request (HttpRequest): Объект входящего запроса.
         filters (ClientFilter): Параметры фильтрации из Query Params.
 
     Returns:
         SoftDeleteQuerySet[Client]: Отфильтрованный список клиентов (пагинация применяется декоратором).
     """
+    # TODO: подумать, нужны ли тут проверка прав
+
     log.info(f"User {request.user.id} fetching client list.")
 
     # Получаем базовый QuerySet (Lazy)
@@ -55,13 +64,13 @@ async def list_clients(
     return query_set
 
 
-@router.get("/{client_id}", response={200: ClientOut})
+@router.get("/{client_id}", response={200: ClientOut, 401: ErrorOut, 404: ErrorOut})
 async def get_client(request: HttpRequest, client_id: UUID) -> tuple[int, Client]:
     """
     Получить детальную информацию о клиенте по ID.
 
     Args:
-        request (HttpRequest): Объект HTTP запроса.
+        request (HttpRequest): Объект входящего запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
@@ -70,6 +79,9 @@ async def get_client(request: HttpRequest, client_id: UUID) -> tuple[int, Client
     Returns:
         tuple[int, Client]: Код ответа, объект клиента.
     """
+    # TODO: добавить логирование юзера
+    # TODO: подумать, нужны ли тут проверка прав
+
     client = await get_client_by_id(client_id=client_id)
 
     if not client:
@@ -80,25 +92,26 @@ async def get_client(request: HttpRequest, client_id: UUID) -> tuple[int, Client
     return 200, client
 
 
-@router.post("/", response={201: ClientOut})
+@router.post("/", response={201: ClientOut, 400: ErrorOut, 401: ErrorOut, 403: ErrorOut, 409: ErrorOut, 422: ErrorOut})
 async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) -> tuple[int, Client]:
     """
     Создание нового клиента.
+    Доступно только администраторам/главбухам.
 
     Args:
-        request (HttpRequest): Объект HTTP запроса.
+        request (HttpRequest): Объект входящего запроса.
         payload (ClientCreate): Данные для создания.
 
     Returns:
         tuple[int, Client]: Код ответа, созданный объект клиента.
     """
-    # TODO: добавить проверку прав (например, только админ или lead_acc)
-    # if not request.user.ahas_perm("clients.add_client"): ...
-
     # Получает ID пользователя из запроса
-    user_id = request.user.id
+    user_id = request.user.id if hasattr(request.user, "id") else None
 
     log.info(f"User {user_id} initiates client creation.")
+
+    # Проверка роли (RBAC)
+    require_admin(request)
 
     # Вызываем сервис создания
     client = await create_client(data=payload, user_id=user_id)
@@ -107,13 +120,14 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     return 201, client
 
 
-@router.patch("/{client_id}", response={200: ClientOut})
+@router.patch("/{client_id}", response={200: ClientOut, 401: ErrorOut, 403: ErrorOut, 404: ErrorOut, 422: ErrorOut})
 async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload: ClientUpdate) -> tuple[int, Client]:
     """
     Частичное обновление данных клиента.
+    Только ответственные лица могут изменять клиента.
 
     Args:
-        request (HttpRequest): Объект HTTP запроса.
+        request (HttpRequest): Объект входящего запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
         payload (ClientUpdate): Данные для обновления.
 
@@ -123,19 +137,20 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
     Returns:
         tuple[int, Client]: Код ответа, обновленный объект клиент.
     """
-    # TODO: добавить проверку прав
-
     # Получает ID пользователя из запроса
-    user_id = request.user.id
+    user_id = request.user.id if hasattr(request.user, "id") else None
 
     log.info(f"User {user_id} initiates update for client {client_id}")
 
     # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id=client_id)
+    client = await get_client_by_id(client_id)
 
     # Проверяем существование клиента
     if not client:
         raise HttpError(status_code=404, message="Клиент не найден")
+
+    # Проверка объектных прав (OLP)
+    await check_client_access(request=request, client=client)
 
     # Вызываем сервис обновления
     updated_client = await update_client(client=client, data=payload, user_id=user_id)
@@ -144,13 +159,17 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
     return 200, updated_client
 
 
-@router.delete("/{client_id}", response={204: None})
-async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple[int, None]:
+@router.delete("/{client_id}", response={204: None, 401: ErrorOut, 403: ErrorOut, 404: ErrorOut})
+async def delete_client_endpoint(
+    request: HttpRequest,
+    client_id: UUID,
+) -> tuple[int, None]:
     """
     Удалить клиента (Soft Delete).
+    Доступно только администраторам.
 
     Args:
-        request (HttpRequest): Объект HTTP запроса.
+        request (HttpRequest): Объект входящего запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
@@ -159,12 +178,13 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     Returns:
         tuple[int, None]: Код ответа, None
     """
-    # TODO: добавить проверку прав
-
     # Получает ID пользователя из запроса
-    user_id = request.user.id
+    user_id = request.user.id if hasattr(request.user, "id") else None
 
     log.info(f"User {user_id} initiates deletion of client {client_id}")
+
+    # Проверка роли (RBAC)
+    require_admin(request)
 
     # Находим клиента, используя селектор для поиска
     client = await get_client_by_id(client_id=client_id)
@@ -180,7 +200,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     return 204, None
 
 
-@router.get("/{client_id}/history", response={200: list[ClientHistoryOut]})
+@router.get("/{client_id}/history", response={200: list[ClientHistoryOut], 401: ErrorOut, 403: ErrorOut, 404: ErrorOut})
 async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict[str, Any]]:
     """
     Получить журнал аудита (историю изменений) клиента.
@@ -189,7 +209,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     Доступно только администраторам.
 
     Args:
-        request (HttpRequest): Объект HTTP запроса.
+        request (HttpRequest): Объект входящего запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
@@ -199,12 +219,15 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     Returns:
         list[dict[str, Any]]: Список событий изменения клиента.
     """
+    # Получает ID пользователя из запроса
+    user_id = request.user.id if hasattr(request.user, "id") else None
 
-    # Проверяем доступ (например, историю видит только Админ)
-    if not request.user.is_staff:
-        raise HttpError(status_code=403, message="Журнал аудита доступен только администраторам.")
+    log.info(f"User {user_id} fetching client audit log {client_id}")
 
-    # Проверяем существование клиента (сам объект нам не нужен, поэтому .aexists для скорости)
+    # Проверка роли (RBAC)
+    require_admin(request)
+
+    # Проверяем существование клиента (сам объект не нужен, поэтому .aexists для скорости)
     client_exists = await Client.objects.filter(id=client_id).aexists()
 
     if not client_exists:
