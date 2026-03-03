@@ -1,6 +1,8 @@
 """
-Custom authentification class for Ninja API.
+Custom authentification class and utils for Ninja API.
 """
+
+from uuid import UUID
 
 from django.conf import settings
 from django.http import HttpRequest
@@ -31,3 +33,28 @@ class AsyncApiKeyAuth(APIKeyHeader):
             return "system_api"  # Маркер для системы, что это программный доступ
 
         return None
+
+
+async def get_initiator_id(request: HttpRequest) -> UUID | None:
+    """
+    Извлекает ID пользователя из HTTP-запроса для передачи в слой сервисов (для аудита).
+
+    Безопасно обрабатывает асинхронные запросы (auser) и системные запросы по API-ключу.
+
+    Args:
+        request (HttpRequest): Объект входящего запроса.
+
+    Returns:
+        UUID: ID пользователя, инициировавшего запрос.
+        None: Если это программный запрос (от system_api).
+    """
+    # Если это программный запрос по API-ключу, пользователя в БД нет
+    if request.auth == "system_api":
+        return None
+
+    # Безопасное асинхронное получение пользователя (распаковывает SimpleLazyObject)
+    user = await request.auser()
+
+    # getattr спасает на случай, если .auser вдруг вернет AnonymousUser
+    # При строгой аутентификации этого быть не должно
+    return getattr(user, "id", None)

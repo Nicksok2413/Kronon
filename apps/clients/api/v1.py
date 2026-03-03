@@ -21,11 +21,10 @@ from apps.clients.schemas.filters import ClientFilter
 from apps.clients.schemas.history import ClientHistoryOut
 from apps.clients.selectors import get_client_by_id, get_client_history_queryset, get_client_queryset
 from apps.clients.services import create_client, delete_client, update_client
-from apps.common.auth import AsyncApiKeyAuth
+from apps.common.auth import AsyncApiKeyAuth, get_initiator_id
 from apps.common.managers import SoftDeleteQuerySet
 from apps.common.permissions import check_client_access, require_admin
 from apps.common.schemas import STANDARD_ERRORS
-from apps.common.utils.request_initiator import get_request_initiator_id
 
 # Эндпоинты доступны как по JWT, так и по API Ключу (для скриптов)
 router = Router(auth=[AsyncJWTAuth(), AsyncApiKeyAuth()])
@@ -54,7 +53,7 @@ async def list_clients(
     # TODO: подумать, нужны ли тут проверка прав
 
     # Получает ID пользователя из запроса
-    initiator = await get_request_initiator_id(request) or "System_API"
+    initiator = await get_initiator_id(request) or "System_API"
 
     log.info(f"User '{initiator}' fetching clients list.")
 
@@ -89,7 +88,7 @@ async def get_client(request: HttpRequest, client_id: UUID) -> tuple[int, Client
         tuple[int, Client]: Код ответа, объект клиента.
     """
     # Получает ID пользователя из запроса
-    initiator = await get_request_initiator_id(request) or "System_API"
+    initiator = await get_initiator_id(request) or "System_API"
 
     log.info(f"Initiator '{initiator}' requesting client {client_id}.")
 
@@ -129,7 +128,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
         tuple[int, Client]: Код ответа, созданный объект клиента.
     """
     # Получает ID пользователя из запроса
-    initiator = await get_request_initiator_id(request) or "System_API"
+    initiator = await get_initiator_id(request) or "System_API"
 
     log.info(f"Initiator '{initiator}' attempts to create client '{payload.name}'.")
 
@@ -165,7 +164,7 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
         tuple[int, Client]: Код ответа, обновленный объект клиент.
     """
     # Получает ID пользователя из запроса
-    initiator = await get_request_initiator_id(request) or "System_API"
+    initiator = await get_initiator_id(request) or "System_API"
 
     log.info(f"Initiator '{initiator}' attempts to update client {client_id}.")
 
@@ -207,7 +206,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
         tuple[int, None]: Код ответа 204 (No Content), None
     """
     # Получает ID пользователя из запроса
-    initiator = await get_request_initiator_id(request) or "System_API"
+    initiator = await get_initiator_id(request) or "System_API"
 
     log.info(f"Initiator '{initiator}' attempts to delete client {client_id}.")
 
@@ -249,7 +248,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
         list[dict[str, Any]]: Список событий изменения клиента.
     """
     # Получает ID пользователя из запроса
-    initiator = await get_request_initiator_id(request) or "System_API"
+    initiator = await get_initiator_id(request) or "System_API"
 
     log.info(f"Initiator '{initiator}' requested history for client {client_id}.")
 
