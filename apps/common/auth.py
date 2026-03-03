@@ -7,6 +7,7 @@ from uuid import UUID
 
 from django.conf import settings
 from django.http import HttpRequest
+from ninja.errors import HttpError
 from ninja.security import APIKeyHeader
 
 from apps.common.types import NinjaRequest
@@ -39,6 +40,38 @@ class AsyncApiKeyAuth(APIKeyHeader):
         return None
 
 
+async def get_auth_identity(request: HttpRequest) -> User | str:
+    """
+    Извлекает личность (объект User или системный маркер "system_api") из запроса.
+
+    Args:
+        request (HttpRequest): Объект входящего запроса.
+
+    Returns:
+          User: объект авторизованного пользователя, инициировавшего запрос.
+          str: Маркер ("system_api"), что запрос пришел от системы
+    """
+    # Приводим тип запроса к интерфейсу NinjaRequest
+    ninja_request = cast(NinjaRequest, request)
+
+    # Ninja уже заполнил auth в аутентификаторе
+    identity = ninja_request.auth
+
+    # Если аутентификация по API-ключу (auth будет строкой "system_api")
+    if identity == "system_api":
+        # Возвращаем строку с системным маркером
+        return "system_api"
+
+    # Если аутентификация по JWT (Ninja-JWT кладет объект User в auth),
+    # проверяем, что в auth действительно User (а не None/Anonymous)
+    if isinstance(identity, User):
+        # Возвращаем объект пользователя
+        return identity
+
+    # Иначе - пробрасываем исключение
+    raise HttpError(status_code=401, message="Не авторизован.")
+
+
 async def get_initiator_id(request: HttpRequest) -> UUID | None:
     """
     Извлекает ID пользователя из запроса для передачи в слой сервисов (для аудита).
@@ -50,19 +83,14 @@ async def get_initiator_id(request: HttpRequest) -> UUID | None:
         UUID: ID пользователя, инициировавшего запрос.
         None: Если это программный запрос (от system_api).
     """
-    # Приводим тип запроса к интерфейсу NinjaRequest
-    ninja_request = cast(NinjaRequest, request)
+    try:
+        # Идентифицируем личность в запросе
+        auth_identity = await get_auth_identity(request)
 
-    # Если это программный запрос по API-ключу, пользователя в БД нет
-    if ninja_request.auth == "system_api":
+        # Если в auth_identity лежит объект пользователя, возвращаем его ID
+        # Если это система ("system_api"), ID пользователя в БД отсутствует, возвращаем None
+        return auth_identity.id if isinstance(auth_identity, User) else None
+
+    except HttpError:
+        # Если аутентификация не пройдена (например, в публичном эндпоинте)
         return None
-
-    # Ninja-JWT кладет объект User в .auth
-    user = ninja_request.auth
-
-    # Проверяем, что в auth действительно User (а не None/Anonymous)
-    if isinstance(user, User):
-        # Возвращаем ID пользователя
-        return user.id
-
-    return None
