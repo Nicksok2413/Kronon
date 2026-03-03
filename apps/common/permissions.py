@@ -27,14 +27,16 @@ async def require_admin(request: HttpRequest) -> None:
     # Приводим тип запроса к интерфейсу NinjaRequest
     ninja_request = cast(NinjaRequest, request)
 
-    # Если авторизация по API-ключу, у системы абсолютные права
+    # Если авторизация по API-ключу (auth будет строкой "system_api"), у системы абсолютные права
     if ninja_request.auth == "system_api":
         return None
 
-    # Для обычных JWT пользователей
-    # Эндпоинты защищены, поэтому в запросе User (анонимных юзеров не может быть)
-    # Но .auser возвращает AbstractBaseUser | AnonymousUser, поэтому используем cast для mypy
-    user = cast(User, await request.auser())
+    # Для обычных JWT пользователей (Ninja-JWT положит объект User в .auth)
+    user = ninja_request.auth
+
+    # Проверяем, что в auth действительно User (а не None/Anonymous)
+    if not isinstance(user, User):
+        raise HttpError(status_code=401, message="Не авторизован.")
 
     # Проверяем права (RBAC)
     # Если это не админ или директор - отказ
@@ -64,14 +66,16 @@ async def check_client_access(request: HttpRequest, client: Client) -> None:
     # Приводим тип запроса к интерфейсу NinjaRequest
     ninja_request = cast(NinjaRequest, request)
 
-    # Если авторизация по API-ключу, у системы абсолютные права
+    # Если авторизация по API-ключу (auth будет строкой "system_api"), у системы абсолютные права
     if ninja_request.auth == "system_api":
         return None
 
-    # Для обычных JWT пользователей
-    # Эндпоинты защищены, поэтому в запросе User (анонимных юзеров не может быть)
-    # Но .auser возвращает AbstractBaseUser | AnonymousUser, поэтому используем cast для mypy
-    user = cast(User, await request.auser())
+    # Для обычных JWT пользователей (Ninja-JWT положит объект User в .auth)
+    user = ninja_request.auth
+
+    # Проверяем, что в auth действительно User (а не None/Anonymous)
+    if not isinstance(user, User):
+        raise HttpError(status_code=401, message="Не авторизован.")
 
     # Проверяем права (RBAC)
     # Админы, директор и главбух имеют полный доступ к клиентам

@@ -175,10 +175,8 @@ test-down:
 	@echo "-> Тестовое окружение остановлено."
 
 test:
-	$(MAKE) test-up
 	@echo "-> ${GREEN}Запуск тестов с (подключение к localhost:5433)...${RESET}"
 	poetry run pytest
-	$(MAKE) test-down
 
 test-clean:
 	$(COMPOSE_TEST) down -v

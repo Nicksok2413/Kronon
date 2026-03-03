@@ -41,9 +41,7 @@ class AsyncApiKeyAuth(APIKeyHeader):
 
 async def get_initiator_id(request: HttpRequest) -> UUID | None:
     """
-    Извлекает ID пользователя из HTTP-запроса для передачи в слой сервисов (для аудита).
-
-    Безопасно обрабатывает асинхронные запросы (auser) и системные запросы по API-ключу.
+    Извлекает ID пользователя из запроса для передачи в слой сервисов (для аудита).
 
     Args:
         request (HttpRequest): Объект входящего запроса.
@@ -59,9 +57,12 @@ async def get_initiator_id(request: HttpRequest) -> UUID | None:
     if ninja_request.auth == "system_api":
         return None
 
-    # Безопасное асинхронное получение пользователя (распаковывает SimpleLazyObject)
-    # Эндпоинты защищены, поэтому в запросе User (анонимных юзеров не может быть)
-    # Но .auser возвращает AbstractBaseUser | AnonymousUser, поэтому используем cast для mypy
-    user = cast(User, await request.auser())
+    # Ninja-JWT кладет объект User в .auth
+    user = ninja_request.auth
 
-    return getattr(user, "id", None)
+    # Проверяем, что в auth действительно User (а не None/Anonymous)
+    if isinstance(user, User):
+        # Возвращаем ID пользователя
+        return user.id
+
+    return None
