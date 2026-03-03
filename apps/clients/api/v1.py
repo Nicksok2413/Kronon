@@ -21,7 +21,7 @@ from apps.clients.schemas.filters import ClientFilter
 from apps.clients.schemas.history import ClientHistoryOut
 from apps.clients.selectors import get_client_by_id, get_client_history_queryset, get_client_queryset
 from apps.clients.services import create_client, delete_client, update_client
-from apps.common.auth import AsyncApiKeyAuth, get_initiator_id
+from apps.common.auth import AsyncApiKeyAuth, get_auth_identity, get_request_initiator
 from apps.common.managers import SoftDeleteQuerySet
 from apps.common.permissions import check_client_access, require_admin
 from apps.common.schemas import STANDARD_ERRORS
@@ -50,18 +50,13 @@ async def list_clients(
     Returns:
         SoftDeleteQuerySet[Client]: Отфильтрованный список клиентов (пагинация применяется декоратором).
     """
-    # TODO: подумать, нужны ли тут проверка прав
+    # Идентифицируем личность в запросе для фильтрации QuerySet
+    identity = await get_auth_identity(request)
 
-    # Получает ID пользователя из запроса
-    initiator = await get_initiator_id(request) or "System_API"
+    log.info(f"Initiator '{identity}' fetching clients list.")
 
-    log.info(f"User '{initiator}' fetching clients list.")
-
-    # Получаем базовый QuerySet (Lazy)
-    query_set = get_client_queryset()
-
-    # TODO: можно добавить фильтрацию на уровне видимости (OLP)
-    # Например: если юзер не админ, query_set = query_set.filter(accountant=request.user | ...)
+    # Получаем базовый QuerySet (Lazy) с OLP-фильтрацией на уровне БД
+    query_set = get_client_queryset(user=identity)
 
     # Применяем фильтры: синхронно строим SQL-запрос, в БД не идем (Lazy)
     # Ninja.FilterSchema применяет фильтры к QuerySet'у, возвращая новый QuerySet
@@ -71,7 +66,7 @@ async def list_clients(
 
 
 @router.get("/{client_id}", response={200: ClientOut, **STANDARD_ERRORS})
-async def get_client(request: HttpRequest, client_id: UUID) -> tuple[int, Client]:
+async def get_client(request: HttpRequest, client_id: UUID) -> Client:
     """
     Получить детальную информацию о клиенте по ID.
 
@@ -85,26 +80,26 @@ async def get_client(request: HttpRequest, client_id: UUID) -> tuple[int, Client
         HttpError(404): Если клиент не найден.
 
     Returns:
-        tuple[int, Client]: Код ответа, объект клиента.
+        Client: Объект клиента.
     """
-    # Получает ID пользователя из запроса
-    initiator = await get_initiator_id(request) or "System_API"
+    # Получаем инициатора запроса (UUID для аудита здесь не нужен, str для логов)
+    _, initiator_str = await get_request_initiator(request)
 
-    log.info(f"Initiator '{initiator}' requesting client {client_id}.")
+    log.info(f"Initiator '{initiator_str}' requesting client {client_id}.")
 
     # Находим клиента, используя селектор для поиска
     client = await get_client_by_id(client_id=client_id)
 
     # Проверяем существование клиента
     if not client:
-        log.info(f"Client {client_id} not found (requested by '{initiator}')")
+        log.info(f"Client {client_id} not found (requested by '{initiator_str}')")
         raise HttpError(status_code=404, message="Клиент не найден")
 
     # Проверка объектных прав (OLP), если бухгалтер запрашивает чужого клиента
     await check_client_access(request=request, client=client)
 
     # Ninja сам преобразует Client в ClientOut
-    return 200, client
+    return client
 
 
 @router.post("/", response={201: ClientOut, **STANDARD_ERRORS})
@@ -127,23 +122,23 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     Returns:
         tuple[int, Client]: Код ответа, созданный объект клиента.
     """
-    # Получает ID пользователя из запроса
-    initiator = await get_initiator_id(request) or "System_API"
+    # Получаем инициатора запроса (UUID для аудита, str для логов)
+    initiator_id, initiator_str = await get_request_initiator(request)
 
-    log.info(f"Initiator '{initiator}' attempts to create client '{payload.name}'.")
+    log.info(f"Initiator '{initiator_str}' attempts to create client '{payload.name}'.")
 
     # Проверка роли (RBAC)
     await require_admin(request)
 
     # Вызываем сервис создания
-    client = await create_client(data=payload, initiator=initiator)
+    client = await create_client(data=payload, initiator=initiator_id)
 
     # Возвращаем созданного клиента
     return 201, client
 
 
 @router.patch("/{client_id}", response={200: ClientOut, **STANDARD_ERRORS})
-async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload: ClientUpdate) -> tuple[int, Client]:
+async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload: ClientUpdate) -> Client:
     """
     Частичное обновление данных клиента.
     Только ответственные лица могут изменять клиента.
@@ -161,12 +156,12 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
         HttpError(422): Ошибка структуры передаваемых данных.
 
     Returns:
-        tuple[int, Client]: Код ответа, обновленный объект клиент.
+        int, Client: Обновленный объект клиента.
     """
-    # Получает ID пользователя из запроса
-    initiator = await get_initiator_id(request) or "System_API"
+    # Получаем инициатора запроса (UUID для аудита, str для логов)
+    initiator_id, initiator_str = await get_request_initiator(request)
 
-    log.info(f"Initiator '{initiator}' attempts to update client {client_id}.")
+    log.info(f"Initiator '{initiator_str}' attempts to update client {client_id}.")
 
     # Находим клиента, используя селектор для поиска
     client = await get_client_by_id(client_id)
@@ -179,10 +174,10 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
     await check_client_access(request=request, client=client)
 
     # Вызываем сервис обновления
-    updated_client = await update_client(client=client, data=payload, initiator=initiator)
+    updated_client = await update_client(client=client, data=payload, initiator=initiator_id)
 
     # Возвращаем обновленного клиента
-    return 200, updated_client
+    return updated_client
 
 
 @router.delete("/{client_id}", response={204: None, **STANDARD_ERRORS})
@@ -205,10 +200,10 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     Returns:
         tuple[int, None]: Код ответа 204 (No Content), None
     """
-    # Получает ID пользователя из запроса
-    initiator = await get_initiator_id(request) or "System_API"
+    # Получаем инициатора запроса (UUID для аудита, str для логов)
+    initiator_id, initiator_str = await get_request_initiator(request)
 
-    log.info(f"Initiator '{initiator}' attempts to delete client {client_id}.")
+    log.info(f"Initiator '{initiator_str}' attempts to delete client {client_id}.")
 
     # Проверка роли (RBAC)
     await require_admin(request)
@@ -221,7 +216,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
         raise HttpError(status_code=404, message="Клиент не найден")
 
     # Вызываем сервис удаления
-    await delete_client(client=client, initiator=initiator)
+    await delete_client(client=client, initiator=initiator_id)
 
     # Возвращаем код ответа
     return 204, None
@@ -247,10 +242,10 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     Returns:
         list[dict[str, Any]]: Список событий изменения клиента.
     """
-    # Получает ID пользователя из запроса
-    initiator = await get_initiator_id(request) or "System_API"
+    # Получаем инициатора запроса (UUID для аудита здесь не нужен, str для логов)
+    _, initiator_str = await get_request_initiator(request)
 
-    log.info(f"Initiator '{initiator}' requested history for client {client_id}.")
+    log.info(f"Initiator '{initiator_str}' requested history for client {client_id}.")
 
     # Проверка роли (RBAC)
     await require_admin(request)

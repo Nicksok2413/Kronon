@@ -72,25 +72,34 @@ async def get_auth_identity(request: HttpRequest) -> User | str:
     raise HttpError(status_code=401, message="Не авторизован.")
 
 
-async def get_initiator_id(request: HttpRequest) -> UUID | None:
+async def get_request_initiator(request: HttpRequest) -> tuple[UUID | None, str]:
     """
-    Извлекает ID пользователя из запроса для передачи в слой сервисов (для аудита).
+    Извлекает из запроса ID пользователя (для аудита pghistory в слое сервисов).
+    Возвращает пару (UUID для БД, Строка для логов).
 
     Args:
         request (HttpRequest): Объект входящего запроса.
 
     Returns:
-        UUID: ID пользователя, инициировавшего запрос.
-        None: Если это программный запрос (от system_api).
+        tuple[UUID | None, str]:
+            - UUID пользователя или None (для системных запросов или в публичном эндпойнте).
+            - Строковое представление для логирования (ID, "System_API" или "Anonymous").
     """
     try:
         # Идентифицируем личность в запросе
         auth_identity = await get_auth_identity(request)
 
-        # Если в auth_identity лежит объект пользователя, возвращаем его ID
-        # Если это система ("system_api"), ID пользователя в БД отсутствует, возвращаем None
-        return auth_identity.id if isinstance(auth_identity, User) else None
+        # Если это система (ID пользователя в БД отсутствует), возвращаем tuple[None, "System_API"]
+        if auth_identity == "system_api":
+            return None, "System_API"
+
+        # user = cast(User, identity)  # Явная типизация для Mypy: identity — это User
+
+        # Если в auth_identity лежит объект пользователя, возвращаем его tuple[UUID, str(UUID)]
+        if isinstance(auth_identity, User):
+            user_id = auth_identity.id
+            return user_id, str(user_id)
 
     except HttpError:
         # Если аутентификация не пройдена (например, в публичном эндпоинте)
-        return None
+        return None, "Anonymous"
