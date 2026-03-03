@@ -136,7 +136,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     await require_admin(request)
 
     # Вызываем сервис создания
-    client = await create_client(data=payload, user_id=initiator)
+    client = await create_client(data=payload, initiator=initiator)
 
     # Возвращаем созданного клиента
     return 201, client
@@ -179,7 +179,7 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
     await check_client_access(request=request, client=client)
 
     # Вызываем сервис обновления
-    updated_client = await update_client(client=client, data=payload, user_id=initiator)
+    updated_client = await update_client(client=client, data=payload, initiator=initiator)
 
     # Возвращаем обновленного клиента
     return 200, updated_client
@@ -221,7 +221,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
         raise HttpError(status_code=404, message="Клиент не найден")
 
     # Вызываем сервис удаления
-    await delete_client(client=client, user_id=initiator)
+    await delete_client(client=client, initiator=initiator)
 
     # Возвращаем код ответа
     return 204, None

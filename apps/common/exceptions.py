@@ -91,7 +91,7 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
 
         # Обработка дубликата УНП (уникальный индекс)
         if "unp" in exc_msg:
-            response_data = (ErrorOut(message="Клиент с таким УНП уже существует.", code="duplicate_unp"),)
+            response_data = ErrorOut(message="Клиент с таким УНП уже существует.", code="duplicate_unp")
             return api.create_response(request=request, data=response_data, status=409)
 
         response_data = ErrorOut(message="Ошибка целостности данных в БД.", code="integrity_error")
