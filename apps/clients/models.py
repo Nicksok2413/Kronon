@@ -3,6 +3,7 @@
 """
 
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 import pghistory
 from django.conf import settings
@@ -289,6 +290,18 @@ class Client(BaseModel):
         self.contact_info = {**current_data, **updates}
 
         return None
+
+    @classmethod
+    def get_olp_filter(cls, user_id: UUID) -> models.Q:
+        """
+        Определяет, к каким клиентам имеет доступ линейный бухгалтер (user_id).
+        """
+        return (
+            models.Q(accountant_id=user_id)
+            | models.Q(primary_accountant_id=user_id)
+            | models.Q(payroll_accountant_id=user_id)
+            | models.Q(hr_specialist_id=user_id)
+        )
 
 
 # Создаем базовый класс для модели событий (аналог декоратора pghistory.track)

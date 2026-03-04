@@ -21,9 +21,9 @@ from apps.clients.schemas.filters import ClientFilter
 from apps.clients.schemas.history import ClientHistoryOut
 from apps.clients.selectors import get_client_by_id, get_client_history_queryset, get_client_queryset
 from apps.clients.services import create_client, delete_client, update_client
-from apps.common.auth import AsyncApiKeyAuth, get_auth_identity, get_request_initiator
+from apps.common.auth import AsyncApiKeyAuth, get_request_initiator
 from apps.common.managers import SoftDeleteQuerySet
-from apps.common.permissions import check_client_access, require_admin
+from apps.common.permissions import check_client_access, is_admin_access
 from apps.common.schemas import STANDARD_ERRORS
 
 # Эндпоинты доступны как по JWT, так и по API Ключу (для скриптов)
@@ -37,7 +37,7 @@ async def list_clients(
     filters: Annotated[ClientFilter, Query(...)],
 ) -> SoftDeleteQuerySet[Client]:
     """
-    Получить список клиентов с фильтрацией и пагинацией.
+    Получить список клиентов с нативной OLP-фильтрацией, фильтрацией из запроса и пагинацией.
 
     Args:
         request (HttpRequest): Объект входящего запроса.
@@ -50,15 +50,18 @@ async def list_clients(
     Returns:
         SoftDeleteQuerySet[Client]: Отфильтрованный список клиентов (пагинация применяется декоратором).
     """
-    # Идентифицируем личность в запросе для фильтрации QuerySet
-    identity = await get_auth_identity(request)
+    # Получаем инициатора запроса (UUID для аудита, str для логов)
+    initiator_id, initiator_str = await get_request_initiator(request)
 
-    log.info(f"Initiator '{identity}' fetching clients list.")
+    # Проверяем роли (RBAC)
+    admin_status = await is_admin_access(request)
+
+    log.info(f"Initiator '{initiator_str}' fetching clients list.")
 
     # Получаем базовый QuerySet (Lazy) с OLP-фильтрацией на уровне БД
-    query_set = get_client_queryset(user=identity)
+    query_set = await get_client_queryset(user_id=initiator_id, is_admin=admin_status)
 
-    # Применяем фильтры: синхронно строим SQL-запрос, в БД не идем (Lazy)
+    # Применяем фильтры из запроса: строим SQL-запрос, в БД не идем (Lazy)
     # Ninja.FilterSchema применяет фильтры к QuerySet'у, возвращая новый QuerySet
     query_set = filters.filter(query_set)
 
@@ -82,13 +85,16 @@ async def get_client(request: HttpRequest, client_id: UUID) -> Client:
     Returns:
         Client: Объект клиента.
     """
-    # Получаем инициатора запроса (UUID для аудита здесь не нужен, str для логов)
-    _, initiator_str = await get_request_initiator(request)
+    # Получаем инициатора запроса (UUID для аудита, str для логов)
+    initiator_id, initiator_str = await get_request_initiator(request)
 
     log.info(f"Initiator '{initiator_str}' requesting client {client_id}.")
 
+    # Проверяем роли (RBAC)
+    admin_status = await is_admin_access(request)
+
     # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id=client_id)
+    client = await get_client_by_id(client_id=client_id, user_id=initiator_id, is_admin=admin_status)
 
     # Проверяем существование клиента
     if not client:
@@ -128,7 +134,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     log.info(f"Initiator '{initiator_str}' attempts to create client '{payload.name}'.")
 
     # Проверка роли (RBAC)
-    await require_admin(request)
+    await is_admin_access(request)
 
     # Вызываем сервис создания
     client = await create_client(data=payload, initiator=initiator_id)
@@ -163,8 +169,11 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
 
     log.info(f"Initiator '{initiator_str}' attempts to update client {client_id}.")
 
+    # Проверяем роли (RBAC)
+    admin_status = await is_admin_access(request)
+
     # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id)
+    client = await get_client_by_id(client_id=client_id, user_id=initiator_id, is_admin=admin_status)
 
     # Проверяем существование клиента
     if not client:
@@ -205,11 +214,11 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
 
     log.info(f"Initiator '{initiator_str}' attempts to delete client {client_id}.")
 
-    # Проверка роли (RBAC)
-    await require_admin(request)
+    # Проверяем роли (RBAC)
+    admin_status = await is_admin_access(request)
 
     # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id=client_id)
+    client = await get_client_by_id(client_id=client_id, user_id=initiator_id, is_admin=admin_status)
 
     # Проверяем существование клиента
     if not client:
@@ -248,7 +257,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     log.info(f"Initiator '{initiator_str}' requested history for client {client_id}.")
 
     # Проверка роли (RBAC)
-    await require_admin(request)
+    await is_admin_access(request)
 
     # Проверяем существование клиента (сам объект не нужен, поэтому .aexists для скорости)
     # TODO: можно искать также по удаленным клиентам через менеджер .all_objects

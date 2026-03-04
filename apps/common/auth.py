@@ -11,6 +11,7 @@ from ninja.errors import HttpError
 from ninja.security import APIKeyHeader
 
 from apps.common.types import NinjaRequest
+from apps.users.constants import SYSTEM_USER_ID
 from apps.users.models import User
 
 
@@ -34,7 +35,7 @@ class AsyncApiKeyAuth(APIKeyHeader):
         Returns:
             str | None: Маркер для системы или None
         """
-        if settings.INTERNAL_API_KEY and key == settings.INTERNAL_API_KEY:
+        if key == settings.INTERNAL_API_KEY:
             return "system_api"  # Маркер для системы, что это программный доступ
 
         return None
@@ -72,34 +73,30 @@ async def get_auth_identity(request: HttpRequest) -> User | str:
     raise HttpError(status_code=401, message="Не авторизован.")
 
 
-async def get_request_initiator(request: HttpRequest) -> tuple[UUID | None, str]:
+async def get_request_initiator(request: HttpRequest) -> tuple[UUID, str]:
     """
     Извлекает из запроса ID пользователя (для аудита pghistory в слое сервисов).
-    Возвращает пару (UUID для БД, Строка для логов).
+    Возвращает пару (UUID для БД, строка для логов).
 
     Args:
         request (HttpRequest): Объект входящего запроса.
 
     Returns:
-        tuple[UUID | None, str]:
-            - UUID пользователя или None (для системных запросов или в публичном эндпойнте).
-            - Строковое представление для логирования (ID, "System_API" или "Anonymous").
+        tuple[UUID, str]: (UUID инициатора, строка для логирования).
     """
     try:
         # Идентифицируем личность в запросе
         auth_identity = await get_auth_identity(request)
 
-        # Если это система (ID пользователя в БД отсутствует), возвращаем tuple[None, "System_API"]
+        # Если это система, возвращаем UUID системного пользователя и системный маркер
         if auth_identity == "system_api":
-            return None, "System_API"
+            return SYSTEM_USER_ID, "System_API"
 
-        # user = cast(User, identity)  # Явная типизация для Mypy: identity — это User
+        # Для JWT-юзеров возвращаем UUID юзера и его email
+        user = cast(User, auth_identity)  # Явная типизация для Mypy: в identity лежит User
 
-        # Если в auth_identity лежит объект пользователя, возвращаем его tuple[UUID, str(UUID)]
-        if isinstance(auth_identity, User):
-            user_id = auth_identity.id
-            return user_id, str(user_id)
+        return user.id, user.email
 
     except HttpError:
         # Если аутентификация не пройдена (например, в публичном эндпоинте)
-        return None, "Anonymous"
+        return SYSTEM_USER_ID, "Anonymous"

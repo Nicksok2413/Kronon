@@ -14,31 +14,34 @@ from apps.common.auth import get_auth_identity
 from apps.users.models import User, UserRole
 
 
-async def require_admin(request: HttpRequest) -> None:
+async def is_admin_access(request: HttpRequest) -> bool:
     """
-    Разрешает доступ только Директору, Staff (RBAC) или Системному API Ключу.
+    Проверяет, является ли текущий доступ административным.
 
     Args:
         request (HttpRequest): Объект входящего запроса.
 
     Raises:
         HttpError(403): Если прав нет.
+
+    Returns:
+        bool: Разрешает доступ админам, директору, главбуху (RBAC) или по системному API Ключу.
     """
     # Идентифицируем личность в запросе (пользователь или система)
     identity = await get_auth_identity(request)
 
     # Если это система, возвращаем None (у системы абсолютные права)
     if identity == "system_api":
-        return None
+        return True
 
-    # Для JWT пользователей проверяем права (RBAC)
-    user = cast(User, identity)  # Явная типизация для Mypy: identity — это User
+    # Для JWT-юзеров проверяем права (RBAC)
+    user = cast(User, identity)  # Явная типизация для Mypy: в identity лежит User
 
     # Если это не админ или директор - отказ
-    if not user.is_staff and user.role != UserRole.DIRECTOR:
+    if not user.is_staff and user.role not in (UserRole.DIRECTOR, UserRole.CHIEF_ACCOUNTANT):
         raise HttpError(status_code=403, message="Доступ запрещен. Требуются права администратора.")
 
-    return None
+    return True
 
 
 async def check_client_access(request: HttpRequest, client: Client) -> None:
@@ -65,24 +68,25 @@ async def check_client_access(request: HttpRequest, client: Client) -> None:
     if identity == "system_api":
         return None
 
-    # Для JWT пользователей проверяем права (RBAC)
-    user = cast(User, identity)  # Явная типизация для Mypy: identity — это User
+    # Для JWT-юзеров проверяем права (RBAC)
+    user = cast(User, identity)  # Явная типизация для Mypy: в identity лежит User
 
     # Админы, директор и главбух имеют полный доступ к клиентам
     if user.is_staff or user.role in (UserRole.DIRECTOR, UserRole.CHIEF_ACCOUNTANT):
         return None
 
     # Если по ролям не прошли, проверяем объектные права (OLP)
-    # Если юзер - кто-то из ответственных за этого клиента, пускаем
-    allowed_users = {
+
+    allowed_ids = {
         client.accountant_id,
         client.primary_accountant_id,
         client.payroll_accountant_id,
         client.hr_specialist_id,
-    }
+    }  # Множество ответственных за этого клиента
 
-    if user.id in allowed_users:
+    # Если юзер - кто-то из ответственных за этого клиента, пускаем
+    if user.id in allowed_ids:
         return None
 
     # Иначе - отказ
-    raise HttpError(status_code=403, message=f"У вас нет прав на редактирование клиента '{client.name}'.")
+    raise HttpError(status_code=403, message=f"У вас нет прав на клиента '{client.name}'.")
