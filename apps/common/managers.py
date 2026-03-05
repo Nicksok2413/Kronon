@@ -45,7 +45,7 @@ class SoftDeleteQuerySet(models.QuerySet[_M]):
             Self: Отфильтрованный QuerySet.
         """
         # Системный доступ или наличие административных прав (админы, директор, главбух) - видят всё
-        if user_id == SYSTEM_USER_ID or is_admin:
+        if is_admin or user_id == SYSTEM_USER_ID:
             return self
 
         # Для линейного персонала вызываем логику фильтрации из самой модели

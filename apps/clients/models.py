@@ -294,6 +294,7 @@ class Client(BaseModel):
     @classmethod
     def get_olp_filter(cls, user_id: UUID) -> models.Q:
         """
+        Возвращает Q-объект для фильтрации доступа.
         Определяет, к каким клиентам имеет доступ линейный бухгалтер (user_id).
         """
         return (

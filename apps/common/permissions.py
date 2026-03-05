@@ -16,7 +16,7 @@ from apps.users.models import User, UserRole
 
 async def is_admin_access(request: HttpRequest) -> bool:
     """
-    Проверяет, является ли текущий доступ административным.
+    Проверяет, является ли текущий доступ системным (API-ключ) или административным (админ/директор/главбух).
 
     Args:
         request (HttpRequest): Объект входящего запроса.
@@ -25,23 +25,24 @@ async def is_admin_access(request: HttpRequest) -> bool:
         HttpError(403): Если прав нет.
 
     Returns:
-        bool: Разрешает доступ админам, директору, главбуху (RBAC) или по системному API Ключу.
+        bool: Флаг системного/административного доступа.
     """
     # Идентифицируем личность в запросе (пользователь или система)
     identity = await get_auth_identity(request)
 
-    # Если это система, возвращаем None (у системы абсолютные права)
+    # Если это система, возвращаем True (у системы абсолютные права)
     if identity == "system_api":
         return True
 
     # Для JWT-юзеров проверяем права (RBAC)
     user = cast(User, identity)  # Явная типизация для Mypy: в identity лежит User
 
-    # Если это не админ или директор - отказ
-    if not user.is_staff and user.role not in (UserRole.DIRECTOR, UserRole.CHIEF_ACCOUNTANT):
-        raise HttpError(status_code=403, message="Доступ запрещен. Требуются права администратора.")
+    # Если это админ/директор/главбух, возвращаем True
+    if user.is_staff and user.role in (UserRole.DIRECTOR, UserRole.CHIEF_ACCOUNTANT):
+        return True
 
-    return True
+    # Если это не системный/административный доступ - выбрасываем исключение
+    raise HttpError(status_code=403, message="Доступ запрещен. Требуются права администратора.")
 
 
 async def check_client_access(request: HttpRequest, client: Client) -> None:
@@ -61,32 +62,30 @@ async def check_client_access(request: HttpRequest, client: Client) -> None:
     Raises:
         HttpError(403): Если прав нет.
     """
-    # Идентифицируем личность в запросе (пользователь или система)
-    identity = await get_auth_identity(request)
-
-    # Если это система, возвращаем None (у системы абсолютные права)
-    if identity == "system_api":
+    try:
+        # Если это системный/административный доступ — пропускаем без дальнейших проверок
+        await is_admin_access(request)
         return None
 
-    # Для JWT-юзеров проверяем права (RBAC)
-    user = cast(User, identity)  # Явная типизация для Mypy: в identity лежит User
+    except HttpError:
+        # Если нет — проверяем объектные права (OLP)
 
-    # Админы, директор и главбух имеют полный доступ к клиентам
-    if user.is_staff or user.role in (UserRole.DIRECTOR, UserRole.CHIEF_ACCOUNTANT):
-        return None
+        # Идентифицируем пользователя
+        identity = await get_auth_identity(request)
 
-    # Если по ролям не прошли, проверяем объектные права (OLP)
+        user = cast(User, identity)  # Явная типизация для Mypy: в identity лежит User
 
-    allowed_ids = {
-        client.accountant_id,
-        client.primary_accountant_id,
-        client.payroll_accountant_id,
-        client.hr_specialist_id,
-    }  # Множество ответственных за этого клиента
+        # Ответственные за этого клиента
+        allowed_ids_set = {
+            client.accountant_id,
+            client.primary_accountant_id,
+            client.payroll_accountant_id,
+            client.hr_specialist_id,
+        }
 
-    # Если юзер - кто-то из ответственных за этого клиента, пускаем
-    if user.id in allowed_ids:
-        return None
+        # Если пользователь - кто-то из ответственных за этого клиента, пропускаем
+        if user.id in allowed_ids_set:
+            return None
 
-    # Иначе - отказ
-    raise HttpError(status_code=403, message=f"У вас нет прав на клиента '{client.name}'.")
+        # Иначе - выбрасываем исключение
+        raise HttpError(status_code=403, message=f"У вас нет прав на клиента '{client.name}'.")

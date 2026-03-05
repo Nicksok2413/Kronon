@@ -50,16 +50,19 @@ async def list_clients(
     Returns:
         SoftDeleteQuerySet[Client]: Отфильтрованный список клиентов (пагинация применяется декоратором).
     """
-    # Получаем инициатора запроса (UUID для аудита, str для логов)
+    # Получаем инициатора запроса (id для аудита, str для логов)
     initiator_id, initiator_str = await get_request_initiator(request)
-
-    # Проверяем роли (RBAC)
-    admin_status = await is_admin_access(request)
 
     log.info(f"Initiator '{initiator_str}' fetching clients list.")
 
+    # Проверяем роли (RBAC) без рейза ошибки, просто для фильтрации
+    try:
+        is_admin = await is_admin_access(request)
+    except HttpError:
+        is_admin = False
+
     # Получаем базовый QuerySet (Lazy) с OLP-фильтрацией на уровне БД
-    query_set = await get_client_queryset(user_id=initiator_id, is_admin=admin_status)
+    query_set = await get_client_queryset(user_id=initiator_id, is_admin=is_admin)
 
     # Применяем фильтры из запроса: строим SQL-запрос, в БД не идем (Lazy)
     # Ninja.FilterSchema применяет фильтры к QuerySet'у, возвращая новый QuerySet
@@ -85,13 +88,10 @@ async def get_client(request: HttpRequest, client_id: UUID) -> Client:
     Returns:
         Client: Объект клиента.
     """
-    # Получаем инициатора запроса (UUID для аудита, str для логов)
+    # Получаем инициатора запроса (id для аудита, str для логов)
     initiator_id, initiator_str = await get_request_initiator(request)
 
     log.info(f"Initiator '{initiator_str}' requesting client {client_id}.")
-
-    # Проверяем роли (RBAC)
-    admin_status = await is_admin_access(request)
 
     # Находим клиента, используя селектор для поиска
     client = await get_client_by_id(client_id=client_id, user_id=initiator_id, is_admin=admin_status)
@@ -128,7 +128,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     Returns:
         tuple[int, Client]: Код ответа, созданный объект клиента.
     """
-    # Получаем инициатора запроса (UUID для аудита, str для логов)
+    # Получаем инициатора запроса (id для аудита, str для логов)
     initiator_id, initiator_str = await get_request_initiator(request)
 
     log.info(f"Initiator '{initiator_str}' attempts to create client '{payload.name}'.")
@@ -164,7 +164,7 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
     Returns:
         int, Client: Обновленный объект клиента.
     """
-    # Получаем инициатора запроса (UUID для аудита, str для логов)
+    # Получаем инициатора запроса (id для аудита, str для логов)
     initiator_id, initiator_str = await get_request_initiator(request)
 
     log.info(f"Initiator '{initiator_str}' attempts to update client {client_id}.")
@@ -209,7 +209,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     Returns:
         tuple[int, None]: Код ответа 204 (No Content), None
     """
-    # Получаем инициатора запроса (UUID для аудита, str для логов)
+    # Получаем инициатора запроса (id для аудита, str для логов)
     initiator_id, initiator_str = await get_request_initiator(request)
 
     log.info(f"Initiator '{initiator_str}' attempts to delete client {client_id}.")
@@ -251,7 +251,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     Returns:
         list[dict[str, Any]]: Список событий изменения клиента.
     """
-    # Получаем инициатора запроса (UUID для аудита здесь не нужен, str для логов)
+    # Получаем инициатора запроса (id для аудита здесь не нужен, str для логов)
     _, initiator_str = await get_request_initiator(request)
 
     log.info(f"Initiator '{initiator_str}' requested history for client {client_id}.")
