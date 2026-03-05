@@ -41,16 +41,18 @@ class AsyncApiKeyAuth(APIKeyHeader):
         return None
 
 
-async def get_auth_identity(request: HttpRequest) -> User | str:
+async def get_auth_identity(request: HttpRequest) -> User:
     """
-    Извлекает личность (объект User или системный маркер "system_api") из запроса.
+    Извлекает объект User (реальный или системный) из запроса.
 
     Args:
         request (HttpRequest): Объект входящего запроса.
 
     Returns:
-          User: объект авторизованного пользователя, инициировавшего запрос.
-          str: Маркер ("system_api"), что запрос пришел от системы
+          User: объект пользователя, инициировавшего запрос.
+
+    Raises:
+        401: Не авторизован.
     """
     # Приводим тип запроса к интерфейсу NinjaRequest
     ninja_request = cast(NinjaRequest, request)
@@ -60,8 +62,8 @@ async def get_auth_identity(request: HttpRequest) -> User | str:
 
     # Если аутентификация по API-ключу (auth будет строкой "system_api")
     if identity == "system_api":
-        # Возвращаем строку с системным маркером
-        return "system_api"
+        # Возвращаем системного юзера из БД (Django кэширует get)
+        return await User.objects.aget(id=SYSTEM_USER_ID)
 
     # Если аутентификация по JWT (Ninja-JWT кладет объект User в auth),
     # проверяем, что в auth действительно User (а не None/Anonymous)
@@ -75,26 +77,19 @@ async def get_auth_identity(request: HttpRequest) -> User | str:
 
 async def get_request_initiator(request: HttpRequest) -> tuple[UUID, str]:
     """
-    Извлекает из запроса ID пользователя (для аудита pghistory в слое сервисов).
-    Возвращает пару (UUID для БД, строка для логов).
+    Возвращает данные инициатора запроса (UUID для pghistory, строка для логов).
 
     Args:
         request (HttpRequest): Объект входящего запроса.
 
     Returns:
-        tuple[UUID, str]: (UUID инициатора, строка для логирования).
+        tuple[UUID, str]: (UUID инициатора запроса, строка для логирования).
     """
     try:
-        # Идентифицируем личность в запросе
-        auth_identity = await get_auth_identity(request)
+        # Получаем пользователя из запроса
+        user = await get_auth_identity(request)
 
-        # Если это система, возвращаем UUID системного пользователя и системный маркер
-        if auth_identity == "system_api":
-            return SYSTEM_USER_ID, "System_API"
-
-        # Для JWT-юзеров возвращаем UUID юзера и его email
-        user = cast(User, auth_identity)  # Явная типизация для Mypy: в identity лежит User
-
+        # Возвращаем UUID пользователя и его email
         return user.id, user.email
 
     except HttpError:

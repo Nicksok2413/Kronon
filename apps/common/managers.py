@@ -49,10 +49,13 @@ class SoftDeleteQuerySet(models.QuerySet[_M]):
             return self
 
         # Для линейного персонала вызываем логику фильтрации из самой модели
-        # Каждая модель (Client, Contract, etc) должна реализовать classmethod get_olp_filter
-        if hasattr(self.model, "get_olp_filter"):
+        # Каждая модель, где нужна OLP-фильтрация (Client, Contract, etc) должна иметь метод get_olp_filter
+        olp_method = getattr(self.model, "get_olp_filter", None)
+
+        if olp_method:
             # Вызываем метод модели, который возвращает Q-объект
-            olp_filter = self.model.get_olp_filter(user_id)
+            olp_filter = olp_method(user_id)
+
             return self.filter(olp_filter).distinct()
 
         # Безопасный отказ: если OLP не настроен для модели — скрываем всё (пустой список)

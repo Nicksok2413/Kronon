@@ -4,14 +4,13 @@ Permissions system for Ninja API endpoints.
 RBAC (Role-Based Access Control) и OLP (Object-Level Permissions)
 """
 
-from typing import cast
-
 from django.http import HttpRequest
 from ninja.errors import HttpError
 
 from apps.clients.models import Client
 from apps.common.auth import get_auth_identity
-from apps.users.models import User, UserRole
+from apps.users.constants import SYSTEM_USER_ID
+from apps.users.models import UserRole
 
 
 async def is_admin_access(request: HttpRequest) -> bool:
@@ -27,15 +26,14 @@ async def is_admin_access(request: HttpRequest) -> bool:
     Returns:
         bool: Флаг системного/административного доступа.
     """
-    # Идентифицируем личность в запросе (пользователь или система)
-    identity = await get_auth_identity(request)
+    # Получаем пользователя из запроса
+    user = await get_auth_identity(request)
 
+    # TODO: подумать не лишняя ли это проверка
     # Если это система, возвращаем True (у системы абсолютные права)
-    if identity == "system_api":
+    # Системный юзер и так имеет роль DIRECTOR (из миграции), но проверяем явно по ID для надежности
+    if user.id == SYSTEM_USER_ID:
         return True
-
-    # Для JWT-юзеров проверяем права (RBAC)
-    user = cast(User, identity)  # Явная типизация для Mypy: в identity лежит User
 
     # Если это админ/директор/главбух, возвращаем True
     if user.is_staff and user.role in (UserRole.DIRECTOR, UserRole.CHIEF_ACCOUNTANT):
@@ -62,18 +60,15 @@ async def check_client_access(request: HttpRequest, client: Client) -> None:
     Raises:
         HttpError(403): Если прав нет.
     """
+    # Проверка на системный/административный доступ (RBAC)
     try:
-        # Если это системный/административный доступ — пропускаем без дальнейших проверок
+        # Если да — пропускаем без дальнейших проверок
         await is_admin_access(request)
         return None
 
     except HttpError:
         # Если нет — проверяем объектные права (OLP)
-
-        # Идентифицируем пользователя
-        identity = await get_auth_identity(request)
-
-        user = cast(User, identity)  # Явная типизация для Mypy: в identity лежит User
+        user = await get_auth_identity(request)  # Получаем пользователя из запроса
 
         # Ответственные за этого клиента
         allowed_ids_set = {
@@ -88,4 +83,4 @@ async def check_client_access(request: HttpRequest, client: Client) -> None:
             return None
 
         # Иначе - выбрасываем исключение
-        raise HttpError(status_code=403, message=f"У вас нет прав на клиента '{client.name}'.")
+        raise HttpError(status_code=403, message=f"У вас нет прав на клиента '{client.name}'.") from None

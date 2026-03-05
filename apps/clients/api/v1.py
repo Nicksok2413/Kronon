@@ -15,15 +15,16 @@ from ninja.errors import HttpError
 from ninja.pagination import PageNumberPagination, paginate
 from ninja_jwt.authentication import AsyncJWTAuth
 
+from apps.clients.guards import get_client_for_admin_or_404, get_client_for_edit_or_404
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
 from apps.clients.schemas.history import ClientHistoryOut
-from apps.clients.selectors import get_client_by_id, get_client_history_queryset, get_client_queryset
+from apps.clients.selectors import get_client_history_queryset, get_client_queryset
 from apps.clients.services import create_client, delete_client, update_client
 from apps.common.auth import AsyncApiKeyAuth, get_request_initiator
 from apps.common.managers import SoftDeleteQuerySet
-from apps.common.permissions import check_client_access, is_admin_access
+from apps.common.permissions import is_admin_access
 from apps.common.schemas import STANDARD_ERRORS
 
 # Эндпоинты доступны как по JWT, так и по API Ключу (для скриптов)
@@ -38,6 +39,7 @@ async def list_clients(
 ) -> SoftDeleteQuerySet[Client]:
     """
     Получить список клиентов с нативной OLP-фильтрацией, фильтрацией из запроса и пагинацией.
+    Доступно системе, администраторам и ответственным лицам.
 
     Args:
         request (HttpRequest): Объект входящего запроса.
@@ -55,14 +57,14 @@ async def list_clients(
 
     log.info(f"Initiator '{initiator_str}' fetching clients list.")
 
-    # Проверяем роли (RBAC) без рейза ошибки, просто для фильтрации
+    # Проверяем права (RBAC) без рейза ошибки, просто для фильтрации
     try:
         is_admin = await is_admin_access(request)
     except HttpError:
         is_admin = False
 
     # Получаем базовый QuerySet (Lazy) с OLP-фильтрацией на уровне БД
-    query_set = await get_client_queryset(user_id=initiator_id, is_admin=is_admin)
+    query_set = get_client_queryset(user_id=initiator_id, is_admin=is_admin)
 
     # Применяем фильтры из запроса: строим SQL-запрос, в БД не идем (Lazy)
     # Ninja.FilterSchema применяет фильтры к QuerySet'у, возвращая новый QuerySet
@@ -75,6 +77,7 @@ async def list_clients(
 async def get_client(request: HttpRequest, client_id: UUID) -> Client:
     """
     Получить детальную информацию о клиенте по ID.
+    Доступно системе, администраторам и ответственным лицам.
 
     Args:
         request (HttpRequest): Объект входящего запроса.
@@ -93,16 +96,8 @@ async def get_client(request: HttpRequest, client_id: UUID) -> Client:
 
     log.info(f"Initiator '{initiator_str}' requesting client {client_id}.")
 
-    # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id=client_id, user_id=initiator_id, is_admin=admin_status)
-
-    # Проверяем существование клиента
-    if not client:
-        log.info(f"Client {client_id} not found (requested by '{initiator_str}')")
-        raise HttpError(status_code=404, message="Клиент не найден")
-
-    # Проверка объектных прав (OLP), если бухгалтер запрашивает чужого клиента
-    await check_client_access(request=request, client=client)
+    # Проверяем существование клиента и права (RBAC + OLP)
+    client = await get_client_for_edit_or_404(request=request, client_id=client_id)
 
     # Ninja сам преобразует Client в ClientOut
     return client
@@ -112,7 +107,7 @@ async def get_client(request: HttpRequest, client_id: UUID) -> Client:
 async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) -> tuple[int, Client]:
     """
     Создание нового клиента.
-    Доступно только администраторам.
+    Доступно только системе и администраторам.
 
     Args:
         request (HttpRequest): Объект входящего запроса.
@@ -133,7 +128,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
 
     log.info(f"Initiator '{initiator_str}' attempts to create client '{payload.name}'.")
 
-    # Проверка роли (RBAC)
+    # Проверяем права (RBAC)
     await is_admin_access(request)
 
     # Вызываем сервис создания
@@ -147,7 +142,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
 async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload: ClientUpdate) -> Client:
     """
     Частичное обновление данных клиента.
-    Только ответственные лица могут изменять клиента.
+    Доступно системе, администраторам и ответственным лицам.
 
     Args:
         request (HttpRequest): Объект входящего запроса.
@@ -169,18 +164,8 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
 
     log.info(f"Initiator '{initiator_str}' attempts to update client {client_id}.")
 
-    # Проверяем роли (RBAC)
-    admin_status = await is_admin_access(request)
-
-    # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id=client_id, user_id=initiator_id, is_admin=admin_status)
-
-    # Проверяем существование клиента
-    if not client:
-        raise HttpError(status_code=404, message="Клиент не найден")
-
-    # Проверка объектных прав (OLP)
-    await check_client_access(request=request, client=client)
+    # Проверяем существование клиента и права (RBAC + OLP)
+    client = await get_client_for_edit_or_404(request=request, client_id=client_id)
 
     # Вызываем сервис обновления
     updated_client = await update_client(client=client, data=payload, initiator=initiator_id)
@@ -195,7 +180,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     Мягкое удаление (Soft Delete) клиента.
 
     Клиент скрывается из списков, но остается в БД.
-    Доступно только администраторам.
+    Доступно только системе и администраторам.
 
     Args:
         request (HttpRequest): Объект входящего запроса.
@@ -214,15 +199,8 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
 
     log.info(f"Initiator '{initiator_str}' attempts to delete client {client_id}.")
 
-    # Проверяем роли (RBAC)
-    admin_status = await is_admin_access(request)
-
-    # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id=client_id, user_id=initiator_id, is_admin=admin_status)
-
-    # Проверяем существование клиента
-    if not client:
-        raise HttpError(status_code=404, message="Клиент не найден")
+    # Проверяем существование клиента и права (RBAC)
+    client = await get_client_for_admin_or_404(request=request, client_id=client_id)
 
     # Вызываем сервис удаления
     await delete_client(client=client, initiator=initiator_id)
@@ -237,7 +215,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     Получить журнал аудита (историю изменений) клиента.
 
     Возвращает список событий с диффами (разницами изменений) и контекстом операции.
-    Доступно только администраторам.
+    Доступно только системе и администраторам.
 
     Args:
         request (HttpRequest): Объект входящего запроса.
@@ -256,7 +234,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
 
     log.info(f"Initiator '{initiator_str}' requested history for client {client_id}.")
 
-    # Проверка роли (RBAC)
+    # Проверяем права (RBAC)
     await is_admin_access(request)
 
     # Проверяем существование клиента (сам объект не нужен, поэтому .aexists для скорости)

@@ -2,7 +2,7 @@
 Custom middleware for collecting pghistory context.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from django.http import HttpRequest
 from pghistory.middleware import HistoryMiddleware
@@ -17,7 +17,7 @@ class KrononHistoryMiddleware(HistoryMiddleware):
     """
 
     @staticmethod
-    def _get_ip_address(request: HttpRequest) -> str:
+    def _get_ip_address(request: HttpRequest) -> str | None:
         """
         Вспомогательный метод для получения IP адреса с учетом прокси.
 
@@ -29,10 +29,18 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         """
         x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
 
-        if x_forwarded:
-            return x_forwarded.split(",")[0]
-        else:
-            return request.META.get("REMOTE_ADDR")
+        if x_forwarded and isinstance(x_forwarded, str):
+            # Берем первый IP из списка (адрес клиента до прокси)
+            ip_address = x_forwarded.split(",")[0].strip()
+
+            return cast(str, ip_address)  # Явная типизация для mypy
+
+        remote_addr = request.META.get("REMOTE_ADDR")
+
+        if remote_addr and isinstance(remote_addr, str):
+            return cast(str, remote_addr)  # Явная типизация для mypy
+
+        return None
 
     @staticmethod
     def _get_user_email(request: HttpRequest) -> str | None:
