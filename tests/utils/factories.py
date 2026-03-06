@@ -56,6 +56,12 @@ class ClientFactory(factory.django.DjangoModelFactory):
     tax_system: str = factory.Iterator(TaxSystem.values)
     status: str = factory.Iterator(ClientStatus.values)
 
+    # Поля ответственных (по умолчанию None, задаем в тестах)
+    accountant = factory.SubFactory(UserFactory)
+    primary_accountant = None
+    payroll_accountant = None
+    hr_specialist = None
+
     @factory.lazy_attribute
     def full_legal_name(self) -> str:
         """Генерирует полное название на основе типа организации."""

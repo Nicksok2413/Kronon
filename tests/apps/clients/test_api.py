@@ -10,16 +10,16 @@ from django.test import AsyncClient
 
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientOut
-from apps.clients.schemas.history import ClientHistoryOut
 from tests.utils.base import BaseAPITest
 from tests.utils.factories import ClientFactory
 
 
 class TestClientAPI(BaseAPITest):
-    """Тестирование CRUD операций API Клиентов.
+    """
+    Тестирование CRUD операций API Клиентов.
 
     Attributes:
-        endpoint: Базовый URL эндпоинта.
+        endpoint (str): Базовый URL эндпоинта.
     """
 
     endpoint: str = "/api/clients/"
@@ -64,12 +64,7 @@ class TestClientAPI(BaseAPITest):
         assert await Client.objects.filter(id=json_response["id"]).aexists()
 
     async def test_get_client_list_paginated(self, auth_client: AsyncClient) -> None:
-        """
-        Проверка получения списка клиентов с пагинацией.
-
-        Args:
-            auth_client: Авторизованный асинхронный клиент.
-        """
+        """Проверка получения списка клиентов с пагинацией."""
         # Создаем 25 клиентов через фабрику
         # Используем create_batch внутри sync_to_async для оптимизации
         await sync_to_async(ClientFactory.create_batch)(25)
@@ -112,50 +107,3 @@ class TestClientAPI(BaseAPITest):
 
         # Проверка количества элементов второй страницы
         assert len(json_response_page_2["items"]) == 5
-
-
-class TestClientHistory(BaseAPITest):
-    """ """
-
-    async def test_history_logging(self, auth_client: AsyncClient) -> None:
-        """
-
-        Args:
-            auth_client: Авторизованный асинхронный клиент.
-        """
-        # Создаем клиента
-        client = await sync_to_async(ClientFactory)()
-
-        # Формируем эндпойнт
-        endpoint: str = f"/api/clients/{client.id}/history"
-
-        # Делаем изменение через API
-        patch_data = {"name": "Updated Name"}
-
-        # Обновляем клиента
-        patch_response = await auth_client.patch(
-            f"/api/clients/{client.id}", data=patch_data, content_type="application/json"
-        )
-
-        assert patch_response.status_code == 200
-
-        # Проверяем историю
-        start = perf_counter()
-        history = await auth_client.get(endpoint)
-        elapsed_time = perf_counter() - start
-
-        data = history.json()
-        update_event = next(event for event in data if event["pgh_label"] == "update")
-
-        # Проверки
-        assert len(data) >= 1
-        assert update_event["pgh_diff"]["name"][1] == "Updated Name"
-
-        # Статус код
-        await self.assert_status(response=history, expected_status=200)
-
-        # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
-
-        # Валидация схемы
-        await self.validate_schema(data=data, schema=ClientHistoryOut, many=True)

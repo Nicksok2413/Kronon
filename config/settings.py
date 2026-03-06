@@ -55,6 +55,9 @@ if READ_DOT_ENV_FILE:
 # Секретный ключ для подписи сессий и токенов
 SECRET_KEY: str = env.str("SECRET_KEY")
 
+# API-ключ для межсервисного взаимодействия
+INTERNAL_API_KEY: str = env.str("INTERNAL_API_KEY")
+
 # debug-режим
 DEBUG: bool = env.bool("DEBUG", default=False)
 
@@ -155,13 +158,6 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Указываем Django использовать кастомную модель пользователя
 AUTH_USER_MODEL = "users.User"
-
-# API-ключ для межсервисного взаимодействия
-INTERNAL_API_KEY: str = env.str("INTERNAL_API_KEY", default=None)
-
-# В проде ключ обязан быть
-if not DEBUG and not INTERNAL_API_KEY:
-    raise ValueError("КРИТИЧЕСКАЯ ОШИБКА: INTERNAL_API_KEY обязан быть задан в production!")
 
 AUTHENTICATION_BACKENDS = [
     "axes.backends.AxesBackend",  # Защита от перебора паролей

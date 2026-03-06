@@ -70,7 +70,9 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         Returns:
             str: User-Agent или "Unknown".
         """
-        return request.META.get("HTTP_USER_AGENT", "Unknown")[:255]  # Ограничиваем длину для БД
+        user_agent = request.META.get("HTTP_USER_AGENT", "Unknown")[:255]  # Ограничиваем длину для БД
+
+        return cast(str, user_agent)  # Явная типизация для mypy
 
     def get_context(self, request: HttpRequest) -> dict[str, Any]:
         """
