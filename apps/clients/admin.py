@@ -43,6 +43,7 @@ class ClientEventAdmin(EventModelAdmin):
         "get_user_info",  # Используем проксированный FK
         "app_source",
         "ip_address",
+        "user_agent",
     ]
 
     list_filter = [

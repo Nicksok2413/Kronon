@@ -46,18 +46,31 @@ class KrononHistoryMiddleware(HistoryMiddleware):
     def _get_user_email(request: HttpRequest) -> str | None:
         """
         Вспомогательный метод для получения Email пользователя.
-        Полезно сохранить email, чтобы он остался в истории при удалении юзера
+        Полезно сохранить email, чтобы он остался в истории при удалении юзера.
 
         Args:
             request (HttpRequest): Объект входящего запроса.
 
         Returns:
-            str: Email пользователя или None.
+            str | None: Email пользователя или None.
         """
         if request.user.is_authenticated:
             return getattr(request.user, "email", None)
 
         return None
+
+    @staticmethod
+    def _get_user_agent(request: HttpRequest) -> str:
+        """
+        Вспомогательный метод для получения User-Agent.
+
+        Args:
+            request (HttpRequest): Объект входящего запроса.
+
+        Returns:
+            str: User-Agent или "Unknown".
+        """
+        return request.META.get("HTTP_USER_AGENT", "Unknown")[:255]  # Ограничиваем длину для БД
 
     def get_context(self, request: HttpRequest) -> dict[str, Any]:
         """
@@ -66,8 +79,9 @@ class KrononHistoryMiddleware(HistoryMiddleware):
 
         Добавляем:
             'app_source': источник изменения (API/Web),
-            'ip_address': IP адрес,
             'method': HTTP метод,
+            'ip_address': IP адрес,
+            'user_agent': User-Agent,
             'user_email': Email пользователя.
 
         Args:
@@ -86,13 +100,17 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         # Получаем IP адрес (с учетом прокси)
         ip_address = self._get_ip_address(request)
 
+        # Получаем User-Agent
+        user_agent = self._get_user_agent(request)
+
         # Получаем Email пользователя
         user_email = self._get_user_email(request)
 
         # Обновляем словарь контекста
         return base_context | {
             "app_source": "API/Web",
-            "ip_address": ip_address,
             "method": request.method,
+            "ip_address": ip_address,
+            "user_agent": user_agent,
             "user_email": user_email,
         }

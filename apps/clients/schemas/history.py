@@ -18,6 +18,7 @@ class HistoryContextMetadata(Schema):
     user_email: str | None = Field(default=None, description="Email пользователя")
     app_source: str | None = Field(default=None, description="Источник изменения (API, Celery, CLI)")
     ip_address: str | None = Field(default=None, description="IP адрес инициатора")
+    user_agent: str | None = Field(default=None, description="User-Agent инициатора")
     method: str | None = Field(default=None, description="HTTP метод")
     url: str | None = Field(default=None, description="URL запроса")
     celery_task: str | None = Field(default=None, description="Имя задачи Celery")

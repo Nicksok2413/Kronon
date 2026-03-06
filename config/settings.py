@@ -409,6 +409,7 @@ LOGGING: dict[str, Any] = {}
 
 # Параметры логирования
 LOG_LEVEL: str = env.str("LOG_LEVEL", default="INFO")
+LOG_DETAILED_AUDIT = env.bool("LOG_DETAILED_AUDIT", default=False)
 LOGFILE_SIZE: int = env.int("LOGFILE_SIZE", default=10)
 LOGFILE_COUNT: int = env.int("LOGFILE_COUNT", default=5)
 

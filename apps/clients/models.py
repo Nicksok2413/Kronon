@@ -368,6 +368,12 @@ class ClientEvent(BaseClientEvent):  # type: ignore[valid-type, misc]
         models.GenericIPAddressField(null=True, blank=True, verbose_name=_("IP Адрес")),
     )
 
+    # User-Agent
+    user_agent = pghistory.ProxyField(
+        "pgh_context__user_agent",
+        models.GenericIPAddressField(null=True, blank=True, verbose_name=_("User-Agent")),
+    )
+
     # HTTP метод
     method = pghistory.ProxyField(
         "pgh_context__method",
