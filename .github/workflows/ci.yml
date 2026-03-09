@@ -17,6 +17,7 @@ jobs:
       PYTHON_VERSION: "3.14"
       POETRY_VERSION: "2.2.0"
       SECRET_KEY: "ci-test-key-at-least-32-characters-long-for-security"
+      INTERNAL_API_KEY: "ci-test-internal-api-key"
       DEBUG: "True"
       # Передаем DATABASE_URL для автоматического подхвата в settings.py
       DATABASE_URL: "postgresql://postgres:postgres@localhost:5433/kronon_test"
