@@ -105,7 +105,7 @@ async def get_request_initiator(request: HttpRequest) -> tuple[UUID, str]:
         user = await get_auth_identity(request)
 
         # Собираем строку для логов
-        log_message = f"'{user.email}'" + log_details
+        log_message = f"{user.email}" + log_details
 
         # Возвращаем UUID пользователя и информацию для логов
         return user.id, log_message

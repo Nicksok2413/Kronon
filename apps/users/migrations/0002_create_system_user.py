@@ -11,7 +11,7 @@ def create_system_user(apps, schema_editor):
             "email": "system@kronon.local",
             "first_name": "System",
             "last_name": "API",
-            "role": "director",  # Полные права для обхода проверок
+            "role": "sys_admin",  # Полные права для обхода проверок
             "is_active": False,  # Чтобы под ним нельзя было залогиниться
             "is_staff": False,
             "is_superuser": False,

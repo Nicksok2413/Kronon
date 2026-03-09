@@ -23,6 +23,7 @@ class UserRole(models.TextChoices):
     """
 
     DIRECTOR = "director", "Директор"
+    SYSTEM_ADMINISTRATOR = "sys_admin", "Системный администратор"
     CHIEF_ACCOUNTANT = "chief_acc", "Главный бухгалтер"
     LEAD_ACCOUNTANT = "lead_acc", "Ведущий бухгалтер"
     ACCOUNTANT = "accountant", "Бухгалтер"

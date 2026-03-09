@@ -22,6 +22,8 @@ class ClientEventAdmin(EventModelAdmin):
     Наследуется от EventModelAdmin для корректного отображения Diff.
     """
 
+    history_model = ClientEvent
+
     def get_queryset(self, request: HttpRequest) -> QuerySet[ClientEvent]:
         """
         Переопределяем метод получения queryset.
@@ -33,6 +35,21 @@ class ClientEventAdmin(EventModelAdmin):
         return queryset.defer("pgh_data")
 
     ordering = ("-pgh_created_at",)
+
+    fields = [
+        "pgh_created_at",
+        "pgh_obj",
+        "pgh_label",
+        "user",
+        "user_email",
+        "app_source",
+        "ip_address",
+        "user_agent",
+        "method",
+        "url",
+        "celery_task",
+        "command",
+    ]
 
     # Отображаем стандартные поля pghistory + прокси поля
     list_display = [

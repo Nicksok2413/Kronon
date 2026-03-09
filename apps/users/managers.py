@@ -19,6 +19,7 @@ class CustomUserManager(BaseUserManager["User"]):
     вместо стандартного имени пользователя (username).
     """
 
+    # TODO: подумать над async
     def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> User:
         """
         Создает и сохраняет пользователя с указанным email и паролем.
@@ -70,6 +71,7 @@ class CustomUserManager(BaseUserManager["User"]):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
+        extra_fields.setdefault("role", "sys_admin")
 
         if extra_fields.get("is_staff") is not True:
             raise ValueError(_("Суперпользователь должен иметь is_staff=True."))

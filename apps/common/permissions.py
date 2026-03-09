@@ -31,12 +31,12 @@ async def is_admin_access(request: HttpRequest) -> bool:
 
     # TODO: подумать не лишняя ли это проверка
     # Если это система, возвращаем True (у системы абсолютные права)
-    # Системный юзер и так имеет роль DIRECTOR (из миграции), но проверяем явно по ID для надежности
+    # Системный юзер и так имеет роль SYSTEM_ADMINISTRATOR (из миграции), но проверяем явно по ID для надежности
     if user.id == SYSTEM_USER_ID:
         return True
 
     # Если это админ/директор/главбух, возвращаем True
-    if user.is_staff and user.role in (UserRole.DIRECTOR, UserRole.CHIEF_ACCOUNTANT):
+    if user.role in (UserRole.DIRECTOR, UserRole.SYSTEM_ADMINISTRATOR, UserRole.CHIEF_ACCOUNTANT):
         return True
 
     # Если это не системный/административный доступ - выбрасываем исключение
@@ -48,9 +48,8 @@ async def check_client_access(request: HttpRequest, client: Client) -> None:
     Проверяет, имеет ли текущий пользователь право управлять данным клиентом (OLP).
 
     Логика:
-    1. Администраторы и Директор могут редактировать/удалять всё.
-    2. Главный бухгалтер может редактировать всё.
-    3. Линейный бухгалтер может редактировать только тех клиентов,
+    - Администратор, директор и главбух могут редактировать/удалять всё.
+    - Линейный бухгалтер может редактировать только тех клиентов,
        где он указан как ответственный (accountant, primary, payroll, hr).
 
     Args:
