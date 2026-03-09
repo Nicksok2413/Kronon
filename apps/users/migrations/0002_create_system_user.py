@@ -26,9 +26,7 @@ def remove_system_user(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
-    dependencies = [
-        ("users", "0001_initial"),
-    ]
+    dependencies = [('users', '0001_initial'),]
 
     operations = [
         migrations.RunPython(create_system_user, remove_system_user),

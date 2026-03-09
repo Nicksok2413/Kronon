@@ -6,7 +6,7 @@ COMPOSE_TEST = docker compose -f docker-compose.test.yml
 COMPOSE_INFRA = docker compose --profile infra
 
 # .PHONY гарантирует, что make не будет путать эти команды с именами файлов
-.PHONY: help install run up down rebuild infra-up prune logs migrations migrate superuser clear_migrations lint lint-fix format types populate test-up test-down test test-clean check check-all clean
+.PHONY: help install run up down rebuild infra-up prune logs migrations migrate superuser clear-migrations lint lint-fix format types populate test-up test-down test test-clean check check-all clean
 
 # Команда по умолчанию, которая будет вызвана при запуске `make`
 default: help
@@ -34,7 +34,7 @@ help:
 	@echo "  migrations     	- Создать новые миграции"
 	@echo "  migrate        	- Применить миграции"
 	@echo "  superuser      	- Создать суперпользователя (администратора)"
-	@echo "  clear_migrations   - Удалить все файлы миграций (для удобства разработки)"
+	@echo "  clear-migrations   - Удалить все файлы миграций (для удобства разработки)"
 	@echo ""
 	@echo "Проверка качества кода (Ruff + mypy):"
 	@echo "  lint           	- Проверить код код с помощью Ruff"
@@ -73,6 +73,7 @@ run:
 # Управление Docker окружением
 # ------------------------------------------------------------------------------
 up:
+	mkdir -p static media
 	@echo "-> Запуск всех сервисов в фоновом режиме..."
 	$(COMPOSE_DEV) up -d
 	@echo "-> Сервисы успешно запущены."
@@ -110,10 +111,11 @@ logs:
 # Управление миграциями БД
 # ------------------------------------------------------------------------------
 migrations:
+	poetry run python manage.py fix_migrations --hide
 	@echo "-> Создание новых миграций..."
 	poetry run python manage.py makemigrations
-	@echo "-> Добавляем зависимость на pg_trgm для приложений, где есть GinIndex..."
-	poetry run python manage.py add_trigram_dependency
+	@echo "-> Восстановление дерева зависимостей..."
+	poetry run python manage.py fix_migrations --repair
 	@echo "-> Миграции успешно созданы."
 
 migrate:
@@ -126,7 +128,7 @@ superuser:
 	poetry run python manage.py createsuperuser
 	@echo "-> Суперпользователь успешно создан."
 
-clear_migrations:
+clear-migrations:
 	@echo "ВНИМАНИЕ: Эта команда УДАЛИТ ВСЕ ФАЙЛЫ МИГРАЦИЙ."
 	@read -p "Вы уверены, что хотите продолжить? [y/N] " confirm && \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
