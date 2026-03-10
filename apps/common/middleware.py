@@ -13,7 +13,7 @@ from apps.users.constants import SYSTEM_USER_ID
 class KrononHistoryMiddleware(HistoryMiddleware):
     """
     Расширенный middleware для фиксации контекста pghistory с поддержкой System API.
-    Добавляет IP адрес, метод, источник и email пользователя в контекст.
+    Добавляет IP адрес, метод, источник, User-Agent и email пользователя в контекст.
     """
 
     @staticmethod

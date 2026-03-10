@@ -10,7 +10,7 @@ from uuid import UUID
 
 from ninja import Field, FilterLookup, FilterSchema
 
-from apps.clients.models import ClientStatus, OrganizationType, TaxSystem
+from apps.clients.models.client import ClientStatus, OrganizationType, TaxSystem
 
 
 class ClientFilter(FilterSchema):

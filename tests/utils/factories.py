@@ -9,7 +9,7 @@ from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from django.utils.text import slugify
 
-from apps.clients.models import Client, ClientStatus, OrganizationType, TaxSystem
+from apps.clients.models.client import Client, ClientStatus, OrganizationType, TaxSystem
 from apps.users.models import Department, User, UserRole
 from tests.utils.unp import generate_valid_unp
 

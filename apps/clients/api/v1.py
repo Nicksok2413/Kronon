@@ -16,7 +16,7 @@ from ninja.pagination import PageNumberPagination, paginate
 from ninja_jwt.authentication import AsyncJWTAuth
 
 from apps.clients.guards import get_client_for_admin_or_404, get_client_for_edit_or_404
-from apps.clients.models import Client
+from apps.clients.models.client import Client
 from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
 from apps.clients.schemas.history import ClientHistoryOut
