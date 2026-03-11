@@ -8,6 +8,7 @@ from uuid import UUID
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from pghistory import DeleteEvent, InsertEvent, UpdateEvent, track
 from pydantic import ValidationError
 
 from apps.clients.types import ContactInfo
@@ -60,6 +61,7 @@ class TaxSystem(models.TextChoices):
     PVT = "pvt", "Парк высоких технологий (ПВТ)"
 
 
+@track(InsertEvent(), UpdateEvent(), DeleteEvent())
 class Client(BaseModel):
     """
     Карточка клиента (Контрагента).
