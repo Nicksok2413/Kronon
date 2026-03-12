@@ -307,7 +307,7 @@ class Client(BaseModel):
         )
 
 
-class ClientEventProxy(Client.pgh_event_model):  # type: ignore[valid-type, misc]
+class ClientEventProxy(Client.pgh_event_model):  # type: ignore
     """Прокси-модель истории изменений клиентов для удобного доступа в админке."""
 
     class Meta:

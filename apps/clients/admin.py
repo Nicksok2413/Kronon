@@ -2,7 +2,6 @@
 Админка для клиентов и журнала аудита.
 """
 
-import json
 from typing import Any
 
 from django.contrib import admin
@@ -84,47 +83,44 @@ class ClientEventAdmin(EventModelAdmin):
     # --- UI helpers ---
 
     @admin.display(description="Клиент")
-    def get_client(self, obj: ClientEventProxy) -> Client:
+    def get_client(self, obj: ClientEventProxy) -> Any:
         return obj.pgh_obj
 
     @admin.display(description="ID пользователя")
-    def get_user_id(self, obj: ClientEventProxy) -> str:
+    def get_user_id(self, obj: ClientEventProxy) -> Any | None:
         return (obj.pgh_context or {}).get("user")
 
     @admin.display(description="Email пользователя")
-    def get_user_email(self, obj: ClientEventProxy) -> str:
+    def get_user_email(self, obj: ClientEventProxy) -> Any | None:
         return (obj.pgh_context or {}).get("user_email")
 
     @admin.display(description=_("Источник"))
-    def get_app_source(self, obj: ClientEventProxy) -> str:
+    def get_app_source(self, obj: ClientEventProxy) -> Any | None:
         return (obj.pgh_context or {}).get("app_source")
 
     @admin.display(description=_("IP адрес"))
-    def get_ip_address(self, obj: ClientEventProxy) -> str:
+    def get_ip_address(self, obj: ClientEventProxy) -> Any | None:
         return (obj.pgh_context or {}).get("ip_address")
 
     @admin.display(description=_("User-Agent"))
-    def get_user_agent(self, obj: ClientEventProxy) -> str:
+    def get_user_agent(self, obj: ClientEventProxy) -> Any | None:
         return (obj.pgh_context or {}).get("user_agent")
 
     @admin.display(description=_("URL"))
-    def get_url(self, obj: ClientEventProxy) -> str:
+    def get_url(self, obj: ClientEventProxy) -> Any | None:
         return (obj.pgh_context or {}).get("url")
 
     @admin.display(description=_("Метод"))
-    def get_method(self, obj: ClientEventProxy) -> str:
+    def get_method(self, obj: ClientEventProxy) -> Any | None:
         return (obj.pgh_context or {}).get("method")
 
     @admin.display(description=_("Celery задача"))
-    def get_celery_task(self, obj: ClientEventProxy) -> str:
+    def get_celery_task(self, obj: ClientEventProxy) -> Any | None:
         return (obj.pgh_context or {}).get("celery_task")
 
     @admin.display(description=_("CLI команда"))
-    def get_command(self, obj: ClientEventProxy) -> str:
+    def get_command(self, obj: ClientEventProxy) -> Any | None:
         return (obj.pgh_context or {}).get("command")
-
-    def context_json(self, obj):
-        return json.dumps(obj.pgh_context or {}, indent=2)
 
     @admin.display(description=_("Изменения"))
     def short_diff(self, obj: ClientEventProxy) -> str:
