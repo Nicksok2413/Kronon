@@ -6,13 +6,10 @@ import json
 from typing import Any
 
 from django.contrib import admin
-
-# from django.db.models import QuerySet
 from django.http import HttpRequest
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-
-# from pghistory.admin import EventModelAdmin
+from pghistory.admin import EventModelAdmin
 from rangefilter.filters import DateTimeRangeFilter
 
 from apps.clients.models import Client, ClientEventProxy
@@ -23,13 +20,13 @@ from apps.clients.models import Client, ClientEventProxy
 
 
 @admin.register(ClientEventProxy)
-class ClientEventAdmin(admin.ModelAdmin[ClientEventProxy]):
+class ClientEventAdmin(EventModelAdmin):
     """
     Админка для просмотра аудита изменений (History).
     Работает с ProxyFields и ContextJSONField.
     """
 
-    # date_hierarchy = "pgh_created_at"
+    date_hierarchy = "pgh_created_at"
 
     list_display = [
         "pgh_created_at",
@@ -53,7 +50,6 @@ class ClientEventAdmin(admin.ModelAdmin[ClientEventProxy]):
     list_filter = [
         "pgh_label",
         ("pgh_created_at", DateTimeRangeFilter),  # Фильтрация по дате (UI с календарём) на уровне БД
-        # "get_app_source",
     ]
 
     # Поиск по имени/унп клиента, email автора изменений и по IP адресу
@@ -75,41 +71,15 @@ class ClientEventAdmin(admin.ModelAdmin[ClientEventProxy]):
     # Немного ускорит админку на больших объёмах
     list_per_page = 10
 
-    # # def get_queryset(self, request: HttpRequest) -> QuerySet[ClientEventProxy]:
-    # #     """
-    # #     Переопределяем метод получения queryset.
-    # #     Django по умолчанию тянет тяжелый pgh_data.
-    # #     Откладываем (.defer) загрузку pgh_data, так как не используем его в list_display.
-    # #     Это дает буст к производительности.
-    # #     """
-    # #     queryset = super().get_queryset(request)
-    # #     return queryset.defer("pgh_data")
-    #
-
-    #
-    # @admin.display(description=_("Пользователь"), ordering="user_email")
-    # def get_user_info(self, obj: ClientEventProxy) -> str:
-    #     """Показывает ФИО и Email автора изменения клиента (или Email из контекста, если удален)."""
-    #     # Если юзер есть в БД - берем его актуальные данные
-    #     if obj.user:
-    #         # user_obj = User.objects.aget(pk=obj.user)
-    #         # url = reverse("admin:%s_%s_change" % (User._meta.app_label, User._meta.model_name), args=[obj.user])
-    #         # return format_html("<a href='{}'>{}</a>", url, obj.user.full_name_rus() or obj.user.email)
-    #         return f"{obj.user.full_name_rus} ({obj.user.email})"
-    #
-    #     # Если юзера удалили, берем email из JSON-слепка истории
-    #     if obj.user_email:
-    #         return f"Удален ({obj.user_email})"
-    #
-    #     return "System / Unknown"
-    #
-    #
-    # @admin.display(description=_("Клиент (Snapshot)"))
-    # def get_client_id(self, obj: ClientEventProxy) -> str:
-    #     """Отображает информацию об клиенте на момент события."""
-    #     client_name = obj.pgh_context.get("pgh_obj__name", "") or "—"
-    #     client_unp = obj.pgh_context.get("pgh_obj__unp", "") or "—"
-    #     return f"{client_name} ({client_unp})"
+    # def get_queryset(self, request: HttpRequest) -> QuerySet[ClientEventProxy]:
+    #     """
+    #     Переопределяем метод получения queryset.
+    #     Django по умолчанию тянет тяжелый pgh_data.
+    #     Откладываем (.defer) загрузку pgh_data, так как не используем его в list_display.
+    #     Это дает буст к производительности.
+    #     """
+    #     queryset = super().get_queryset(request)
+    #     return queryset.defer("pgh_data")
 
     # --- UI helpers ---
 
@@ -168,34 +138,6 @@ class ClientEventAdmin(admin.ModelAdmin[ClientEventProxy]):
             parts.append(f"{field}: {old} → {new}")
 
         return "; ".join(parts[:3])  # Ограничиваем длину
-
-        # prev = (
-        #     obj.__class__.objects.filter(
-        #         pgh_obj=obj.pgh_obj,
-        #         pgh_created_at__lt=obj.pgh_created_at,
-        #     )
-        #     .order_by("-pgh_created_at")
-        #     .first()
-        # )
-        #
-        # if not prev:
-        #     return "—"
-        #
-        # diff = {}
-        #
-        # for field in obj._meta.fields:
-        #     name = field.name
-        #
-        #     if name.startswith("pgh_"):
-        #         continue
-        #
-        #     old = getattr(prev, name)
-        #     new = getattr(obj, name)
-        #
-        #     if old != new:
-        #         diff[name] = (old, new)
-        #
-        # return json.dumps(diff, indent=2)
 
     @admin.display(description=_("Тип"))
     def colored_label(self, obj: ClientEventProxy) -> str:

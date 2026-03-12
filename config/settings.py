@@ -315,7 +315,7 @@ PGHISTORY_CONTEXT_FIELD = ContextJSONField()
 PGHISTORY_APPEND_ONLY = True
 
 # Глобальная модель для админки событий всех моделей, чтобы видеть колонки user и url
-# PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
+PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
 
 # ==============================================================================
 # INTERNATIONALIZATION
