@@ -9,7 +9,7 @@ from uuid import UUID
 from loguru import logger as log
 from pghistory import context as pghistory_context
 
-from apps.clients.models.client import Client
+from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientUpdate
 from apps.clients.selectors import get_client_by_id
 

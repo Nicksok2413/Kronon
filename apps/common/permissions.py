@@ -7,7 +7,7 @@ RBAC (Role-Based Access Control) и OLP (Object-Level Permissions)
 from django.http import HttpRequest
 from ninja.errors import HttpError
 
-from apps.clients.models.client import Client
+from apps.clients.models import Client
 from apps.common.auth import get_auth_identity
 from apps.users.constants import SYSTEM_USER_ID
 from apps.users.models import UserRole

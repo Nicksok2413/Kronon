@@ -8,7 +8,7 @@ from django.http import HttpRequest
 from loguru import logger as log
 from ninja.errors import HttpError
 
-from apps.clients.models.client import Client
+from apps.clients.models import Client
 from apps.clients.selectors import get_client_by_id
 from apps.common.permissions import check_client_access, is_admin_access
 

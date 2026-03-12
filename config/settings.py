@@ -311,9 +311,11 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # Максимум 30 минут на зада
 # Это значительно повышает производительность и упрощает SQL-запросы (избавляет от JOIN)
 PGHISTORY_CONTEXT_FIELD = ContextJSONField()
 
+# Модели событий по умолчанию неизменяемые (доступны только для добавления)
+PGHISTORY_APPEND_ONLY = True
+
 # Глобальная модель для админки событий всех моделей, чтобы видеть колонки user и url
 # PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
-
 
 # ==============================================================================
 # INTERNATIONALIZATION

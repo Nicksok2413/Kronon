@@ -11,7 +11,7 @@ from uuid import UUID
 import pghistory.models
 from loguru import logger as log
 
-from apps.clients.models.client import Client
+from apps.clients.models import Client
 from apps.common.managers import SoftDeleteQuerySet
 
 

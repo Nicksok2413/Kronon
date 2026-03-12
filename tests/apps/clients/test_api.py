@@ -8,7 +8,7 @@ from typing import Any
 from asgiref.sync import sync_to_async
 from django.test import AsyncClient
 
-from apps.clients.models.client import Client
+from apps.clients.models import Client
 from apps.clients.schemas.client import ClientOut
 from tests.utils.base import BaseAPITest
 from tests.utils.factories import ClientFactory

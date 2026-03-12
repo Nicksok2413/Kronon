@@ -8,7 +8,7 @@ from uuid import UUID
 from ninja import Field, Schema
 from pydantic import ConfigDict
 
-from apps.clients.models.client import ClientStatus, OrganizationType, TaxSystem
+from apps.clients.models import ClientStatus, OrganizationType, TaxSystem
 from apps.clients.schemas.contacts import ClientContactInfo, ClientContactInfoUpdate
 from apps.users.schemas import DepartmentOut, UserOut
 
