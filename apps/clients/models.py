@@ -1,5 +1,6 @@
 """
 Модели для управления клиентами (Юр.лица и ИП).
+И Прокси-модель для аудита клиентов.
 """
 
 from typing import TYPE_CHECKING
@@ -8,7 +9,8 @@ from uuid import UUID
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from pghistory import DeleteEvent, InsertEvent, UpdateEvent, track
+from pghistory import DeleteEvent, InsertEvent, UpdateEvent
+from pghistory import track as pghistory_track
 from pydantic import ValidationError
 
 from apps.clients.types import ContactInfo
@@ -61,7 +63,7 @@ class TaxSystem(models.TextChoices):
     PVT = "pvt", "Парк высоких технологий (ПВТ)"
 
 
-@track(InsertEvent(), UpdateEvent(), DeleteEvent())
+@pghistory_track(InsertEvent(), UpdateEvent(), DeleteEvent())
 class Client(BaseModel):
     """
     Карточка клиента (Контрагента).
@@ -303,3 +305,13 @@ class Client(BaseModel):
             | models.Q(payroll_accountant_id=user_id)
             | models.Q(hr_specialist_id=user_id)
         )
+
+
+class ClientEventProxy(Client.pgh_event_model):  # type: ignore[valid-type, misc]
+    """Прокси-модель истории изменений клиентов для удобного доступа в админке."""
+
+    class Meta:
+        proxy = True
+        ordering = ["-pgh_created_at"]
+        verbose_name = _("Журнал изменений клиента")
+        verbose_name_plural = _("Журнал изменений клиентов")
