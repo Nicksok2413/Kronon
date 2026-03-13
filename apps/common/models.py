@@ -1,7 +1,5 @@
 """
-Базовая абстрактная модель.
-
-Все бизнес-сущности наследуются от неё.
+Общие модели для всего проекта.
 """
 
 import uuid
@@ -10,6 +8,8 @@ from typing import Any
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from pghistory.core import ProxyField
+from pghistory.models import MiddlewareEvents
 
 from apps.common.managers import SoftDeleteManager
 
@@ -109,3 +109,82 @@ class BaseModel(TimeStampedModel):
 
         # Используем update_fields для оптимизации SQL запроса
         await self.asave(update_fields=["deleted_at", "updated_at"])
+
+
+class KrononMiddlewareEvents(MiddlewareEvents):
+    """Расширенная прокси-модель для отображения расширенного контекста истории изменений в админке."""
+
+    # # Пользователь
+    # id = ProxyField(
+    #     "pgh_context__user",
+    #     models.ForeignKey(
+    #         settings.AUTH_USER_MODEL,
+    #         null=True,
+    #         blank=True,
+    #         # Если пользователя удалят физически, история должна остаться
+    #         on_delete=models.DO_NOTHING,
+    #         # Отключаем constraint БД, чтобы не было ошибки целостности при удалении родителя
+    #         db_constraint=False,
+    #         verbose_name=_("Пользователь"),
+    #         help_text=_("Сотрудник, внесший изменения"),
+    #     ),
+    # )
+    #
+    # # URL запроса
+    # url = ProxyField(
+    #     "pgh_context__url",
+    #     models.TextField(null=True, blank=True, verbose_name=_("URL")),
+    # )
+
+    # ID корреляции
+    correlation_id = ProxyField(
+        "pgh_context__correlation_id", models.UUIDField(null=True, blank=True, verbose_name=_("ID корреляции"))
+    )
+
+    # Неизменяемый слепок email из контекста (спасет, если юзера удалят из БД)
+    user_email = ProxyField(
+        "pgh_context__user_email",
+        models.CharField(max_length=254, null=True, blank=True, verbose_name=_("Email пользователя (исторический)")),
+    )
+
+    # IP адрес
+    ip_address = ProxyField(
+        "pgh_context__ip_address",
+        models.GenericIPAddressField(null=True, blank=True, verbose_name=_("IP адрес")),
+    )
+
+    # User-Agent
+    user_agent = ProxyField(
+        "pgh_context__user_agent",
+        models.CharField(max_length=255, null=True, blank=True, verbose_name=_("User-Agent")),
+    )
+
+    # HTTP метод
+    method = ProxyField(
+        "pgh_context__method",
+        models.CharField(max_length=10, null=True, blank=True, verbose_name=_("HTTP метод")),
+    )
+
+    # Сервис - источник изменения объекта (API/Web, Celery, CLI)
+    app_source = ProxyField(
+        "pgh_context__service",
+        models.CharField(max_length=50, null=True, blank=True, verbose_name=_("Сервис")),
+    )
+
+    # Для Celery (название задачи)
+    celery_task = ProxyField(
+        "pgh_context__celery_task",
+        models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Celery задача")),
+    )
+
+    # Для CLI (команда в manage.py)
+    command = ProxyField(
+        "pgh_context__command",
+        models.CharField(max_length=255, null=True, blank=True, verbose_name=_("CLI команда")),
+    )
+
+    class Meta:
+        proxy = True
+        verbose_name = _("Журнал изменений клиента")
+        verbose_name_plural = _("Журнал изменений клиентов")
+        ordering = ["-pgh_created_at"]

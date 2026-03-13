@@ -17,8 +17,8 @@ class PghistoryTask(Task):
     """
 
     def __call__(self, *args: Any, **kwargs: Any):  # type: ignore
-        # В БД в поле pgh_context будет: {"app_source": "Celery", "celery_task": "..."}
-        with pghistory_context(app_source="Celery", celery_task=self.name):
+        # В БД в поле pgh_context будет: {"service": "Celery", "celery_task": "..."}
+        with pghistory_context(service="Celery", celery_task=self.name):
             return super().__call__(*args, **kwargs)
 
 

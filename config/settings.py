@@ -304,7 +304,7 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # Максимум 30 минут на зада
 
 
 # ==============================================================================
-# PGHISTORY CONFIGURATION
+# AUDIT (pghistory)
 # ==============================================================================
 
 # Денормализация контекста: храним контекст в JSONField прямо в таблице события, а не в центральной таблице
@@ -315,7 +315,8 @@ PGHISTORY_CONTEXT_FIELD = ContextJSONField()
 PGHISTORY_APPEND_ONLY = True
 
 # Глобальная модель для админки событий всех моделей, чтобы видеть колонки user и url
-PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
+# PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
+PGHISTORY_ADMIN_MODEL = "common.KrononMiddlewareEvents"
 
 # ==============================================================================
 # INTERNATIONALIZATION
@@ -372,7 +373,7 @@ DEFAULT_FROM_EMAIL: str = env.str("DEFAULT_FROM_EMAIL", default="noreply@kronon.
 
 
 # ==============================================================================
-# BUSINESS LOGIC SETTINGS & VALIDATION
+# BUSINESS LOGIC SETTINGS
 # ==============================================================================
 
 # Максимальный размер загружаемого изображения (в МБ)

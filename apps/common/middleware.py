@@ -2,9 +2,10 @@
 Custom middleware for collecting pghistory context.
 """
 
+import uuid
 from typing import Any, cast
 
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from pghistory.middleware import HistoryMiddleware
 
 from apps.users.constants import SYSTEM_USER_ID
@@ -13,8 +14,47 @@ from apps.users.constants import SYSTEM_USER_ID
 class KrononHistoryMiddleware(HistoryMiddleware):
     """
     Расширенный middleware для фиксации контекста pghistory с поддержкой System API.
-    Добавляет IP адрес, метод, источник, User-Agent и email пользователя в контекст.
+    Добавляет Email пользователя, IP адрес, User-Agent, HTTP-метод и сервис (источник изменения объекта) в контекст.
     """
+
+    def __call__(self, request: HttpRequest) -> HttpResponse:
+        """
+        Переопределяем метод вызова для проброса ID корреляции в Response.
+
+        Args:
+            request (HttpRequest): Объект входящего HTTP запроса.
+        """
+        # Извлекаем или генерируем Correlation ID до начала обработки запроса
+        correlation_id = request.headers.get("X-Correlation-ID") or request.META.get("HTTP_X_CORRELATION_ID")
+
+        if not correlation_id:
+            correlation_id = str(uuid.uuid7())
+
+        # Сохраняем в объект запроса
+        request.correlation_id = correlation_id
+
+        # Отдаем Correlation ID обратно в Response (полезно для фронтенда/отладки)
+        response: HttpResponse = super().__call__(request)
+        response["X-Correlation-ID"] = correlation_id
+
+        return response
+
+    @staticmethod
+    def _get_user_email(request: HttpRequest) -> str | None:
+        """
+        Вспомогательный метод для получения Email пользователя.
+        Полезно сохранить email, чтобы он остался в истории при удалении юзера.
+
+        Args:
+            request (HttpRequest): Объект входящего HTTP запроса.
+
+        Returns:
+            str | None: Email пользователя или None.
+        """
+        if request.user.is_authenticated:
+            return getattr(request.user, "email", None)
+
+        return None
 
     @staticmethod
     def _get_ip_address(request: HttpRequest) -> str | None:
@@ -43,23 +83,6 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         return None
 
     @staticmethod
-    def _get_user_email(request: HttpRequest) -> str | None:
-        """
-        Вспомогательный метод для получения Email пользователя.
-        Полезно сохранить email, чтобы он остался в истории при удалении юзера.
-
-        Args:
-            request (HttpRequest): Объект входящего запроса.
-
-        Returns:
-            str | None: Email пользователя или None.
-        """
-        if request.user.is_authenticated:
-            return getattr(request.user, "email", None)
-
-        return None
-
-    @staticmethod
     def _get_user_agent(request: HttpRequest) -> str:
         """
         Вспомогательный метод для получения User-Agent.
@@ -76,18 +99,19 @@ class KrononHistoryMiddleware(HistoryMiddleware):
 
     def get_context(self, request: HttpRequest) -> dict[str, Any]:
         """
-        Формирует словарь контекста.
-        Базовый метод добавляет 'user' (ID) и 'url' (эндпойнт).
+        Формирует расширенный словарь контекста.
+        Базовый метод добавляет 'user' (ID) и 'url' (эндпойнт) в контекст.
 
         Добавляем:
-            'app_source': источник изменения (API/Web),
-            'method': HTTP метод,
+            'correlation_id': ID корреляции (уникальная метка запроса для аналитика логов/ошибок),
+            'user_email': Email пользователя,
             'ip_address': IP адрес,
             'user_agent': User-Agent,
-            'user_email': Email пользователя.
+            'method': HTTP метод,
+            'service': Сервис - источник изменения объекта (API/Web).
 
         Args:
-            request (HttpRequest): Объект входящего запроса.
+            request (HttpRequest): Объект входящего HTTP запроса.
 
         Returns:
             dict[str, Any]: Обновленный словарь контекста.
@@ -99,20 +123,15 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         if getattr(request, "auth", None) == "system_api":
             base_context["user"] = SYSTEM_USER_ID
 
-        # Получаем IP адрес (с учетом прокси)
-        ip_address = self._get_ip_address(request)
-
-        # Получаем User-Agent
-        user_agent = self._get_user_agent(request)
-
-        # Получаем Email пользователя
-        user_email = self._get_user_email(request)
+        # Получаем Correlation ID (уже созданный в __call__)
+        correlation_id = getattr(request, "correlation_id", None)
 
         # Обновляем словарь контекста
         return base_context | {
-            "app_source": "API/Web",
+            "correlation_id": correlation_id,
+            "user_email": self._get_user_email(request),
+            "ip_address": self._get_ip_address(request),
+            "user_agent": self._get_user_agent(request),
             "method": request.method,
-            "ip_address": ip_address,
-            "user_agent": user_agent,
-            "user_email": user_email,
+            "service": "API/Web",
         }

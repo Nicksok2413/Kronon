@@ -33,8 +33,8 @@ def main() -> None:
         and sys.argv[1] not in ["migrate", "makemigrations", "test"]
     ):
         # Оборачиваем выполнение команды в контекст
-        # В БД в поле pgh_context будет: {"app_source": "CLI", "command": "..."}
-        history_context = pghistory_context(app_source="CLI", command=" ".join(sys.argv[1:]))
+        # В БД в поле pgh_context будет: {"service": "CLI", "command": "..."}
+        history_context = pghistory_context(service="CLI", command=" ".join(sys.argv[1:]))
     else:
         # Пустой контекстный менеджер, если трекинг не нужен
         history_context = ExitStack()
