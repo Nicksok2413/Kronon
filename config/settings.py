@@ -323,12 +323,6 @@ PGHISTORY_ADMIN_CLASS = "apps.common.admin.KrononEventsAdmin"
 # Поля list_display админки
 PGHISTORY_ADMIN_LIST_DISPLAY = [
     "pgh_created_at",
-    "pgh_obj_model",
-    "pgh_obj_id",
-    "pgh_diff",
-    "user_email",
-    "correlation_id",
-    "ip_address",
 ]
 
 # ==============================================================================
