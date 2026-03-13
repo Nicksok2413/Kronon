@@ -20,7 +20,7 @@ class PghistoryTask(Task):
     """
 
     def __call__(self, *args: Any, **kwargs: Any):  # type: ignore
-        # Извлекаем Trace ID 'correlation_id' из заголовков сообщения (прилетает из Django)
+        # Извлекаем ID 'correlation_id' из заголовков сообщения (прилетает из Django)
         # Если задача запущена не из веба (например, через beat) - генерим новый ID
         correlation_id = self.request.get("correlation_id") or str(uuid.uuid7())
 
@@ -35,7 +35,7 @@ def add_correlation_id_to_headers(headers: dict, **kwargs: Any) -> None:
     """Автоматически подхватывает ID из текущего контекста Loguru и упаковывает его в транспортный заголовок Celery."""
     correlation_id = None
 
-    # "Патчим" временный логгер, чтобы просто вытащить из его контекста Trace ID 'correlation_id'
+    # "Патчим" временный логгер, чтобы просто вытащить из его контекста ID 'correlation_id'
     # Это официальный и безопасный способ доступа к extra-полям в Loguru
     def capture(record):
         nonlocal correlation_id

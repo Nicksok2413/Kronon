@@ -11,8 +11,8 @@ from loguru import logger
 
 LOG_FORMAT = (
     "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-    "<level>{level: <8}</level> | "
-    "Trace ID: <yellow>{extra[correlation_id]}</yellow> | "
+    "<level>{level: <4}</level> | "
+    "ID: <yellow>{extra[correlation_id]}</yellow> | "
     "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
 )
 
@@ -77,7 +77,7 @@ def setup_loguru(settings: LoguruSettingsProtocol) -> None:
         colorize=True,
     )
 
-    # По умолчанию привязываем пустой Trace ID 'correlation_id', чтобы Loguru не ругался на отсутствие ключа
+    # По умолчанию привязываем пустой ID 'correlation_id', чтобы Loguru не ругался на отсутствие ключа
     logger.configure(extra={"correlation_id": "-"})
 
     # Вывод в файл (ротация + сжатие)
