@@ -29,13 +29,9 @@ class ClientEventAdmin(EventModelAdmin):
 
     list_display = [
         "pgh_created_at",
-        # "pgh_diff",
         "get_client",
         "colored_label",
-        # "get_client_info",
         "short_diff",
-        # "get_user_info",
-        # "get_user_id",
         "get_user_email",
         "get_app_source",
         "get_ip_address",
@@ -55,30 +51,16 @@ class ClientEventAdmin(EventModelAdmin):
     search_fields = ("pgh_context",)
 
     readonly_fields = (
-        # "pgh_diff",
         "pgh_created_at",
         "pgh_label",
         "pgh_context",
     )
-
-    # # Делаем JOIN клиента, чтобы не было N+1 запросов при отрисовке списка
-    list_select_related = ("pgh_obj",)
 
     # Явно запрещаем массовые действия
     actions = None
 
     # Немного ускорит админку на больших объёмах
     list_per_page = 10
-
-    # def get_queryset(self, request: HttpRequest) -> QuerySet[ClientEventProxy]:
-    #     """
-    #     Переопределяем метод получения queryset.
-    #     Django по умолчанию тянет тяжелый pgh_data.
-    #     Откладываем (.defer) загрузку pgh_data, так как не используем его в list_display.
-    #     Это дает буст к производительности.
-    #     """
-    #     queryset = super().get_queryset(request)
-    #     return queryset.defer("pgh_data")
 
     # --- UI helpers ---
 

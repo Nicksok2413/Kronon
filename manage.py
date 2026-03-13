@@ -3,7 +3,9 @@
 
 import os
 import sys
-from contextlib import ExitStack
+import uuid
+
+from loguru import logger
 
 # Используем pghistory для трекинга контекста консольных команд
 from pghistory import context as pghistory_context
@@ -22,24 +24,24 @@ def main() -> None:
         ) from exc
 
     # --- PGHISTORY CONTEXT INSTRUMENTATION ---
+
     # Игнорируем runserver (слишком много шума), миграции (конфликты схем) и тесты
-
-    # Явная типизация для mypy
-    history_context: pghistory_context | ExitStack[bool | None]
-
     if (
         len(sys.argv) > 1
         and not sys.argv[1].startswith("runserver")
         and sys.argv[1] not in ["migrate", "makemigrations", "test"]
     ):
-        # Оборачиваем выполнение команды в контекст
-        # В БД в поле pgh_context будет: {"service": "CLI", "command": "..."}
-        history_context = pghistory_context(service="CLI", command=" ".join(sys.argv[1:]))
-    else:
-        # Пустой контекстный менеджер, если трекинг не нужен
-        history_context = ExitStack()
+        # Генерируем Trace ID 'correlation_id'
+        correlation_id = str(uuid.uuid7())
 
-    with history_context:
+        command: str = " ".join(sys.argv[1:])
+
+        # Оборачиваем в контекст Loguru (для красивых логов)
+        with logger.contextualize(correlation_id=correlation_id):
+            # Оборачиваем в контекст pghistory (для записей в БД)
+            with pghistory_context(correlation_id=correlation_id, service="CLI", command=command):
+                execute_from_command_line(sys.argv)
+    else:
         execute_from_command_line(sys.argv)
 
 

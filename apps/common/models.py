@@ -5,11 +5,12 @@
 import uuid
 from typing import Any
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from pghistory.core import ProxyField
-from pghistory.models import MiddlewareEvents
+from pghistory.models import Events
 
 from apps.common.managers import SoftDeleteManager
 
@@ -111,40 +112,40 @@ class BaseModel(TimeStampedModel):
         await self.asave(update_fields=["deleted_at", "updated_at"])
 
 
-class KrononMiddlewareEvents(MiddlewareEvents):
-    """Расширенная прокси-модель для отображения расширенного контекста истории изменений в админке."""
+class KrononEvents(Events):
+    """Расширенная прокси-модель отображения полей контекста истории изменений в админке."""
 
-    # # Пользователь
-    # id = ProxyField(
-    #     "pgh_context__user",
-    #     models.ForeignKey(
-    #         settings.AUTH_USER_MODEL,
-    #         null=True,
-    #         blank=True,
-    #         # Если пользователя удалят физически, история должна остаться
-    #         on_delete=models.DO_NOTHING,
-    #         # Отключаем constraint БД, чтобы не было ошибки целостности при удалении родителя
-    #         db_constraint=False,
-    #         verbose_name=_("Пользователь"),
-    #         help_text=_("Сотрудник, внесший изменения"),
-    #     ),
-    # )
-    #
-    # # URL запроса
-    # url = ProxyField(
-    #     "pgh_context__url",
-    #     models.TextField(null=True, blank=True, verbose_name=_("URL")),
-    # )
+    # Пользователь
+    user = ProxyField(
+        "pgh_context__user",
+        models.ForeignKey(
+            settings.AUTH_USER_MODEL,
+            null=True,
+            blank=True,
+            # Если пользователя удалят физически, история должна остаться
+            on_delete=models.DO_NOTHING,
+            # Отключаем constraint БД, чтобы не было ошибки целостности при удалении родителя
+            db_constraint=False,
+            verbose_name=_("Пользователь"),
+            help_text=_("Сотрудник, внесший изменения"),
+        ),
+    )
+
+    # Исторический Email из контекста (спасет, если юзера удалят из БД)
+    user_email = ProxyField(
+        "pgh_context__user_email",
+        models.CharField(
+            max_length=254,
+            null=True,
+            blank=True,
+            verbose_name=_("Email пользователя"),
+            help_text=_("Для исторических данных (полезно если пользователь был удален)"),
+        ),
+    )
 
     # ID корреляции
     correlation_id = ProxyField(
         "pgh_context__correlation_id", models.UUIDField(null=True, blank=True, verbose_name=_("ID корреляции"))
-    )
-
-    # Неизменяемый слепок email из контекста (спасет, если юзера удалят из БД)
-    user_email = ProxyField(
-        "pgh_context__user_email",
-        models.CharField(max_length=254, null=True, blank=True, verbose_name=_("Email пользователя (исторический)")),
     )
 
     # IP адрес
@@ -159,6 +160,12 @@ class KrononMiddlewareEvents(MiddlewareEvents):
         models.CharField(max_length=255, null=True, blank=True, verbose_name=_("User-Agent")),
     )
 
+    # URL запроса
+    url = ProxyField(
+        "pgh_context__url",
+        models.TextField(null=True, blank=True, verbose_name=_("URL")),
+    )
+
     # HTTP метод
     method = ProxyField(
         "pgh_context__method",
@@ -166,7 +173,7 @@ class KrononMiddlewareEvents(MiddlewareEvents):
     )
 
     # Сервис - источник изменения объекта (API/Web, Celery, CLI)
-    app_source = ProxyField(
+    service = ProxyField(
         "pgh_context__service",
         models.CharField(max_length=50, null=True, blank=True, verbose_name=_("Сервис")),
     )

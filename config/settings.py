@@ -314,9 +314,22 @@ PGHISTORY_CONTEXT_FIELD = ContextJSONField()
 # Модели событий по умолчанию неизменяемые (доступны только для добавления)
 PGHISTORY_APPEND_ONLY = True
 
-# Глобальная модель для админки событий всех моделей, чтобы видеть колонки user и url
-# PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
-PGHISTORY_ADMIN_MODEL = "common.KrononMiddlewareEvents"
+# Кастомная прокси-модель отображения полей контекста (расширяет pghistory.models.Events)
+PGHISTORY_ADMIN_MODEL = "common.KrononEvents"
+
+# Кастомный класс админки (расширяет pghistory.admin.EventsAdmin)
+PGHISTORY_ADMIN_CLASS = "apps.common.admin.KrononEventsAdmin"
+
+# Поля list_display админки
+PGHISTORY_ADMIN_LIST_DISPLAY = [
+    "pgh_created_at",
+    "pgh_obj_model",
+    "pgh_obj_id",
+    "pgh_diff",
+    "user_email",
+    "correlation_id",
+    "ip_address",
+]
 
 # ==============================================================================
 # INTERNATIONALIZATION

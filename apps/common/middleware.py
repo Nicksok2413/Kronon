@@ -6,6 +6,7 @@ import uuid
 from typing import Any, cast
 
 from django.http import HttpRequest, HttpResponse
+from loguru import logger
 from pghistory.middleware import HistoryMiddleware
 
 from apps.users.constants import SYSTEM_USER_ID
@@ -33,17 +34,18 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         # Сохраняем в объект запроса
         request.correlation_id = correlation_id
 
-        # Отдаем Correlation ID обратно в Response (полезно для фронтенда/отладки)
-        response: HttpResponse = super().__call__(request)
-        response["X-Correlation-ID"] = correlation_id
-
-        return response
+        # logger.contextualize привязывает extra данные к текущему контексту выполнения
+        with logger.contextualize(correlation_id=correlation_id):
+            # Отдаем Correlation ID обратно в Response (полезно для фронтенда/отладки)
+            response: HttpResponse = super().__call__(request)
+            response["X-Correlation-ID"] = correlation_id
+            return response
 
     @staticmethod
     def _get_user_email(request: HttpRequest) -> str | None:
         """
         Вспомогательный метод для получения Email пользователя.
-        Полезно сохранить email, чтобы он остался в истории при удалении юзера.
+        Полезно сохранить Email, чтобы он остался в истории при удалении юзера.
 
         Args:
             request (HttpRequest): Объект входящего HTTP запроса.

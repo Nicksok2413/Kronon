@@ -63,7 +63,17 @@ class TaxSystem(models.TextChoices):
     PVT = "pvt", "Парк высоких технологий (ПВТ)"
 
 
-@pghistory_track(InsertEvent(), UpdateEvent(), DeleteEvent())
+@pghistory_track(
+    InsertEvent(),
+    UpdateEvent(),
+    DeleteEvent(),
+    meta={
+        "indexes": [
+            # Индексируем всё поле pgh_context для быстрого поиска по любому ключу
+            GinIndex(fields=["pgh_context"], name="client_event_context_gin"),
+        ]
+    },
+)
 class Client(BaseModel):
     """
     Карточка клиента (Контрагента).

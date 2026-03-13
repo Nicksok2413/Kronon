@@ -6,7 +6,7 @@ COMPOSE_TEST = docker compose -f docker-compose.test.yml
 COMPOSE_INFRA = docker compose --profile infra
 
 # .PHONY гарантирует, что make не будет путать эти команды с именами файлов
-.PHONY: help install run up down rebuild infra-up prune logs migrations migrate superuser clear-migrations lint lint-fix format types populate test-up test-down test test-clean check check-all clean
+.PHONY: help install run up down rebuild infra-up prune logs migrations migrate superuser clear-migrations vipe lint lint-fix format types populate test-up test-down test test-clean check check-all clean
 
 # Команда по умолчанию, которая будет вызвана при запуске `make`
 default: help
@@ -35,6 +35,7 @@ help:
 	@echo "  migrate        	- Применить миграции"
 	@echo "  superuser      	- Создать суперпользователя (администратора)"
 	@echo "  clear-migrations   - Удалить все файлы миграций (для удобства разработки)"
+	@echo "  vipe   			- Удалить все данные и все файлы миграций (для удобства разработки)"
 	@echo ""
 	@echo "Проверка качества кода (Ruff + mypy):"
 	@echo "  lint           	- Проверить код код с помощью Ruff"
@@ -138,6 +139,10 @@ clear-migrations:
 	else \
 		echo "-> Очистка отменена."; \
 	fi
+
+vipe:
+	$(MAKE) prune
+	$(MAKE) clear-migrations
 
 # ------------------------------------------------------------------------------
 # Проверка качества кода (Ruff + mypy)
