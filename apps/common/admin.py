@@ -76,18 +76,14 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
             with pghistory_context(correlation_id=correlation_id, service="Admin"):
                 return func(*args, **kwargs)
 
-    def get_queryset(self, request: HttpRequest):
-        """По умолчанию показываем ВСЕ объекты (включая мягко удаленные) в админке."""
-        return super().get_queryset(request).all()
-
-    def save_model(self, request: HttpRequest, obj: _MT, form: BaseModelForm, change: bool) -> None:
+    def save_model(self, request: HttpRequest, obj: _MT, form: BaseModelForm[_MT], change: bool) -> None:
         """
         Сохраняет объект модели с регистрацией контекста аудита.
 
         Args:
             request (HttpRequest): Объект входящего HTTP-запроса.
             obj (_MT): Экземпляр сохраняемой модели.
-            form (BaseModelForm): Форма, использованная для редактирования/создания.
+            form (BaseModelForm[_MT]): Форма, использованная для редактирования/создания.
             change (bool): Флаг, указывающий на изменение существующего объекта.
         """
         self._run_with_audit(request, super().save_model, request, obj, form, change)
@@ -118,8 +114,8 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
 
         Args:
             request (HttpRequest): Объект входящего HTTP-запроса.
-            form (BaseModelForm): Основная форма родительского объекта.
-            formset (BaseFormSet): Набор форм связанных объектов.
+            form (BaseModelForm[_MT]): Основная форма родительского объекта.
+            formset (BaseFormSet[_MT]): Набор форм связанных объектов.
             change (bool): Флаг изменения существующего родителя.
         """
         self._run_with_audit(request, super().save_formset, request, form, formset, change)
@@ -152,13 +148,12 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
             dict[str, Any]: Словарь доступных действий, где ключ — имя метода.
         """
         actions = super().get_actions(request)
-        if "restore_selected" not in actions:
-            actions["restore_selected"] = (
-                self.restore_selected,
-                "restore_selected",
-                cast(str, self.restore_selected.short_description),
-            )
-        return actions
 
-    # --- Кастомные экшены для Soft Delete ---
-    actions = ["restore_selected"]
+        new_action = (
+            self.restore_selected,
+            "restore_selected",
+            getattr(self.restore_selected, "short_description", "Restore selected"),
+        )
+
+        actions.update({"restore_selected": new_action})
+        return actions
