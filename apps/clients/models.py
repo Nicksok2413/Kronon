@@ -315,13 +315,3 @@ class Client(BaseModel):
             | models.Q(payroll_accountant_id=user_id)
             | models.Q(hr_specialist_id=user_id)
         )
-
-
-class ClientEventProxy(Client.pgh_event_model):  # type: ignore
-    """Прокси-модель истории изменений клиентов для удобного доступа в админке."""
-
-    class Meta:
-        proxy = True
-        ordering = ["-pgh_created_at"]
-        verbose_name = _("Журнал изменений клиента")
-        verbose_name_plural = _("Журнал изменений клиентов")

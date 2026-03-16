@@ -2,7 +2,7 @@
 Админка журнала аудита.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from django.contrib import admin
 from django.http import HttpRequest
@@ -37,8 +37,10 @@ class KrononEventsAdmin(EventsAdmin):
 
     # Поля pghistory из settings + кастомные поля
     def get_list_display(self, request: HttpRequest) -> Any:
-        return super().get_list_display(request) + [
-            "obj_name_display",
+        """Расширяет отображение полей списка."""
+        base_list_display = super().get_list_display(request)  # type: ignore[no-untyped-call]
+        return base_list_display + [
+            "obj_display",
             "colored_label",
             "user_email_display",
             "correlation_id_display",
@@ -48,7 +50,9 @@ class KrononEventsAdmin(EventsAdmin):
 
     # Базовые фильтры pghistory + кастомные фильтры
     def get_list_filter(self, request: HttpRequest) -> Any:
-        return super().get_list_filter(request) + [
+        """Расширяет фильтрацию списка."""
+        base_list_filter = super().get_list_filter(request)  # type: ignore[no-untyped-call]
+        return base_list_filter + [
             # Фильтрация по дате на уровне БД (UI с календарём)
             ("pgh_created_at", DateTimeRangeFilter),
         ]
@@ -56,24 +60,24 @@ class KrononEventsAdmin(EventsAdmin):
     # --- UI helpers ---
 
     @admin.display(description=_("Объект"))
-    def obj_display(self, obj: KrononEvents) -> Any:
-        return obj.pgh_obj_id
-
-    @admin.display(description=_("Объект"))
-    def obj_name_display(self, obj: KrononEvents) -> Any:
-        return getattr(obj, "pgh_data__name", None) or obj.pgh_obj_id
+    def obj_display(self, obj: KrononEvents) -> str:
+        """Отображает в списке название или UUID измененного объекта."""
+        return str(obj.pgh_data["name"] or obj.pgh_obj_id)
 
     @admin.display(description=_("Пользователь"))
     def user_email_display(self, obj: KrononEvents) -> str:
-        return obj.user_email
+        """Отображает в списке Email пользователя (изменившего объект) из контекста запроса."""
+        return cast(str, obj.user_email)
 
     @admin.display(description="Trace ID")
     def correlation_id_display(self, obj: KrononEvents) -> str:
-        return obj.correlation_id
+        """Отображает в списке ID (UUID) корреляции из контекста запроса."""
+        return cast(str, obj.correlation_id)
 
     @admin.display(description=_("IP"))
-    def ip_address_display(self, obj: KrononEvents):
-        return obj.ip_address
+    def ip_address_display(self, obj: KrononEvents) -> str | None:
+        """Отображает в списке IP адрес из контекста запроса."""
+        return cast(str | None, obj.ip_address)
 
     @admin.display(description=_("Тип"))
     def colored_label(self, obj: KrononEvents) -> str:

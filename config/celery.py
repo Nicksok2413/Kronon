@@ -19,7 +19,7 @@ class PghistoryTask(Task):
     Автоматически добавляет имя задачи в контекст аудита.
     """
 
-    def __call__(self, *args: Any, **kwargs: Any):  # type: ignore
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
         # Извлекаем ID 'correlation_id' из заголовков сообщения (прилетает из Django)
         # Если задача запущена не из веба (например, через beat) - генерим новый ID
         correlation_id = self.request.get("correlation_id") or str(uuid.uuid7())
@@ -30,14 +30,14 @@ class PghistoryTask(Task):
                 return super().__call__(*args, **kwargs)
 
 
-@before_task_publish.connect
-def add_correlation_id_to_headers(headers: dict, **kwargs: Any) -> None:
+@before_task_publish.connect  # type: ignore
+def add_correlation_id_to_headers(headers: dict[str, Any], **kwargs: Any) -> None:
     """Автоматически подхватывает ID из текущего контекста Loguru и упаковывает его в транспортный заголовок Celery."""
     correlation_id = None
 
     # "Патчим" временный логгер, чтобы просто вытащить из его контекста ID 'correlation_id'
     # Это официальный и безопасный способ доступа к extra-полям в Loguru
-    def capture(record):
+    def capture(record: Any) -> None:
         nonlocal correlation_id
         correlation_id = record["extra"].get("correlation_id")
 

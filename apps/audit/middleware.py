@@ -37,7 +37,7 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         # logger.contextualize привязывает extra данные к текущему контексту выполнения
         with logger.contextualize(correlation_id=correlation_id):
             # Отдаем Correlation ID обратно в Response (полезно для фронтенда/отладки)
-            response: HttpResponse = super().__call__(request)
+            response: HttpResponse = super().__call__(request)  # type: ignore[no-untyped-call]
             response["X-Correlation-ID"] = correlation_id
             return response
 
@@ -53,8 +53,10 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         Returns:
             str | None: Email пользователя или None.
         """
-        if request.user.is_authenticated:
-            return getattr(request.user, "email", None)
+        user = getattr(request, "user", None)
+
+        if user and getattr(user, "is_authenticated", False):
+            return getattr(user, "email", None)
 
         return None
 
