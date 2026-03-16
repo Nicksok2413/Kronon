@@ -34,7 +34,7 @@ class Command(BaseCommand):
 
     # --- Конфигурация для триграмм ---
     TRIGRAM_DEPENDENCY = "('common', '0001_install_trigram')"
-    APPS_WITH_GIN = ["clients"]  # Приложения, где есть GinIndex
+    APPS_WITH_GIN = ["audit", "clients"]  # Приложения, где есть GinIndex
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
