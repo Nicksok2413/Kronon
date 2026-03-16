@@ -75,12 +75,6 @@ class KrononEvents(Events):
         models.CharField(max_length=50, null=True, blank=True, verbose_name=_("Сервис")),
     )
 
-    # Для админки (название действия)
-    admin_action = ProxyField(
-        "pgh_context__action",
-        models.CharField(max_length=50, null=True, blank=True, verbose_name=_("Действие в админке")),
-    )
-
     # Для Celery (название задачи)
     celery_task = ProxyField(
         "pgh_context__celery_task",
