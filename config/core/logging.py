@@ -85,6 +85,7 @@ def setup_loguru(settings: LoguruSettingsProtocol) -> None:
         logger.add(
             logs_dir / "kronon.log",
             level=log_level,
+            format=LOG_FORMAT,
             rotation=f"{settings.LOGFILE_SIZE} MB",
             retention=settings.LOGFILE_COUNT,
             compression="zip",

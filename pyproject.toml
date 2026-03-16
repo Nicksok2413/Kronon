@@ -142,6 +142,11 @@ exclude = [
 module = "apps.*.models"
 disable_error_code = ["django-manager-missing"]
 
+# Разрешаем наследование от Any (EventsAdmin, KrononBaseAdmin[Any]) для админки истории
+[[tool.mypy.overrides]]
+module = "apps.audit.admin"
+allow_subclassing_any = true
+
 [tool.django-stubs]
 # Конфигурация плагина Django-stubs
 django_settings_module = "config.settings"  # Указываем путь к настройкам Django

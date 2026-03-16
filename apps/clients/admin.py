@@ -6,10 +6,11 @@ from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
 
 from apps.clients.models import Client
+from apps.common.admin import KrononBaseAdmin
 
 
 @admin.register(Client)
-class ClientAdmin(admin.ModelAdmin[Client]):
+class ClientAdmin(KrononBaseAdmin[Client]):
     """Управление клиентами."""
 
     list_display = (

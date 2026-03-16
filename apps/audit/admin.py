@@ -12,9 +12,10 @@ from pghistory.admin import EventsAdmin
 from rangefilter.filters import DateTimeRangeFilter
 
 from apps.audit.models import KrononEvents
+from apps.common.admin import KrononBaseAdmin
 
 
-class KrononEventsAdmin(EventsAdmin):
+class KrononEventsAdmin(EventsAdmin, KrononBaseAdmin[Any]):
     """
     Расширенная админка аудита изменений (History).
     Работает с ProxyFields и ContextJSONField.

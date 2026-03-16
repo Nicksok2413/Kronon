@@ -32,7 +32,7 @@ class KrononHistoryMiddleware(HistoryMiddleware):
             correlation_id = str(uuid.uuid7())
 
         # Сохраняем в объект запроса
-        request.correlation_id = correlation_id
+        request.correlation_id = correlation_id  # type: ignore[attr-defined]
 
         # logger.contextualize привязывает extra данные к текущему контексту выполнения
         with logger.contextualize(correlation_id=correlation_id):

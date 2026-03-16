@@ -108,7 +108,13 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
         """
         self._run_with_audit(request, queryset.delete)
 
-    def save_formset(self, request: HttpRequest, form: BaseModelForm, formset: BaseFormSet, change: bool) -> None:
+    def save_formset(
+        self,
+        request: HttpRequest,
+        form: BaseModelForm[_MT],
+        formset: BaseFormSet[Any],
+        change: bool,
+    ) -> None:
         """
         Сохраняет связанные наборы форм (Inlines) с регистрацией контекста.
 
@@ -131,10 +137,21 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
             request (HttpRequest): Объект входящего HTTP-запроса.
             queryset (QuerySet[_MT]): Набор восстанавливаемых объектов.
         """
-        restore_func = getattr(queryset, "restore", None)
 
-        if callable(restore_func):
-            count = self._run_with_audit(request, restore_func)
+        # Определяем внутреннюю функцию, которую будем аудировать
+        # Она не должна принимать аргументов, так как queryset уже в замыкании
+        def _do_restore() -> Any:
+            restore_func = getattr(queryset, "restore", None)
+
+            if callable(restore_func):
+                return restore_func()
+
+            return 0
+
+        # Вызываем через обертку
+        count = self._run_with_audit(request, _do_restore)
+
+        if count > 0:
             self.message_user(request, f"Успешно восстановлено объектов: {count}")
 
     def get_actions(self, request: HttpRequest) -> dict[str, Any]:
@@ -147,13 +164,15 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
         Returns:
             dict[str, Any]: Словарь доступных действий, где ключ — имя метода.
         """
-        actions = super().get_actions(request)
+        actions: dict[str, Any] = super().get_actions(request)
 
-        new_action = (
-            self.restore_selected,
+        # Получаем описание из атрибута, который добавил декоратор @admin.action
+        description = getattr(self.restore_selected, "short_description", "Restore")
+
+        actions["restore_selected"] = (
+            self.__class__.restore_selected,  # Передаем как unbound method
             "restore_selected",
-            getattr(self.restore_selected, "short_description", "Restore selected"),
+            description,
         )
 
-        actions.update({"restore_selected": new_action})
         return actions
