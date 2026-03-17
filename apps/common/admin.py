@@ -6,10 +6,15 @@ import uuid
 from collections.abc import Callable
 from typing import Any, TypeVar, cast
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db.models import Model, QuerySet
 from django.forms import BaseFormSet, BaseModelForm
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
+from django.shortcuts import redirect, render
+from django.urls import URLPattern, path
+from django.utils.html import format_html
+from django.utils.safestring import SafeString
+from django.utils.translation import gettext_lazy as _
 from loguru import logger
 from pghistory import context as pghistory_context
 
@@ -17,6 +22,31 @@ from pghistory import context as pghistory_context
 _MT = TypeVar("_MT", bound=Model)
 # Generic тип для возвращаемого значения оборачиваемой функции
 _RT = TypeVar("_RT")
+
+
+class SoftDeleteFilter(admin.SimpleListFilter):
+    """Фильтр для разделения активных и удаленных записей."""
+
+    title = _("Статус удаления")
+    parameter_name = "soft_deleted"
+
+    def lookups(self, request: HttpRequest, model_admin: admin.ModelAdmin[Any]) -> list[tuple[str, Any]]:
+        return [
+            ("active", _("Активные")),
+            ("deleted", _("Удаленные (в корзине)")),
+        ]
+
+    def queryset(self, request: HttpRequest, queryset: QuerySet[_MT]) -> QuerySet[_MT] | None:
+        # Используем методы из SoftDeleteQuerySet
+        if self.value() == "active":
+            active_func = getattr(queryset, "active", None)
+            return active_func() if callable(active_func) else queryset
+
+        if self.value() == "deleted":
+            deleted_func = getattr(queryset, "deleted", None)
+            return deleted_func() if callable(deleted_func) else queryset
+
+        return queryset
 
 
 class KrononBaseAdmin(admin.ModelAdmin[_MT]):
@@ -39,6 +69,42 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
 
     # Немного ускорит админку на больших объёмах
     list_per_page = 50
+
+    # Добавляем фильтр в список стандартных
+    list_filter = (SoftDeleteFilter,)
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[_MT]:
+        """Возвращает QuerySet со всеми записями (включая удаленные)."""
+        # По умолчанию админка должна видеть всё, чтобы была возможность восстановить
+        return super().get_queryset(request).all()
+
+    # --- UI helpers ---
+
+    @admin.display(description=_("Статус"))
+    def soft_delete_status(self, obj: _MT) -> SafeString:
+        """
+        Визуальное отображение статуса записи (активна/удалена).
+
+        Args:
+            obj: Экземпляр модели.
+
+        Returns:
+            HTML-строка с цветным индикатором статуса.
+        """
+
+        deleted_at = getattr(obj, "deleted_at", None)
+
+        # white-space: nowrap — чтобы текст не разрывался
+        # min-width: 60px — гарантирует, что колонка не сожмется слишком сильно
+        style_base = "text-align: center; white-space: nowrap; display: inline-block; min-width: 60px;"
+
+        if deleted_at:
+            date = deleted_at.strftime("%d.%m.%y %H:%M")
+            return format_html('<span style="color:red; font-weight: bold; {}">✘ Удален<br>{}</span>', style_base, date)
+
+        return format_html('<span style="color:green; {}">✔ Активен</span>', style_base)
+
+    # --- Audit ---
 
     @staticmethod
     def _get_correlation_id(request: HttpRequest) -> str:
@@ -76,6 +142,8 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
             with pghistory_context(correlation_id=correlation_id, service="Admin"):
                 return func(*args, **kwargs)
 
+    # --- Object manipulations ---
+
     def save_model(self, request: HttpRequest, obj: _MT, form: BaseModelForm[_MT], change: bool) -> None:
         """
         Сохраняет объект модели с регистрацией контекста аудита.
@@ -87,26 +155,6 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
             change (bool): Флаг, указывающий на изменение существующего объекта.
         """
         self._run_with_audit(request, super().save_model, request, obj, form, change)
-
-    def delete_model(self, request: HttpRequest, obj: _MT) -> None:
-        """
-        Удаляет объект модели, используя логику Soft Delete.
-
-        Args:
-            request (HttpRequest): Объект входящего HTTP-запроса.
-            obj (_MT): Экземпляр удаляемой модели.
-        """
-        self._run_with_audit(request, obj.delete)
-
-    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[_MT]) -> None:
-        """
-        Массово помечает объекты как удаленные (Bulk Soft Delete).
-
-        Args:
-            request (HttpRequest): Объект входящего HTTP-запроса.
-            queryset (QuerySet[_MT]): Набор объектов для удаления.
-        """
-        self._run_with_audit(request, queryset.delete)
 
     def save_formset(
         self,
@@ -126,7 +174,87 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
         """
         self._run_with_audit(request, super().save_formset, request, form, formset, change)
 
-    # --- ACTIONS ---
+    def delete_model(self, request: HttpRequest, obj: _MT) -> None:
+        """
+        Стандартная кнопка 'Удалить'.
+        Удаляет объект модели, используя логику Soft Delete.
+
+        Args:
+            request (HttpRequest): Объект входящего HTTP-запроса.
+            obj (_MT): Экземпляр удаляемой модели.
+        """
+        self._run_with_audit(request, obj.delete)
+
+    def delete_queryset(self, request: HttpRequest, queryset: QuerySet[_MT]) -> None:
+        """
+        Массово помечает объекты как удаленные (Bulk Soft Delete).
+
+        Args:
+            request (HttpRequest): Объект входящего HTTP-запроса.
+            queryset (QuerySet[_MT]): Набор объектов для удаления.
+        """
+        self._run_with_audit(request, queryset.delete)
+
+    def hard_delete_view(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        """View для обработки физического удаления."""
+
+        obj = self.get_object(request, object_id)
+
+        if not obj:
+            return redirect("..")
+
+        if request.method == "POST":
+            # Выполняем физическое удаление с аудитом
+            hard_delete_func = getattr(obj, "hard_delete", obj.delete)
+
+            self._run_with_audit(request, hard_delete_func)
+
+            self.message_user(request, "Объект полностью удален из базы данных.", messages.WARNING)
+
+            return redirect(f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist")
+
+        # Если GET - показываем страницу подтверждения (можно использовать стандартный шаблон)
+        opts = self.model._meta
+
+        context = {
+            **self.admin_site.each_context(request),
+            "object_name": str(opts.verbose_name),
+            "object": obj,
+            "opts": opts,
+            "app_label": opts.app_label,
+            "title": "Вы уверены?",
+        }
+
+        return render(request, "admin/delete_confirmation.html", context)
+
+    def get_urls(self) -> list[URLPattern]:
+        """Добавляем кастомный URL для физического удаления (Hard Delete)."""
+
+        urls = super().get_urls()
+
+        custom_urls = [
+            path(
+                "<path:object_id>/hard-delete/",
+                self.admin_site.admin_view(self.hard_delete_view),
+                name=f"{self.model._meta.app_label}_{self.model._meta.model_name}_hard_delete",
+            ),
+        ]
+
+        return custom_urls + urls
+
+    def change_view(
+        self, request: HttpRequest, object_id: str, form_url: str = "", extra_context: dict[str, Any] | None = None
+    ) -> HttpResponse:
+        """Добавляем ссылку на Hard Delete в контекст шаблона."""
+
+        extra_context = extra_context or {}
+
+        # Ссылка будет доступна в шаблоне
+        extra_context["hard_delete_url"] = "hard-delete/"
+
+        return super().change_view(request, object_id, form_url, extra_context=extra_context)
+
+    # --- Custom actions ---
 
     @admin.action(description="Восстановить выбранные записи")
     def restore_selected(self, request: HttpRequest, queryset: QuerySet[_MT]) -> None:
@@ -158,6 +286,8 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
         """
         Расширяет список доступных действий админки.
 
+        Добавляет возможность восстановления мягко удаленных записей.
+
         Args:
             request (HttpRequest): Объект входящего HTTP-запроса.
 
@@ -176,3 +306,6 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
         )
 
         return actions
+
+    class Media:
+        js = ("admin/js/hard_delete_button.js",)

@@ -2,7 +2,10 @@
 Админка для клиентов.
 """
 
+from typing import Any
+
 from django.contrib import admin
+from django.http import HttpRequest
 from django.utils.translation import gettext_lazy as _
 
 from apps.clients.models import Client
@@ -14,6 +17,7 @@ class ClientAdmin(KrononBaseAdmin[Client]):
     """Управление клиентами."""
 
     list_display = (
+        "soft_delete_status",
         "name",
         "unp",
         "org_type",
@@ -29,16 +33,7 @@ class ClientAdmin(KrononBaseAdmin[Client]):
         "deleted_at",
     )
 
-    list_filter = (
-        "status",
-        "department",
-        "org_type",
-        "tax_system",
-        "accountant",
-        "primary_accountant",
-        "payroll_accountant",
-        "hr_specialist",
-    )
+    list_display_links = ("name",)
 
     search_fields = ("name", "full_legal_name", "unp")
 
@@ -85,3 +80,22 @@ class ClientAdmin(KrononBaseAdmin[Client]):
         "payroll_accountant",
         "hr_specialist",
     )
+
+    # Кастомный SoftDeleteFilter фильтр + базовые фильтры
+    def get_list_filter(self, request: HttpRequest) -> Any:
+        """Расширяет фильтрацию списка."""
+
+        soft_delete_filter = super().get_list_filter(request)  # type: ignore[no-untyped-call]
+
+        filters = (
+            "status",
+            "department",
+            "org_type",
+            "tax_system",
+            "accountant",
+            "primary_accountant",
+            "payroll_accountant",
+            "hr_specialist",
+        )
+
+        return soft_delete_filter + filters

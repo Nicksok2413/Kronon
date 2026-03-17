@@ -76,6 +76,12 @@ def setup_sentry(settings: SentrySettingsProtocol) -> None:
                 ThreadingIntegration(propagate_hub=True),
             ],
         )
+
+        # # Добавляем Correlation ID как глобальный тег или в scope
+        # with sentry_sdk.configure_scope() as scope:
+        #     # Мы сможем обновлять это в Middleware для каждого запроса
+        #     pass
+
         log.success("✅ Sentry SDK successfully initialized.")
 
     except Exception as exc:
