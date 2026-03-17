@@ -76,15 +76,21 @@ class KrononEvents(Events):
     )
 
     # Для Celery (название задачи)
-    celery_task = ProxyField(
-        "pgh_context__celery_task",
-        models.CharField(max_length=255, null=True, blank=True, verbose_name=_("Celery задача")),
+    celery_task_name = ProxyField(
+        "pgh_context__celery_task_name",
+        models.TextField(null=True, blank=True, verbose_name=_("Название Celery-задачи")),
+    )
+
+    # Для Celery (ID задачи)
+    celery_task_id = ProxyField(
+        "pgh_context__celery_task_id",
+        models.UUIDField(null=True, blank=True, verbose_name=_("ID Celery-задачи")),
     )
 
     # Для CLI (команда в manage.py)
-    command = ProxyField(
-        "pgh_context__command",
-        models.CharField(max_length=255, null=True, blank=True, verbose_name=_("CLI команда")),
+    cli_command = ProxyField(
+        "pgh_context__cli_command",
+        models.TextField(null=True, blank=True, verbose_name=_("CLI команда")),
     )
 
     class Meta:

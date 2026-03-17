@@ -17,9 +17,9 @@ class ClientAdmin(KrononBaseAdmin[Client]):
     """Управление клиентами."""
 
     list_display = (
-        "soft_delete_status",
         "name",
         "unp",
+        "soft_delete_status",
         "org_type",
         "tax_system",
         "status",

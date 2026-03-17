@@ -80,7 +80,7 @@ class BaseModel(TimeStampedModel):
         return self.deleted_at is not None
 
     def delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
-        """Синхронное мягкое удаление объекта."""
+        """Синхронное мягкое удаление объекта (Soft Delete)."""
         now = timezone.now()
         self.deleted_at = now
         self.updated_at = now
@@ -90,7 +90,7 @@ class BaseModel(TimeStampedModel):
         return 1, {self._meta.label: 1}
 
     async def adelete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
-        """Асинхронное мягкое удаление объекта."""
+        """Асинхронное мягкое удаление объекта (Soft Delete)."""
         now = timezone.now()
         self.deleted_at = now
         self.updated_at = now
@@ -116,9 +116,9 @@ class BaseModel(TimeStampedModel):
         await self.asave(update_fields=["deleted_at", "updated_at"])
 
     def hard_delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
-        """Синхронное физическое удаление объекта из БД."""
+        """Синхронное физическое удаление объекта из БД (Hard Delete)."""
         return super().delete(using=using, keep_parents=keep_parents)
 
     async def ahard_delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
-        """Асинхронное физическое удаление объекта из БД."""
+        """Асинхронное физическое удаление объекта из БД (Hard Delete)."""
         return await super().adelete(using=using, keep_parents=keep_parents)

@@ -9,6 +9,7 @@ from loguru import logger
 
 # Используем pghistory для трекинга контекста консольных команд
 from pghistory import context as pghistory_context
+from sentry_sdk import set_context, set_tag
 
 
 def main() -> None:
@@ -36,10 +37,15 @@ def main() -> None:
 
         command: str = " ".join(sys.argv[1:])
 
+        # Данные для Sentry: приклеятся ко всем ошибкам, возникшим в рамках CLI-сессии
+        set_tag("correlation_id", correlation_id)
+        set_tag("service", "CLI")
+        set_context("cli_command", {"full_command": command})
+
         # Оборачиваем в контекст Loguru (для красивых логов)
         with logger.contextualize(correlation_id=correlation_id):
             # Оборачиваем в контекст pghistory (для записей в БД)
-            with pghistory_context(correlation_id=correlation_id, service="CLI", command=command):
+            with pghistory_context(correlation_id=correlation_id, service="CLI", cli_command=command):
                 execute_from_command_line(sys.argv)
     else:
         execute_from_command_line(sys.argv)

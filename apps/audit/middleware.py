@@ -8,6 +8,7 @@ from typing import Any, cast
 from django.http import HttpRequest, HttpResponse
 from loguru import logger
 from pghistory.middleware import HistoryMiddleware
+from sentry_sdk import set_tag, set_user
 
 from apps.users.constants import SYSTEM_USER_ID
 
@@ -33,6 +34,13 @@ class KrononHistoryMiddleware(HistoryMiddleware):
 
         # Сохраняем в объект запроса
         request.correlation_id = correlation_id  # type: ignore[attr-defined]
+
+        # Данные для Sentry: приклеятся ко всем ошибкам, возникшим в рамках этого запроса
+        set_tag("correlation_id", correlation_id)
+        set_tag("service", "API/Web")
+        user_email = self._get_user_email(request)
+        user_id = getattr(request.user, "id", None)
+        set_user({"id": str(user_id), "email": user_email})
 
         # logger.contextualize привязывает extra данные к текущему контексту выполнения
         with logger.contextualize(correlation_id=correlation_id):

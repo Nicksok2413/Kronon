@@ -8,6 +8,7 @@ from loguru import logger
 
 # Используем pghistory для трекинга контекста celery tasks
 from pghistory import context as pghistory_context
+from sentry_sdk import set_context, set_tag
 
 # Устанавливаем переменную окружения, чтобы Celery знал, где искать настройки Django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
@@ -24,9 +25,27 @@ class PghistoryTask(Task):
         # Если задача запущена не из веба (например, через beat) - генерим новый ID
         correlation_id = self.request.get("correlation_id") or str(uuid.uuid7())
 
+        # Данные для Sentry: приклеятся ко всем ошибкам этой конкретной задачи
+        set_tag("correlation_id", correlation_id)
+        set_tag("service", "Celery")
+        set_context(
+            "celery_task",
+            {
+                "task_id": self.request.id,
+                "task_name": self.name,
+                "args": args,
+                "kwargs": kwargs,
+            },
+        )
+
         # Связываем контекст для Loguru (логи воркера) и контекст для pghistory (записи в БД)
         with logger.contextualize(correlation_id=correlation_id):
-            with pghistory_context(correlation_id=correlation_id, service="Celery", celery_task=self.name):
+            with pghistory_context(
+                correlation_id=correlation_id,
+                service="Celery",
+                celery_task_name=self.name,
+                celery_task_id=self.request.id,
+            ):
                 return super().__call__(*args, **kwargs)
 
 

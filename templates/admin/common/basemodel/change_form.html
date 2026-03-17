@@ -1,0 +1,23 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block submit_buttons_bottom %}
+    {{ block.super }}
+    <div class="submit-row" style="float: left; padding: 10px 0; display: flex; gap: 10px;">
+        {% if is_deleted %}
+            <a href="{{ restore_url }}" class="closelink" style="background: #28a745; color: white; padding: 10px 15px; border-radius: 4px;">
+               {% trans "Восстановить" %}
+            </a>
+        {% endif %}
+        <a href="{{ hard_delete_url }}" class="deletelink" style="background: #444; color: white; padding: 10px 15px; border-radius: 4px;">
+           {% trans "Удалить навсегда" %}
+        </a>
+    </div>
+
+    <style>
+        /* Если объект удален, скрываем стандартную кнопку Soft Delete */
+        {% if is_deleted %}
+            .submit-row a.deletelink:not([style*="background: #444"]) { display: none !important; }
+        {% endif %}
+    </style>
+{% endblock %}

@@ -7,19 +7,25 @@ from typing import Any, cast
 from django.contrib import admin
 from django.http import HttpRequest
 from django.utils.html import format_html
+from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
 from pghistory.admin import EventsAdmin
 from rangefilter.filters import DateTimeRangeFilter
 
 from apps.audit.models import KrononEvents
-from apps.common.admin import KrononBaseAdmin
 
 
-class KrononEventsAdmin(EventsAdmin, KrononBaseAdmin[Any]):
+class KrononEventsAdmin(EventsAdmin):
     """
     Расширенная админка аудита изменений (History).
     Работает с ProxyFields и ContextJSONField.
     """
+
+    # Оптимизация поиска (ускоряет `SELECT COUNT(*)` на миллионах строк)
+    show_full_result_count = False
+
+    # Немного ускорит админку на больших объёмах
+    list_per_page = 50
 
     search_fields = (
         "pgh_context__user_email",
@@ -27,22 +33,18 @@ class KrononEventsAdmin(EventsAdmin, KrononBaseAdmin[Any]):
         "pgh_context__ip_address",
     )
 
-    # Оптимизация поиска (ускоряет `SELECT COUNT(*)` на миллионах строк)
-    show_full_result_count = False
-
     # Явно запрещаем массовые действия
     actions = None
-
-    # Немного ускорит админку на больших объёмах
-    list_per_page = 50
 
     # Поля pghistory из settings + кастомные поля
     def get_list_display(self, request: HttpRequest) -> Any:
         """Расширяет отображение полей списка."""
         base_list_display = super().get_list_display(request)  # type: ignore[no-untyped-call]
+
         return base_list_display + [
             "obj_display",
             "colored_label",
+            "service_display",
             "user_email_display",
             "correlation_id_display",
             "ip_address_display",
@@ -53,6 +55,7 @@ class KrononEventsAdmin(EventsAdmin, KrononBaseAdmin[Any]):
     def get_list_filter(self, request: HttpRequest) -> Any:
         """Расширяет фильтрацию списка."""
         base_list_filter = super().get_list_filter(request)  # type: ignore[no-untyped-call]
+
         return base_list_filter + [
             # Фильтрация по дате на уровне БД (UI с календарём)
             ("pgh_created_at", DateTimeRangeFilter),
@@ -64,6 +67,18 @@ class KrononEventsAdmin(EventsAdmin, KrononBaseAdmin[Any]):
     def obj_display(self, obj: KrononEvents) -> str:
         """Отображает в списке название или UUID измененного объекта."""
         return str(obj.pgh_data["name"] or obj.pgh_obj_id)
+
+    @admin.display(description=_("Сервис"))
+    def service_display(self, obj: KrononEvents) -> str:
+        """Отображает сервис - источник изменения объекта и детали (задачу или команду)."""
+        service = obj.service
+
+        if service == "Celery":
+            return f"⚙️ {obj.celery_task_name}"
+        if service == "CLI":
+            return f"💻 CLI: {obj.cli_command[:20]}..."
+
+        return "🌐 API/Web"
 
     @admin.display(description=_("Пользователь"))
     def user_email_display(self, obj: KrononEvents) -> str:
@@ -81,22 +96,51 @@ class KrononEventsAdmin(EventsAdmin, KrononBaseAdmin[Any]):
         return cast(str | None, obj.ip_address)
 
     @admin.display(description=_("Тип"))
-    def colored_label(self, obj: KrononEvents) -> str:
+    def colored_label(self, obj: KrononEvents) -> SafeString:
         """
         Цветовая индикация типов событий.
 
         Зеленый - Создание нового клиента.
         Оранжевый - Обновление клиента.
-        Красный - Удаление клиента.
-        Черный - По умолчанию.
+        Красный - Удаление клиента (Soft Delete).
+        Черный - Удаление клиента (Hard Delete).
+        Серый - Неизвестное событие.
         """
+        label = obj.pgh_label
+        diff = getattr(obj, "pgh_diff", {}) or {}
+
+        # Если это update, проверяем поле deleted_at в диффе
+        if label == "update" and "deleted_at" in diff:
+            deleted_at_value = diff["deleted_at"][1]  # Кортеж (old, new)
+
+            if deleted_at_value is not None:
+                label = "soft_delete"  # Установили дату — удалили
+            else:
+                label = "restore"  # Сбросили дату в null — восстановили
+
+        # Маппинг цветов
         colors = {
-            "insert": "green",
-            "update": "orange",
-            "delete": "red",
+            "insert": "#28a745",  # Зеленый
+            "update": "#ffc107",  # Оранжевый
+            "soft_delete": "#dc3545",  # Красный
+            "restore": "#007bff",  # Синий
+            "delete": "#000000",  # Черный (Hard Delete)
         }
-        color = colors.get(obj.pgh_label, "black")
-        return format_html('<b style="color:{}">{}</b>', color, obj.pgh_label)
+
+        color = colors.get(label, "#6c757d")  # Серый для неизвестных событий
+
+        # Переводим метку для отображения
+        labels_map = {
+            "insert": "Создание",
+            "update": "Обновление",
+            "soft_delete": "Мягкое удаление",
+            "restore": "Восстановлен",
+            "delete": "Физ. удаление",
+        }
+
+        display_text = labels_map.get(label, label.upper())
+
+        return format_html('<b style="color:{}; white-space: nowrap;">{}</b>', color, display_text)
 
     @admin.display(description=_("Изменения"))
     def short_diff(self, obj: KrononEvents) -> str:

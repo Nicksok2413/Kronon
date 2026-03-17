@@ -69,9 +69,12 @@ class TaxSystem(models.TextChoices):
     DeleteEvent(),
     meta={
         "indexes": [
-            # Индексируем всё поле pgh_context для быстрого поиска по любому ключу
-            GinIndex(fields=["pgh_context"], name="client_event_context_gin"),
-        ]
+            # Функциональный B-tree индекс для correlation_id
+            models.Index(
+                models.F("pgh_context__correlation_id"),
+                name="client_pgh_corr_id_idx",
+            ),
+        ],
     },
 )
 class Client(BaseModel):
