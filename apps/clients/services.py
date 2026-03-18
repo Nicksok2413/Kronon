@@ -25,7 +25,7 @@ async def create_client(data: ClientCreate, initiator: UUID | str | None = None)
                                        Или None.
 
     Returns:
-        Client: Созданный объект с подгруженными связями.
+        Client: Созданный объект клиента с подгруженными связями.
     """
     # Логируем бизнес-контекст операции
     log.info(f"User {initiator} creating client. UNP: {data.unp}, Name: {data.name}")
@@ -89,7 +89,7 @@ async def update_client(client: Client, data: ClientUpdate, initiator: UUID | st
                                        Или None.
 
     Returns:
-        Client: Обновленный объект с подгруженными связями.
+        Client: Обновленный объект клиента с подгруженными связями.
     """
     # Логируем, какие поля меняются
     changed_fields = data.model_dump(exclude_unset=True).keys()
@@ -155,7 +155,7 @@ async def delete_client(client: Client, initiator: UUID | str | None = None) -> 
         # Оборачиваем в контекст pghistory для записи автора
         # pghistory работает через contextvars, это безопасно в async
         with pghistory_context(user=initiator):
-            # Soft delete - это UPDATE запрос (ставит deleted_at), поэтому pghistory зафиксирует это изменение
+            # Soft delete - UPDATE запрос (ставит текущее время в deleted_at)
             await client.adelete()
 
         log.info(f"Client {client.id} marked as deleted.")
@@ -163,4 +163,45 @@ async def delete_client(client: Client, initiator: UUID | str | None = None) -> 
     except Exception as exc:
         # Логируем контекст ошибки перед тем, как она уйдет в глобальный хендлер
         log.error(f"Error deleting client {client.id}: {exc}")
+        raise
+
+
+async def restore_client(client: Client, initiator: UUID | str | None = None) -> Client:
+    """
+    Выполняет восстановление клиента после мягкого удаления.
+
+    Args:
+        client (Client): Объект клиента.
+        initiator (UUID | str | None): ID пользователя, инициирующего восстановление клиента (для аудита).
+                                       Маркер для системы, что это программный доступ.
+                                       Или None.
+
+    Returns:
+        Client: Восстановленный объект клиента с подгруженными связями.
+    """
+    log.info(f"Start restoring client {client.id}.")
+
+    try:
+        # Оборачиваем в контекст pghistory для записи автора
+        # pghistory работает через contextvars, это безопасно в async
+        with pghistory_context(user=initiator):
+            # Restore - UPDATE запрос (ставит Null в deleted_at)
+            await client.arestore()
+
+        log.info(f"Client {client.id} restored.")
+
+        # Делаем рефреш через селектор с подгрузкой связей (актуальные связи и updated_at) для корректного ответа API
+        restored_client = await get_client_by_id(client_id=client.id)
+
+        # Теоретически невозможно, что его нет, но для Mypy:
+        if not restored_client:
+            log.critical(f"Client {client.id} disappeared after restore!")
+            raise RuntimeError("Client not found after restore")
+
+        # Возвращаем актуальные данные
+        return restored_client
+
+    except Exception as exc:
+        # Логируем контекст ошибки перед тем, как она уйдет в глобальный хендлер
+        log.error(f"Error restoring client {client.id}: {exc}")
         raise

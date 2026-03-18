@@ -77,7 +77,7 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
     # Добавляем фильтр в список стандартных
     list_filter = (SoftDeleteFilter,)
 
-    # Меняем шаблон формы карточки объекта?
+    # Меняем шаблон формы карточки объекта
     change_form_template = "admin/common/basemodel/change_form.html"
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[_MT]:
@@ -87,7 +87,7 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
 
     # --- UI helpers ---
 
-    @admin.display(description=_("Статус"))
+    @admin.display(description=_("Активен"))
     def soft_delete_status(self, obj: _MT) -> SafeString:
         """
         Визуальное отображение статуса записи (активна/удалена).
