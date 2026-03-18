@@ -6,6 +6,7 @@ from ninja_extra import NinjaExtraAPI
 from ninja_jwt.authentication import AsyncJWTAuth
 from ninja_jwt.controller import NinjaJWTDefaultController
 
+from apps.audit.api.v1 import router as audit_router
 from apps.clients.api.v1 import router as clients_router
 from apps.common.exceptions import setup_exception_handlers
 
@@ -30,7 +31,7 @@ api.register_controllers(NinjaJWTDefaultController)
 # --- Подключаем роутеры приложений ---
 
 # Аудит
-api.add_router("/history", clients_router, tags=["Audit"])
+api.add_router("/audit", audit_router, tags=["Audit"])
 
 # Клиенты
 api.add_router("/clients", clients_router, tags=["Clients"])
