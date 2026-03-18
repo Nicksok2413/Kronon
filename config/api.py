@@ -29,6 +29,9 @@ api.register_controllers(NinjaJWTDefaultController)
 
 # --- Подключаем роутеры приложений ---
 
+# Аудит
+api.add_router("/history", clients_router, tags=["Audit"])
+
 # Клиенты
 api.add_router("/clients", clients_router, tags=["Clients"])
 

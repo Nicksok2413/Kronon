@@ -8,7 +8,7 @@ from typing import Any
 from asgiref.sync import sync_to_async
 from django.test import AsyncClient
 
-from apps.clients.schemas.history import ClientHistoryOut
+from apps.audit.schemas import ClientHistoryOut
 from apps.users.constants import SYSTEM_USER_ID
 from tests.utils.base import BaseAPITest
 from tests.utils.factories import ClientFactory
@@ -73,7 +73,7 @@ class TestClientHistory(BaseAPITest):
         )
 
         # Проверяем историю (используя pghistory модели или селектор)
-        from apps.clients.selectors import get_client_history_queryset
+        from apps.audit.selectors import get_client_history_queryset
 
         history = await get_client_history_queryset(client.id)
 
@@ -96,7 +96,7 @@ class TestClientHistory(BaseAPITest):
         client_id = response.json()["id"]
 
         # Проверяем историю в БД напрямую (что в pghistory записался SYSTEM_USER_ID)
-        from apps.clients.selectors import get_client_history_queryset
+        from apps.audit.selectors import get_client_history_queryset
 
         history = await get_client_history_queryset(client_id)
 

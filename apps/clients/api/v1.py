@@ -5,7 +5,7 @@ API Endpoints для Клиентов (v1).
 и удаления (DELETE) клиентов. А так же историю изменения клиентов (GET).
 """
 
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from django.http import HttpRequest
@@ -19,8 +19,7 @@ from apps.clients.guards import get_client_for_admin_or_404, get_client_for_edit
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
-from apps.clients.schemas.history import ClientHistoryOut
-from apps.clients.selectors import get_client_history_queryset, get_client_queryset
+from apps.clients.selectors import get_client_queryset
 from apps.clients.services import create_client, delete_client, restore_client, update_client
 from apps.common.auth import AsyncApiKeyAuth, get_request_initiator
 from apps.common.managers import SoftDeleteQuerySet
@@ -233,52 +232,10 @@ async def restore_client_endpoint(request: HttpRequest, client_id: UUID) -> Clie
     log.info(f"Initiator '{initiator_str}' attempts to restore client {client_id}.")
 
     # Проверяем существование клиента и права (RBAC)
-    client = await get_client_for_admin_or_404(request=request, client_id=client_id)
+    client = await get_client_for_admin_or_404(request=request, client_id=client_id, is_deleted=True)
 
     # Вызываем сервис восстановления
     restored_client = await restore_client(client=client, initiator=initiator_id)
 
     # Возвращаем восстановленного клиента
     return restored_client
-
-
-@router.get("/{client_id}/history", response={200: list[ClientHistoryOut], **STANDARD_ERRORS})
-async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict[str, Any]]:
-    """
-    Получить журнал аудита (историю изменений) клиента.
-
-    Возвращает список событий с диффами (разницами изменений) и контекстом операции.
-    Доступно только системе и администраторам.
-
-    Args:
-        request (HttpRequest): Объект входящего HTTP запроса.
-        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
-
-    Raises:
-        HttpError(401): Токен отсутствует или недействителен.
-        HttpError(403): При попытке доступа без прав администратора.
-        HttpError(404): Если клиент не найден.
-
-    Returns:
-        list[dict[str, Any]]: Список событий изменения клиента.
-    """
-    # Получаем инициатора запроса (id для аудита здесь не нужен, str для логов)
-    _, initiator_str = await get_request_initiator(request)
-
-    log.info(f"Initiator '{initiator_str}' requested history for client {client_id}.")
-
-    # Проверяем права (RBAC)
-    await is_admin_access(request)
-
-    # Проверяем существование клиента (сам объект не нужен, поэтому .aexists для скорости)
-    # TODO: можно искать также по удаленным клиентам через менеджер .all_objects
-    client_exists = await Client.objects.filter(id=client_id).aexists()
-
-    if not client_exists:
-        raise HttpError(status_code=404, message="Клиент не найден")
-
-    # Получаем данные через селектор
-    history_data = await get_client_history_queryset(client_id=client_id)
-
-    # Возвращаем данные (Ninja сам преобразует словари в ClientHistoryOut)
-    return history_data
