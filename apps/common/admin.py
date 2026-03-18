@@ -87,7 +87,7 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
 
     # --- UI helpers ---
 
-    @admin.display(description=_("Активен"))
+    @admin.display(description=_("Активность"))
     def soft_delete_status(self, obj: _MT) -> SafeString:
         """
         Визуальное отображение статуса записи (активна/удалена).
