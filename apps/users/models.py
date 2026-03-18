@@ -9,6 +9,8 @@ from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from pghistory import DeleteEvent, InsertEvent, UpdateEvent
+from pghistory import track as pghistory_track
 
 from apps.common.models import BaseModel
 from apps.common.utils.paths import RandomFileName
@@ -81,6 +83,20 @@ class Department(BaseModel):
         return self.name
 
 
+@pghistory_track(
+    InsertEvent(),
+    UpdateEvent(),
+    DeleteEvent(),
+    meta={
+        "indexes": [
+            # Функциональный B-tree индекс для correlation_id
+            models.Index(
+                models.F("pgh_context__correlation_id"),
+                name="user_pgh_corr_idx",
+            ),
+        ],
+    },
+)
 class User(AbstractUser):
     """
     Кастомная модель пользователя Kronon.

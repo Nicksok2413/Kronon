@@ -6,6 +6,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils import timezone
 from django.utils.html import format_html
+from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
 
 from apps.users.models import Department, EmploymentStatus, Profile, User
@@ -96,7 +97,7 @@ class UserAdmin(BaseUserAdmin[User]):
     )
 
     @classmethod
-    def _render_badge(cls, text: str, color_style: str) -> str:
+    def _render_badge(cls, text: str, color_style: str) -> SafeString:
         """Универсальный отрисовщик бейджей."""
         base_style = "padding: 3px 6px; border-radius: 4px; font-weight: bold; white-space: nowrap;"
 

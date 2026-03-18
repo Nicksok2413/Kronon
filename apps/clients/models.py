@@ -72,7 +72,7 @@ class TaxSystem(models.TextChoices):
             # Функциональный B-tree индекс для correlation_id
             models.Index(
                 models.F("pgh_context__correlation_id"),
-                name="client_pgh_corr_id_idx",
+                name="client_pgh_corr_idx",
             ),
         ],
     },

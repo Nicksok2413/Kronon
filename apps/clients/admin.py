@@ -82,12 +82,12 @@ class ClientAdmin(KrononBaseAdmin[Client]):
     )
 
     # Кастомный SoftDeleteFilter фильтр + базовые фильтры
-    def get_list_filter(self, request: HttpRequest) -> Any:
+    def get_list_filter(self, request: HttpRequest) -> list[Any]:
         """Расширяет фильтрацию списка."""
 
-        soft_delete_filter = super().get_list_filter(request)  # type: ignore[no-untyped-call]
+        soft_delete_filter = list(super().get_list_filter(request))
 
-        filters = (
+        filters = [
             "status",
             "department",
             "org_type",
@@ -96,6 +96,6 @@ class ClientAdmin(KrononBaseAdmin[Client]):
             "primary_accountant",
             "payroll_accountant",
             "hr_specialist",
-        )
+        ]
 
         return soft_delete_filter + filters

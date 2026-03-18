@@ -65,8 +65,12 @@ class KrononEventsAdmin(EventsAdmin):
 
     @admin.display(description=_("Объект"))
     def obj_display(self, obj: KrononEvents) -> str:
-        """Отображает в списке название или UUID измененного объекта."""
-        return str(obj.pgh_data["name"] or obj.pgh_obj_id)
+        """Отображает в списке название измененного объекта или email, в случае изменения пользователя."""
+        data = obj.pgh_data
+
+        display_value = data.get("name") or data.get("email")
+
+        return str(display_value) if display_value else "-"
 
     @admin.display(description=_("Сервис"))
     def service_display(self, obj: KrononEvents) -> str:
