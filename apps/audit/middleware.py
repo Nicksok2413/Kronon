@@ -5,12 +5,13 @@ Custom middleware for collecting pghistory context.
 import uuid
 from typing import Any, cast
 
+from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from loguru import logger
 from pghistory.middleware import HistoryMiddleware
 from sentry_sdk import set_tag, set_user
 
-from apps.users.constants import SYSTEM_USER_ID
+from apps.users.constants import SYSTEM_USER_EMAIL, SYSTEM_USER_ID
 
 
 class KrononHistoryMiddleware(HistoryMiddleware):
@@ -37,10 +38,23 @@ class KrononHistoryMiddleware(HistoryMiddleware):
 
         # Данные для Sentry: приклеятся ко всем ошибкам, возникшим в рамках этого запроса
         set_tag("correlation_id", correlation_id)
-        set_tag("service", "API/Web")
-        user_email = self._get_user_email(request)
-        user_id = getattr(request.user, "id", None)
-        set_user({"id": str(user_id), "email": user_email})
+
+        # Проверяем заголовки на наличие системного API-ключа
+        api_key = request.headers.get("X-API-KEY") or request.META.get("HTTP_X_API_KEY")
+
+        # Если нашли системный API-ключ
+        if api_key == settings.INTERNAL_API_KEY:
+            set_user({"id": str(SYSTEM_USER_ID), "email": SYSTEM_USER_EMAIL})
+            set_tag("auth_type", "api_key")
+            set_tag("service", "System")
+
+        # Иначе - это JWT-юзер
+        else:
+            user_id = getattr(request.user, "id", None)
+            user_email = self._get_user_email(request)
+            set_user({"id": str(user_id), "email": user_email})
+            set_tag("auth_type", "jwt/session")
+            set_tag("service", "API/Web")
 
         # logger.contextualize привязывает extra данные к текущему контексту выполнения
         with logger.contextualize(correlation_id=correlation_id):
@@ -131,9 +145,22 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         # Базовый контекст (user и url)
         base_context = super().get_context(request)
 
-        # Переопределяем 'user', если Ninja опознал системный API-ключ
-        if getattr(request, "auth", None) == "system_api":
+        # Проверяем заголовки на наличие системного API-ключа
+        api_key = request.headers.get("X-API-KEY") or request.META.get("HTTP_X_API_KEY")
+
+        # Если нашли системный API-ключ
+        if api_key == settings.INTERNAL_API_KEY:
+            # Переопределяем ID юзера на системного в базовом контексте
             base_context["user"] = SYSTEM_USER_ID
+            # Добавляем Email системного юзера в базовый контекст
+            base_context["user_email"] = SYSTEM_USER_EMAIL
+            service = "System"
+
+        # Иначе - это JWT-юзер
+        else:
+            # Добавляем Email JWT-юзера в базовый контекст
+            base_context["user_email"] = self._get_user_email(request)
+            service = "API/Web"
 
         # Получаем Correlation ID (уже созданный в __call__)
         correlation_id = getattr(request, "correlation_id", None)
@@ -141,9 +168,8 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         # Обновляем словарь контекста
         return base_context | {
             "correlation_id": correlation_id,
-            "user_email": self._get_user_email(request),
             "ip_address": self._get_ip_address(request),
             "user_agent": self._get_user_agent(request),
             "method": request.method,
-            "service": "API/Web",
+            "service": service,
         }
