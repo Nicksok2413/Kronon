@@ -86,6 +86,7 @@ async def admin_client(admin_user: User) -> AsyncClient:
     token: str = str(AccessToken.for_user(admin_user))
 
     client.defaults["Authorization"] = f"Bearer {token}"
+    # client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {token}"
 
     return client
 
@@ -101,5 +102,6 @@ async def system_client() -> AsyncClient:
     client = AsyncClient()
 
     client.defaults["X-API-Key"] = settings.INTERNAL_API_KEY
+    # client.defaults["X-API-KEY"] = settings.INTERNAL_API_KEY
 
     return client
