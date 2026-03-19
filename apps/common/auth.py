@@ -63,7 +63,8 @@ async def get_auth_identity(request: HttpRequest) -> User:
     # Если аутентификация по API-ключу (auth будет строкой "system_api")
     if identity == "system_api":
         # Возвращаем системного юзера из БД (Django кэширует get)
-        return await User.objects.aget(id=SYSTEM_USER_ID)
+        system_user: User = await User.objects.aget(id=SYSTEM_USER_ID)
+        return system_user
 
     # Если аутентификация по JWT (Ninja-JWT кладет объект User в auth),
     # проверяем, что в auth действительно User (а не None/Anonymous)

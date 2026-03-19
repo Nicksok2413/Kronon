@@ -5,7 +5,9 @@ Custom middleware for collecting pghistory context.
 import uuid
 from typing import Any, cast
 
+from asgiref.sync import async_to_sync
 from django.conf import settings
+from django.contrib.auth import alogout
 from django.http import HttpRequest, HttpResponse
 from loguru import logger
 from pghistory.middleware import HistoryMiddleware
@@ -16,12 +18,15 @@ from apps.users.constants import SYSTEM_USER_EMAIL, SYSTEM_USER_ID
 
 class KrononHistoryMiddleware(HistoryMiddleware):
     """
-    Расширенный middleware для фиксации контекста pghistory с поддержкой System API.
-    Добавляет Email пользователя, IP адрес, User-Agent, HTTP-метод и сервис (источник изменения объекта) в контекст.
+    Единая точка входа для аудита, трассировки ID корреляции и безопасности.
+    Адаптирована под асинхронный logout и системный API-инструментарий.
+    Использует async_to_sync, чтобы безопасно вызвать асинхронные методы в синхронном middleware.
+    Добавляет ID корреляции, Email пользователя, IP адрес, User-Agent, HTTP-метод и сервис в контекст pghistory.
     """
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         """
+        Асинхронная обработка запроса.
         Переопределяем метод вызова для проброса ID корреляции в Response.
 
         Args:
@@ -36,7 +41,22 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         # Сохраняем в объект запроса
         request.correlation_id = correlation_id  # type: ignore[attr-defined]
 
-        # Данные для Sentry: приклеятся ко всем ошибкам, возникшим в рамках этого запроса
+        # --- Безопасность: Force Logout ---
+
+        # Используем auser(), чтобы не вызывать синхронный доступ к БД
+        user = async_to_sync(request.auser)()
+
+        # Проверка на Soft Delete (если админ удалил юзера - мгновенное разлогинивание)
+        if user.is_authenticated and getattr(user, "is_deleted", False):
+            logger.warning(f"Force logout for deleted user: {user}")
+
+            # Используем alogout(), чтобы не вызывать синхронный доступ к БД
+            async_to_sync(alogout)(request)  # Force Logout
+
+            return HttpResponse("Account deactivated", status=401)
+
+        # --- Sentry (данные приклеятся ко всем ошибкам, возникшим в рамках запроса) ---
+
         set_tag("correlation_id", correlation_id)
 
         # Проверяем заголовки на наличие системного API-ключа
@@ -50,17 +70,21 @@ class KrononHistoryMiddleware(HistoryMiddleware):
 
         # Иначе - это JWT-юзер
         else:
-            user_id = getattr(request.user, "id", None)
-            user_email = self._get_user_email(request)
-            set_user({"id": str(user_id), "email": user_email})
+            set_user({"id": str(user.id), "email": self._get_user_email(request)})
             set_tag("auth_type", "jwt/session")
             set_tag("service", "API/Web")
 
+        # --- Аудит: pghistory + Loguru ---
+
         # logger.contextualize привязывает extra данные к текущему контексту выполнения
         with logger.contextualize(correlation_id=correlation_id):
-            # Отдаем Correlation ID обратно в Response (полезно для фронтенда/отладки)
+            # Вызываем родительский __call__ (он внутри себя вызовет get_context)
             response: HttpResponse = super().__call__(request)  # type: ignore[no-untyped-call]
-            response["X-Correlation-ID"] = correlation_id
+
+            # Если это HttpResponse, добавляем заголовок (отдаем Correlation ID обратно в Response)
+            if isinstance(response, HttpResponse):
+                response["X-Correlation-ID"] = correlation_id  # Полезно для фронтенда/отладки
+
             return response
 
     @staticmethod
@@ -75,9 +99,9 @@ class KrononHistoryMiddleware(HistoryMiddleware):
         Returns:
             str | None: Email пользователя или None.
         """
-        user = getattr(request, "user", None)
+        user = request.user
 
-        if user and getattr(user, "is_authenticated", False):
+        if user and user.is_authenticated:
             return getattr(user, "email", None)
 
         return None
@@ -125,10 +149,9 @@ class KrononHistoryMiddleware(HistoryMiddleware):
 
     def get_context(self, request: HttpRequest) -> dict[str, Any]:
         """
-        Формирует расширенный словарь контекста.
-        Базовый метод добавляет 'user' (ID) и 'url' (эндпойнт) в контекст.
+        Формирует расширенный словарь контекста (вызывается внутри super().__call__).
 
-        Добавляем:
+        Добавляет в контекст кроме базовых 'user' (ID) и 'url' (эндпойнт):
             'correlation_id': ID корреляции (уникальная метка запроса для аналитика логов/ошибок),
             'user_email': Email пользователя,
             'ip_address': IP адрес,

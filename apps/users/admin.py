@@ -2,13 +2,17 @@
 Настройки админ-панели для пользователей и структуры.
 """
 
+from typing import Any
+
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.http import HttpRequest
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
 
+from apps.common.admin import KrononBaseAdmin
 from apps.users.models import Department, EmploymentStatus, Profile, User
 
 
@@ -34,33 +38,37 @@ class DepartmentAdmin(admin.ModelAdmin[Department]):
 
 
 @admin.register(User)
-class UserAdmin(BaseUserAdmin[User]):
+class UserAdmin(KrononBaseAdmin[User], DjangoUserAdmin[User]):
     """
     Кастомная админка пользователя.
+
+    Наследует:
+    KrononBaseAdmin: аудит (pghistory), Trace ID, Soft/Hard Delete кнопки.
+    DjangoUserAdmin: стандартные fieldsets, смену пароля и права доступа.
+
     Добавляет фильтры, поиск и inline-редактирование профиля.
     """
 
-    ordering = ["email"]
     list_display = (
         "email",
+        "soft_delete_status",
+        "is_staff_status",
         "last_name",
         "first_name",
         "role",
         "department",
         "probation_badge",
         "contract_status_badge",
-        "is_active",
     )
 
-    list_filter = (
-        "role",
-        "department",
-        "employment_status",
-        "is_active",
-        "is_staff",
-    )
-
+    # Явно указываем поиск по email (вместо username)
     search_fields = ("email", "last_name", "first_name")
+
+    # Сортировка по email для удобства
+    ordering = ("email",)
+
+    # Оптимизация запросов (чтобы не делать N+1 запрос в списке)
+    list_select_related = ("department",)
 
     # Добавляем профиль вниз формы
     inlines = (ProfileInline,)
@@ -96,12 +104,31 @@ class UserAdmin(BaseUserAdmin[User]):
         ),
     )
 
+    # Кастомный SoftDeleteFilter фильтр + базовые фильтры
+    def get_list_filter(self, request: HttpRequest) -> list[Any]:
+        """Расширяет фильтрацию списка."""
+
+        soft_delete_filter = list(super().get_list_filter(request))
+
+        filters = [
+            "employment_status",
+            "role",
+            "department",
+        ]
+
+        return soft_delete_filter + filters
+
     @classmethod
     def _render_badge(cls, text: str, color_style: str) -> SafeString:
         """Универсальный отрисовщик бейджей."""
         base_style = "padding: 3px 6px; border-radius: 4px; font-weight: bold; white-space: nowrap;"
 
         return format_html('<span style="{} {}">{}</span>', base_style, color_style, text)
+
+    @admin.display(description=_("Staff"))
+    def is_staff_status(self, obj: User) -> str:
+        """"""
+        return "✔" if obj.is_staff else "—"
 
     @admin.display(description=_("Испытательный срок"), ordering="probation_end_date")
     def probation_badge(self, obj: User) -> str:

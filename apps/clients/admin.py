@@ -33,11 +33,9 @@ class ClientAdmin(KrononBaseAdmin[Client]):
         "deleted_at",
     )
 
-    list_display_links = ("name",)
-
     search_fields = ("name", "full_legal_name", "unp")
 
-    # Оптимизация запросов (чтобы не делать N+1 запрос для каждого юзера в списке)
+    # Оптимизация запросов (чтобы не делать N+1 запрос в списке)
     list_select_related = (
         "department",
         "accountant",

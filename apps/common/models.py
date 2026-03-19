@@ -65,7 +65,7 @@ class BaseModel(TimeStampedModel):
     # Кастомный менеджер для мягкого удаления (по умолчанию для всех моделей, наследующих BaseModel)
     objects = SoftDeleteManager()
 
-    # Стандартный менеджер для чистого поведения (опционально)
+    # Стандартный менеджер для чистого поведения
     all_objects = models.Manager()
 
     class Meta:
@@ -81,9 +81,7 @@ class BaseModel(TimeStampedModel):
 
     def delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
         """Синхронное мягкое удаление объекта (Soft Delete)."""
-        now = timezone.now()
-        self.deleted_at = now
-        self.updated_at = now
+        self.deleted_at = timezone.now()
 
         # Используем update_fields для оптимизации SQL запроса
         self.save(update_fields=["deleted_at", "updated_at"])
@@ -91,9 +89,7 @@ class BaseModel(TimeStampedModel):
 
     async def adelete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
         """Асинхронное мягкое удаление объекта (Soft Delete)."""
-        now = timezone.now()
-        self.deleted_at = now
-        self.updated_at = now
+        self.deleted_at = timezone.now()
 
         # Используем update_fields для оптимизации SQL запроса
         await self.asave(using=using, update_fields=["deleted_at", "updated_at"])
@@ -102,7 +98,6 @@ class BaseModel(TimeStampedModel):
     def restore(self) -> None:
         """Синхронное восстановление удаленного объекта."""
         self.deleted_at = None
-        self.updated_at = timezone.now()
 
         # Используем update_fields для оптимизации SQL запроса
         self.save(update_fields=["deleted_at", "updated_at"])
@@ -110,7 +105,6 @@ class BaseModel(TimeStampedModel):
     async def arestore(self) -> None:
         """Асинхронное восстановление удаленного объекта."""
         self.deleted_at = None
-        self.updated_at = timezone.now()
 
         # Используем update_fields для оптимизации SQL запроса
         await self.asave(update_fields=["deleted_at", "updated_at"])
