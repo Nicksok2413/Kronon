@@ -8,6 +8,7 @@ from django.conf import settings
 from django.test import AsyncClient
 from ninja_jwt.tokens import AccessToken
 
+from apps.users.constants import SYSTEM_USER_EMAIL, SYSTEM_USER_ID
 from apps.users.models import User, UserRole
 from tests.utils.factories import UserFactory
 
@@ -41,6 +42,29 @@ async def admin_user() -> User:
 
 
 @pytest.fixture
+async def system_user() -> User:
+    """
+    Гарантирует существование системного пользователя в тестовой БД.
+
+    Returns:
+        User: Экземпляр модели системного пользователя.
+    """
+    user, _ = await User.objects.aget_or_create(
+        id=SYSTEM_USER_ID,
+        defaults={
+            "email": SYSTEM_USER_EMAIL,
+            "first_name": "System",
+            "last_name": "API",
+            "role": UserRole.SYSTEM_ADMINISTRATOR,
+            "is_active": False,
+            "is_staff": False,
+            "is_superuser": False,
+        },
+    )
+    return user
+
+
+@pytest.fixture
 async def auth_client(api_user: User) -> AsyncClient:
     """
     Клиент (с JWT токеном) обычного линейного бухгалтера.
@@ -59,9 +83,7 @@ async def auth_client(api_user: User) -> AsyncClient:
     # Если ninja_jwt полезет в базу - обернем его в sync_to_async, но пока так:
     # TODO: sync_to_async
     token: str = str(AccessToken.for_user(api_user))
-
     client.defaults["Authorization"] = f"Bearer {token}"
-
     return client
 
 
@@ -84,15 +106,12 @@ async def admin_client(admin_user: User) -> AsyncClient:
     # Если ninja_jwt полезет в базу - обернем его в sync_to_async, но пока так:
     # TODO: sync_to_async
     token: str = str(AccessToken.for_user(admin_user))
-
     client.defaults["Authorization"] = f"Bearer {token}"
-    # client.defaults["HTTP_AUTHORIZATION"] = f"Bearer {token}"
-
     return client
 
 
 @pytest.fixture
-async def system_client() -> AsyncClient:
+async def system_client(system_user: User) -> AsyncClient:
     """
     Клиент с системным API-ключом (без JWT).
 
@@ -100,8 +119,5 @@ async def system_client() -> AsyncClient:
         AsyncClient: Клиент с системным API-ключом.
     """
     client = AsyncClient()
-
     client.defaults["X-API-Key"] = settings.INTERNAL_API_KEY
-    # client.defaults["X-API-KEY"] = settings.INTERNAL_API_KEY
-
     return client

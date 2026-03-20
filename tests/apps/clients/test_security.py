@@ -2,8 +2,12 @@
 Тесты системы аутентификации, прав (RBAC) и объектных прав (OLP) API клиентов.
 """
 
-from asgiref.sync import sync_to_async
+from typing import Any
 
+from asgiref.sync import sync_to_async
+from django.test import AsyncClient
+
+from apps.common.schemas import ErrorOut
 from apps.users.models import UserRole
 from tests.utils.base import BaseAPITest
 from tests.utils.factories import ClientFactory, UserFactory
@@ -20,7 +24,7 @@ class TestClientSecurity(BaseAPITest):
     endpoint: str = "/api/clients/"
 
     # --- ТЕСТЫ OLP (Фильтрация списка) ---
-    async def test_list_olp_isolation(self, auth_client, api_user):
+    async def test_list_olp_isolation(self, auth_client: AsyncClient, api_user: Any):
         """Проверка: бухгалтер (api_user) видит только 'своих' клиентов."""
         # Создаем 'чужого' бухгалтера
         other_user = await sync_to_async(UserFactory)(role=UserRole.ACCOUNTANT)
@@ -40,6 +44,19 @@ class TestClientSecurity(BaseAPITest):
 
         # Убеждаемся, что чужого клиента нет в списке
         assert all(item["id"] != str(other_client.id) for item in data["items"])
+
+    async def test_update_olp_forbidden(self, auth_client: AsyncClient) -> None:
+        """Проверка OLP: бухгалтер не может обновить чужого клиента."""
+        # Клиент без привязки к api_user
+        client = await sync_to_async(ClientFactory)()
+
+        response = await auth_client.patch(
+            f"{self.endpoint}{client.id}", data={"name": "Hacked"}, content_type="application/json"
+        )
+        await self.assert_status(response=response, expected_status=403)
+
+        # Проверяем формат ошибки
+        await self.validate_schema(data=response.json(), schema=ErrorOut)
 
     # --- ТЕСТЫ RBAC (Доступ к эндпоинтам) ---
     async def test_delete_requires_admin_rbac(self, auth_client, api_user):
@@ -61,7 +78,7 @@ class TestClientSecurity(BaseAPITest):
         assert response.status_code == 204
 
     # --- ТЕСТЫ СИСТЕМНОГО API ---
-    async def test_system_api_full_access(self, system_client):
+    async def test_system_api_full_access(self, system_client: AsyncClient):
         """Проверка: системный ключ видит всё и обходит OLP/RBAC."""
         # Создаем 5 клиентов
         await sync_to_async(ClientFactory.create_batch)(5)
