@@ -32,7 +32,7 @@ async def aexecute_with_audit[T](
         T: Результат выполнения `async_func` с сохранением оригинального типа.
     """
     # Приводим initiator к строке, чтобы pghistory корректно сериализовал его в JSON
-    initiator_str = str(initiator) if initiator else None
+    initiator_id = str(initiator) if initiator else None
 
     # Оборачиваем в контекст pghistory для записи ID инициатора запроса
     # pghistory работает через ContextVars, которые нативно поддерживаются в asyncio
@@ -41,5 +41,5 @@ async def aexecute_with_audit[T](
     # "Следующий запрос в БД должен быть помечен этим юзером"
 
     # Контекст устанавливается для текущей асинхронной задачи
-    with pghistory_context(user=initiator_str):
+    with pghistory_context(user=initiator_id):
         return await async_func(*args, **kwargs)
