@@ -13,12 +13,13 @@ from apps.clients.selectors import get_client_by_id
 from apps.common.permissions import check_client_access, is_admin_access
 
 
-async def get_client_or_404(client_id: UUID) -> Client:
+async def get_client_or_404(client_id: UUID, is_deleted: bool = False) -> Client:
     """
     Проверяет существование клиента.
 
     Args:
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        is_deleted (bool): Флаг поиска по мягко удалённым клиентам.
 
     Raises:
         HttpError(404): Если клиент не найден.
@@ -27,7 +28,7 @@ async def get_client_or_404(client_id: UUID) -> Client:
         Client: Объект клиента.
     """
     # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id)
+    client = await get_client_by_id(client_id=client_id, is_deleted=is_deleted)
 
     # Проверяем существование клиента
     if client:
@@ -39,13 +40,14 @@ async def get_client_or_404(client_id: UUID) -> Client:
     return client
 
 
-async def get_client_for_admin_or_404(request: HttpRequest, client_id: UUID) -> Client:
+async def get_client_for_admin_or_404(request: HttpRequest, client_id: UUID, is_deleted: bool = False) -> Client:
     """
     Проверяет существование клиента и RBAC-права (система/админ/директор/главбух).
 
     Args:
         request (HttpRequest): Объект входящего запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        is_deleted (bool): Флаг поиска по мягко удалённым клиентам.
 
     Raises:
         HttpError(404): Если клиент не найден.
@@ -54,7 +56,7 @@ async def get_client_for_admin_or_404(request: HttpRequest, client_id: UUID) -> 
     Returns:
         Client: Объект клиента.
     """
-    client = await get_client_or_404(client_id)
+    client = await get_client_or_404(client_id=client_id, is_deleted=is_deleted)
 
     # Проверка прав (RBAC)
     await is_admin_access(request)

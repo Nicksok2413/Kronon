@@ -1,5 +1,5 @@
 from django.db import migrations
-from apps.users.constants import SYSTEM_USER_ID
+from apps.users.constants import SYSTEM_USER_EMAIL,  SYSTEM_USER_ID
 
 
 def create_system_user(apps, schema_editor):
@@ -8,7 +8,7 @@ def create_system_user(apps, schema_editor):
     User.objects.get_or_create(
         id=SYSTEM_USER_ID,
         defaults={
-            "email": "system@kronon.local",
+            "email": SYSTEM_USER_EMAIL,
             "first_name": "System",
             "last_name": "API",
             "role": "sys_admin",  # Полные права для обхода проверок

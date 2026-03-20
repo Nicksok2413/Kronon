@@ -1,7 +1,5 @@
 """
-Базовая абстрактная модель.
-
-Все бизнес-сущности наследуются от неё.
+Общие модели для всего проекта.
 """
 
 import uuid
@@ -67,7 +65,7 @@ class BaseModel(TimeStampedModel):
     # Кастомный менеджер для мягкого удаления (по умолчанию для всех моделей, наследующих BaseModel)
     objects = SoftDeleteManager()
 
-    # Стандартный менеджер для чистого поведения (опционально)
+    # Стандартный менеджер для чистого поведения
     all_objects = models.Manager()
 
     class Meta:
@@ -81,31 +79,40 @@ class BaseModel(TimeStampedModel):
         """Удобное свойство для проверки статуса."""
         return self.deleted_at is not None
 
+    def delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
+        """Синхронное мягкое удаление объекта (Soft Delete)."""
+        self.deleted_at = timezone.now()
+
+        # Используем update_fields для оптимизации SQL запроса
+        self.save(update_fields=["deleted_at", "updated_at"])
+        return 1, {self._meta.label: 1}
+
     async def adelete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
-        """
-        Мягкое удаление объекта.
-        """
-        now = timezone.now()
-        self.deleted_at = now
-        self.updated_at = now
+        """Асинхронное мягкое удаление объекта (Soft Delete)."""
+        self.deleted_at = timezone.now()
 
         # Используем update_fields для оптимизации SQL запроса
         await self.asave(using=using, update_fields=["deleted_at", "updated_at"])
         return 1, {self._meta.label: 1}
 
-    async def ahard_delete(self, **kwargs: Any) -> tuple[int, dict[str, int]]:
-        """
-        Физическое удаление объекта из БД.
-        """
-        return await super().adelete(**kwargs)
+    def restore(self) -> None:
+        """Синхронное восстановление удаленного объекта."""
+        self.deleted_at = None
+
+        # Используем update_fields для оптимизации SQL запроса
+        self.save(update_fields=["deleted_at", "updated_at"])
 
     async def arestore(self) -> None:
-        """
-        Восстановление удаленного объекта.
-        """
-        now = timezone.now()
+        """Асинхронное восстановление удаленного объекта."""
         self.deleted_at = None
-        self.updated_at = now
 
         # Используем update_fields для оптимизации SQL запроса
         await self.asave(update_fields=["deleted_at", "updated_at"])
+
+    def hard_delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
+        """Синхронное физическое удаление объекта из БД (Hard Delete)."""
+        return super().delete(using=using, keep_parents=keep_parents)
+
+    async def ahard_delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
+        """Асинхронное физическое удаление объекта из БД (Hard Delete)."""
+        return await super().adelete(using=using, keep_parents=keep_parents)

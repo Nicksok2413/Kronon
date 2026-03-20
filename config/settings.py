@@ -110,9 +110,10 @@ INSTALLED_APPS = [
     "pghistory",  # Журнал изменений (Audit Log)
     "rangefilter",  # Фильтр по дате для админки
     # --- Приложения проекта Kronon ---
+    "apps.audit",  # Аудит (History)
+    "apps.clients",  # Клиенты
     "apps.common",  # Общие утилиты
     "apps.users",  # Пользователи, Отделы, Авторизация
-    "apps.clients",  # Клиенты
 ]
 
 MIDDLEWARE = [
@@ -124,7 +125,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # Кастомный middleware для сбора контекста (расширяет pghistory.middleware.HistoryMiddleware)
-    "apps.common.middleware.KrononHistoryMiddleware",
+    "apps.audit.middleware.KrononHistoryMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",  # Middleware безопасности Axes
@@ -304,16 +305,26 @@ CELERY_TASK_TIME_LIMIT = 30 * 60  # Максимум 30 минут на зада
 
 
 # ==============================================================================
-# PGHISTORY CONFIGURATION
+# AUDIT (pghistory)
 # ==============================================================================
 
 # Денормализация контекста: храним контекст в JSONField прямо в таблице события, а не в центральной таблице
 # Это значительно повышает производительность и упрощает SQL-запросы (избавляет от JOIN)
 PGHISTORY_CONTEXT_FIELD = ContextJSONField()
 
-# Глобальная модель для админки событий всех моделей, чтобы видеть колонки user и url
-PGHISTORY_ADMIN_MODEL = "pghistory.MiddlewareEvents"
+# Модели событий по умолчанию неизменяемые (доступны только для добавления)
+PGHISTORY_APPEND_ONLY = True
 
+# Кастомная прокси-модель отображения полей контекста (расширяет pghistory.models.Events)
+PGHISTORY_ADMIN_MODEL = "audit.KrononEvents"
+
+# Кастомный класс админки (расширяет pghistory.admin.EventsAdmin)
+PGHISTORY_ADMIN_CLASS = "apps.audit.admin.KrononEventsAdmin"
+
+# Поля list_display админки
+PGHISTORY_ADMIN_LIST_DISPLAY = [
+    "pgh_created_at",
+]
 
 # ==============================================================================
 # INTERNATIONALIZATION
@@ -370,7 +381,7 @@ DEFAULT_FROM_EMAIL: str = env.str("DEFAULT_FROM_EMAIL", default="noreply@kronon.
 
 
 # ==============================================================================
-# BUSINESS LOGIC SETTINGS & VALIDATION
+# BUSINESS LOGIC SETTINGS
 # ==============================================================================
 
 # Максимальный размер загружаемого изображения (в МБ)

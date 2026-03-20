@@ -3,14 +3,17 @@
 """
 
 import uuid
+from typing import Any
 
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from pghistory import DeleteEvent, InsertEvent, UpdateEvent
+from pghistory import track as pghistory_track
 
-from apps.common.models import BaseModel
+from apps.common.models import BaseModel, TimeStampedModel
 from apps.common.utils.paths import RandomFileName
 from apps.common.validators import validate_image_size, validate_international_phone_number
 from apps.users.managers import CustomUserManager
@@ -81,18 +84,41 @@ class Department(BaseModel):
         return self.name
 
 
-class User(AbstractUser):
+@pghistory_track(
+    InsertEvent(),
+    UpdateEvent(),
+    DeleteEvent(),
+    meta={
+        "indexes": [
+            # Функциональный B-tree индекс для correlation_id
+            models.Index(
+                models.F("pgh_context__correlation_id"),
+                name="user_pgh_corr_idx",
+            ),
+        ],
+    },
+)
+class User(AbstractUser, TimeStampedModel):
     """
     Кастомная модель пользователя Kronon.
 
-    Наследуется от AbstractUser.
-    Использует email вместо username.
-    Содержит только данные авторизации и позицию.
+    Наследует стандартные поля Django Auth от AbstractUser и таймстэмпы, имеет логику мягкого удаления (Soft Delete).
+    Использует email вместо username и UUIDv7 в качестве первичного ключа (сортируемый).
+
+    Содержит данные авторизации, роль, отдел и контрактные данные.
     Личные данные вынесены в модель Profile.
     """
 
     # Переопределяем id
     id = models.UUIDField(primary_key=True, default=uuid.uuid7, editable=False, verbose_name="ID")
+
+    # Поле мягкого удаления
+    deleted_at = models.DateTimeField(
+        _("Дата удаления"),
+        null=True,
+        blank=True,
+        editable=False,
+    )
 
     # Убираем поле username
     username = None  # type: ignore
@@ -141,6 +167,9 @@ class User(AbstractUser):
     # Используем кастомный менеджер
     objects = CustomUserManager()  # type: ignore
 
+    # Стандартный менеджер для чистого поведения
+    all_objects = models.Manager()
+
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []  # Email и пароль обязательны по умолчанию
 
@@ -169,6 +198,38 @@ class User(AbstractUser):
                 return False  # Срок истек, но статус забыли поменять (формально уже не на испытательном)
             return True
         return False
+
+    # --- Для админки ---
+
+    @property
+    def is_deleted(self) -> bool:
+        """Удобное свойство для проверки статуса."""
+        return self.deleted_at is not None
+
+    def delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
+        """Мягкое удаление пользователя (Soft Delete)."""
+        self.deleted_at = timezone.now()
+
+        # Деактивируем (чтобы мягко удалённый юзер не мог залогиниться)
+        self.is_active = False
+
+        # Используем update_fields для оптимизации SQL запроса
+        self.save(update_fields=["deleted_at", "is_active", "updated_at"])
+        return 1, {self._meta.label: 1}
+
+    def restore(self) -> None:
+        """Восстановление удаленного пользователя."""
+        self.deleted_at = None
+
+        # Активируем
+        self.is_active = True
+
+        # Используем update_fields для оптимизации SQL запроса
+        self.save(update_fields=["deleted_at", "is_active", "updated_at"])
+
+    def hard_delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
+        """Физическое удаление пользователя из БД (Hard Delete)."""
+        return super().delete(using=using, keep_parents=keep_parents)
 
 
 class Profile(models.Model):

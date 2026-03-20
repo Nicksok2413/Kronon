@@ -25,72 +25,71 @@ from django.core.management.base import BaseCommand
 class Command(BaseCommand):
     help = "Управляет кастомными миграциями при пересоздании базы"
 
+    # --- Конфигурация для триграмм ---
+    TRIGRAM_DEPENDENCY = "('common', '0001_install_trigram')"
+    APPS_WITH_GIN = ["clients"]  # Приложения, где есть GinIndex
+
     # --- Конфигурация для системного пользователя ---
     USERS_APP = "users"
     SYSTEM_USER_MIGRATION = "0002_create_system_user.py"
     # Пути к файлу миграции создания системного пользователя и его временной копии
-    ORIGINAL_PATH = Path(f"apps/{USERS_APP}/migrations/{SYSTEM_USER_MIGRATION}")
-    BACKUP_PATH = Path(f"apps/{USERS_APP}/migrations/{SYSTEM_USER_MIGRATION}.bak")
-
-    # --- Конфигурация для триграмм ---
-    TRIGRAM_DEPENDENCY = "('common', '0001_install_trigram')"
-    APPS_WITH_GIN = ["clients"]  # Приложения, где есть GinIndex
+    SYSTEM_USER_MIGRATION_PATH = Path(f"apps/{USERS_APP}/migrations/{SYSTEM_USER_MIGRATION}")
+    SYSTEM_USER_MIGRATION_BACKUP_PATH = Path(f"apps/{USERS_APP}/migrations/{SYSTEM_USER_MIGRATION}.bak")
 
     def add_arguments(self, parser: CommandParser) -> None:
         parser.add_argument(
             "--hide",
             action="store_true",
-            help="Спрятать 0002_create_system_user.py перед makemigrations",
+            help="Спрятать кастомные миграции перед makemigrations",
         )
         parser.add_argument(
             "--repair",
             action="store_true",
-            help="Вернуть 0002_create_system_user.py и починить связи",
+            help="Вернуть кастомные миграции и починить связи",
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
         if options["hide"]:
-            # Прячем 0002_create_system_user.py
-            self.hide_system_user_migration()
+            # Прячем кастомные миграции
+            self.hide_custom_migrations()
         elif options["repair"]:
-            # Восстанавливаем 0002_create_system_user.py
-            self.restore_system_user_migrations()
+            # Восстанавливаем кастомные миграции
+            self.restore_custom_migrations()
             # Привязываем 0002_create_system_user к 0001_initial
             self.fix_users_migrations()
             # Привязываем 0001_initial других приложений к 0001_install_trigram
             self.add_trigram_dependencies()
 
-    def hide_system_user_migration(self) -> None:
+    def hide_custom_migrations(self) -> None:
         """
-        'Прячет' файл миграции создания системного пользователя.
-        (Переименовывает 0002_create_system_user.py в 0002_create_system_user.py.bak)
+        'Прячет' файлы кастомных миграции.
+        (Переименовывает *.py в *.py.bak)
         """
-        if self.ORIGINAL_PATH.exists():
-            self.ORIGINAL_PATH.rename(self.BACKUP_PATH)
+        if self.SYSTEM_USER_MIGRATION_PATH.exists():
+            self.SYSTEM_USER_MIGRATION_PATH.rename(self.SYSTEM_USER_MIGRATION_BACKUP_PATH)
             self.stdout.write(self.style.WARNING(f"[-] {self.SYSTEM_USER_MIGRATION} спрятан во временный файл .bak"))
 
-    def restore_system_user_migrations(self) -> None:
+    def restore_custom_migrations(self) -> None:
         """
-        'Возвращаем' файл миграции создания системного пользователя на место, если он был спрятан.
-        (Переименовывает 0002_create_system_user.py.bak в 0002_create_system_user.py)
+        'Возвращает' файлы кастомных миграции, если они были спрятаны.
+        (Переименовывает *.py.bak в *.py)
         """
-        if self.BACKUP_PATH.exists():
-            self.BACKUP_PATH.rename(self.ORIGINAL_PATH)
+        if self.SYSTEM_USER_MIGRATION_BACKUP_PATH.exists():
+            self.SYSTEM_USER_MIGRATION_BACKUP_PATH.rename(self.SYSTEM_USER_MIGRATION_PATH)
             self.stdout.write(self.style.SUCCESS(f"[+] {self.SYSTEM_USER_MIGRATION} возвращен на место"))
 
-        if not self.ORIGINAL_PATH.exists():
+        if not self.SYSTEM_USER_MIGRATION_PATH.exists():
             self.stdout.write(self.style.ERROR(f"❌ Файл {self.SYSTEM_USER_MIGRATION} не найден!"))
 
     def fix_users_migrations(self) -> None:
         """Привязывает 0002_create_system_user к 0001_initial."""
-
-        content = self.ORIGINAL_PATH.read_text(encoding="utf-8")
+        content = self.SYSTEM_USER_MIGRATION_PATH.read_text(encoding="utf-8")
 
         # Заменяем [] на  [("users", "0001_initial"),]
         pattern = r"dependencies\s*=\s*\[.*?\]"
         replacement = f"dependencies = [('{self.USERS_APP}', '0001_initial'),]"
         new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-        self.ORIGINAL_PATH.write_text(new_content, encoding="utf-8")
+        self.SYSTEM_USER_MIGRATION_PATH.write_text(new_content, encoding="utf-8")
         self.stdout.write(self.style.SUCCESS(f"[+] {self.SYSTEM_USER_MIGRATION}: привязан к 0001_initial"))
 
     def add_trigram_dependencies(self) -> None:

@@ -40,7 +40,7 @@ class UserFactory(factory.django.DjangoModelFactory):
     department: str = factory.SubFactory(DepartmentFactory)
 
     is_active: bool = True
-    is_staff: bool = True  # Чтобы пускало в админку
+    is_staff: bool = False  # Чтобы пускало в админку
 
 
 class ClientFactory(factory.django.DjangoModelFactory):

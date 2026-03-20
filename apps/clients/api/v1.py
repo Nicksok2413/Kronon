@@ -1,11 +1,10 @@
 """
 API Endpoints для Клиентов (v1).
 
-Предоставляет методы для чтения (GET), создания (POST), обновления (PATCH)
-и удаления (DELETE) клиентов. А так же историю изменения клиентов (GET).
+Предоставляет методы для чтения (GET), создания (POST), обновления (PATCH) и удаления (DELETE) клиентов.
 """
 
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from django.http import HttpRequest
@@ -19,9 +18,8 @@ from apps.clients.guards import get_client_for_admin_or_404, get_client_for_edit
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
-from apps.clients.schemas.history import ClientHistoryOut
-from apps.clients.selectors import get_client_history_queryset, get_client_queryset
-from apps.clients.services import create_client, delete_client, update_client
+from apps.clients.selectors import get_client_queryset
+from apps.clients.services import create_client, delete_client, restore_client, update_client
 from apps.common.auth import AsyncApiKeyAuth, get_request_initiator
 from apps.common.managers import SoftDeleteQuerySet
 from apps.common.permissions import is_admin_access
@@ -42,7 +40,7 @@ async def list_clients(
     Доступно системе, администраторам и ответственным лицам.
 
     Args:
-        request (HttpRequest): Объект входящего запроса.
+        request (HttpRequest): Объект входящего HTTP запроса.
         filters (ClientFilter): Параметры фильтрации из Query Params.
 
     Raises:
@@ -80,7 +78,7 @@ async def get_client(request: HttpRequest, client_id: UUID) -> Client:
     Доступно системе, администраторам и ответственным лицам.
 
     Args:
-        request (HttpRequest): Объект входящего запроса.
+        request (HttpRequest): Объект входящего HTTP запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
@@ -110,7 +108,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     Доступно только системе и администраторам.
 
     Args:
-        request (HttpRequest): Объект входящего запроса.
+        request (HttpRequest): Объект входящего HTTP запроса.
         payload (ClientCreate): Данные для создания.
 
     Raises:
@@ -145,7 +143,7 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
     Доступно системе, администраторам и ответственным лицам.
 
     Args:
-        request (HttpRequest): Объект входящего запроса.
+        request (HttpRequest): Объект входящего HTTP запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
         payload (ClientUpdate): Данные для обновления.
 
@@ -157,7 +155,7 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
         HttpError(422): Ошибка структуры передаваемых данных.
 
     Returns:
-        int, Client: Обновленный объект клиента.
+        Client: Обновленный объект клиента.
     """
     # Получаем инициатора запроса (id для аудита, str для логов)
     initiator_id, initiator_str = await get_request_initiator(request)
@@ -183,7 +181,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     Доступно только системе и администраторам.
 
     Args:
-        request (HttpRequest): Объект входящего запроса.
+        request (HttpRequest): Объект входящего HTTP запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
@@ -209,43 +207,34 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     return 204, None
 
 
-@router.get("/{client_id}/history", response={200: list[ClientHistoryOut], **STANDARD_ERRORS})
-async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict[str, Any]]:
+@router.patch("/{client_id}/restore", response={200: ClientOut, **STANDARD_ERRORS})
+async def restore_client_endpoint(request: HttpRequest, client_id: UUID) -> Client:
     """
-    Получить журнал аудита (историю изменений) клиента.
-
-    Возвращает список событий с диффами (разницами изменений) и контекстом операции.
+    Восстановление клиента после мягкого удаления.
     Доступно только системе и администраторам.
 
     Args:
-        request (HttpRequest): Объект входящего запроса.
+        request (HttpRequest): Объект входящего HTTP запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
 
     Raises:
         HttpError(401): Токен отсутствует или недействителен.
-        HttpError(403): При попытке доступа без прав администратора.
+        HttpError(403): Нет прав на редактирование данного клиента.
         HttpError(404): Если клиент не найден.
 
     Returns:
-        list[dict[str, Any]]: Список событий изменения клиента.
+        Client: Восстановленный объект клиента.
     """
-    # Получаем инициатора запроса (id для аудита здесь не нужен, str для логов)
-    _, initiator_str = await get_request_initiator(request)
+    # Получаем инициатора запроса (id для аудита, str для логов)
+    initiator_id, initiator_str = await get_request_initiator(request)
 
-    log.info(f"Initiator '{initiator_str}' requested history for client {client_id}.")
+    log.info(f"Initiator '{initiator_str}' attempts to restore client {client_id}.")
 
-    # Проверяем права (RBAC)
-    await is_admin_access(request)
+    # Проверяем существование клиента и права (RBAC)
+    client = await get_client_for_admin_or_404(request=request, client_id=client_id, is_deleted=True)
 
-    # Проверяем существование клиента (сам объект не нужен, поэтому .aexists для скорости)
-    # TODO: можно искать также по удаленным клиентам через менеджер .all_objects
-    client_exists = await Client.objects.filter(id=client_id).aexists()
+    # Вызываем сервис восстановления
+    restored_client = await restore_client(client=client, initiator=initiator_id)
 
-    if not client_exists:
-        raise HttpError(status_code=404, message="Клиент не найден")
-
-    # Получаем данные через селектор
-    history_data = await get_client_history_queryset(client_id=client_id)
-
-    # Возвращаем данные (Ninja сам преобразует словари в ClientHistoryOut)
-    return history_data
+    # Возвращаем восстановленного клиента
+    return restored_client

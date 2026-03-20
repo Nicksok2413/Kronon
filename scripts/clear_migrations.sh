@@ -4,7 +4,7 @@
 # Скрипт для безопасного удаления всех файлов миграций
 # ==============================================================================
 # Массив с именами файлов, которые не нужно удалять
-EXCLUDE_FILES=("__init__.py" "0001_install_trigram.py" "0002_create_system_user.py")
+EXCLUDE_FILES=("__init__.py" "0001_install_trigram.py" "0002_add_index_to_correlation_id.py" "0002_create_system_user.py")
 
 # Преобразуем массив в условия для find
 FIND_EXCLUDE=""

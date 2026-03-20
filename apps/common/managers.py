@@ -61,9 +61,24 @@ class SoftDeleteQuerySet(models.QuerySet[_M]):
         # Безопасный отказ: если OLP не настроен для модели — скрываем всё (пустой список)
         return self.none()
 
+    def delete(self) -> tuple[int, dict[str, int]]:
+        """
+        Синхронный Soft Delete для Bulk операций в админке.
+        Вместо физического удаления проставляет текущее время в `deleted_at` и `updated_at`.
+
+        Returns:
+            tuple[int, dict[str, int]]: (Количество удаленных записей, Словарь по типам объектов).
+            Формат совпадает со стандартным Django delete().
+        """
+        now = timezone.now()
+        updated_count = self.update(deleted_at=now, updated_at=now)
+
+        # Эмулируем возвращаемое значение стандартного delete()
+        return updated_count, {self.model._meta.label: updated_count}
+
     async def adelete(self) -> tuple[int, dict[str, int]]:
         """
-        Переопределение стандартного метода удаления (Bulk Delete).
+        Асинхронный Soft Delete.
         Вместо физического удаления проставляет текущее время в `deleted_at` и `updated_at`.
 
         Returns:
@@ -76,22 +91,41 @@ class SoftDeleteQuerySet(models.QuerySet[_M]):
         # Эмулируем возвращаемое значение стандартного delete()
         return updated_count, {self.model._meta.label: updated_count}
 
+    def hard_delete(self) -> tuple[int, dict[str, int]]:
+        """
+        Синхронное физическое удаление записей из базы данных (навсегда).
+
+        Returns:
+            tuple[int, dict[str, int]]: (Количество удаленных записей, Словарь по типам объектов).
+        """
+        return super().delete()
+
     async def ahard_delete(self) -> tuple[int, dict[str, int]]:
         """
-        Физическое удаление записей из базы данных (навсегда).
-        Использует стандартный метод delete() родительского класса.
+        Асинхронное физическое удаление записей из базы данных (навсегда).
+
+        Returns:
+            tuple[int, dict[str, int]]: (Количество удаленных записей, Словарь по типам объектов).
         """
         return await super().adelete()
 
-    async def arestore(self) -> int:
+    def restore(self) -> int:
         """
-        Восстановление удаленных записей.
+        Синхронное восстановление удаленных записей.
 
         Returns:
             int: Количество восстановленных записей.
         """
-        now = timezone.now()
-        return await self.aupdate(deleted_at=None, updated_at=now)
+        return self.update(deleted_at=None, updated_at=timezone.now())
+
+    async def arestore(self) -> int:
+        """
+        Асинхронное восстановление удаленных записей.
+
+        Returns:
+            int: Количество восстановленных записей.
+        """
+        return await self.aupdate(deleted_at=None, updated_at=timezone.now())
 
 
 # Создаем класс менеджера через from_queryset

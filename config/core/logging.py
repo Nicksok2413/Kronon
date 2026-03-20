@@ -9,6 +9,13 @@ from typing import Protocol
 
 from loguru import logger
 
+LOG_FORMAT = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+    "<level>{level: <4}</level> | "
+    "ID: <yellow>{extra[correlation_id]}</yellow> | "
+    "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+)
+
 
 # Определяем протокол (контракт), которому должен соответствовать объект настроек
 class LoguruSettingsProtocol(Protocol):
@@ -66,17 +73,19 @@ def setup_loguru(settings: LoguruSettingsProtocol) -> None:
     logger.add(
         sys.stderr,
         level=log_level,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-        "<level>{level: <8}</level> | "
-        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+        format=LOG_FORMAT,
         colorize=True,
     )
+
+    # По умолчанию привязываем пустой ID 'correlation_id', чтобы Loguru не ругался на отсутствие ключа
+    logger.configure(extra={"correlation_id": "-"})
 
     # Вывод в файл (ротация + сжатие)
     try:
         logger.add(
             logs_dir / "kronon.log",
             level=log_level,
+            format=LOG_FORMAT,
             rotation=f"{settings.LOGFILE_SIZE} MB",
             retention=settings.LOGFILE_COUNT,
             compression="zip",

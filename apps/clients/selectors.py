@@ -5,23 +5,25 @@
 Используют асинхронный подход для неблокирующего ввода-вывода.
 """
 
-from typing import Any
 from uuid import UUID
 
-import pghistory.models
 from loguru import logger as log
 
 from apps.clients.models import Client
 from apps.common.managers import SoftDeleteQuerySet
 
 
-def _get_base_client_queryset() -> SoftDeleteQuerySet[Client]:
+def _get_base_client_queryset(is_deleted: bool = False) -> SoftDeleteQuerySet[Client]:
     """
     Технический метод для оптимизации и сортировки базового QuerySet для списка клиентов.
 
+    Если передан флаг is_deleted=True, формирует QuerySet по мягко удалённым клиентам.
     Применяет `select_related` для всех связанных полей, необходимых в API,
     чтобы избежать проблемы N+1 запросов.
     Гарантирует сортировку по ID (в обратном порядке).
+
+    Args:
+        is_deleted (bool): Флаг формирования QuerySet по мягко удалённым клиентам.
 
     Returns:
         SoftDeleteQuerySet[Client]: Оптимизированный базовый QuerySet.
@@ -29,16 +31,17 @@ def _get_base_client_queryset() -> SoftDeleteQuerySet[Client]:
     # Логируем на уровне DEBUG, так как это частая операция
     log.debug("Building base client queryset with select_related")
 
+    # Если is_deleted=True, формируем по мягко удалённым клиентам, иначе по активным
+    search_clients = Client.objects.deleted() if is_deleted else Client.objects.active()
+
     return (
-        Client.objects.active()
-        .select_related(
+        search_clients.select_related(
             "department",
             "accountant",
             "primary_accountant",
             "payroll_accountant",
             "hr_specialist",
-        )  # Оптимизация N+1
-        .order_by("-id")  # Гарантируем сортировку
+        ).order_by("-id")  # Оптимизация N+1  # Гарантируем сортировку
     )
 
 
@@ -58,7 +61,7 @@ def get_client_queryset(user_id: UUID, is_admin: bool) -> SoftDeleteQuerySet[Cli
     return _get_base_client_queryset().for_user(user_id, is_admin)  # OLP-фильтрация
 
 
-async def get_client_by_id(client_id: UUID) -> Client | None:
+async def get_client_by_id(client_id: UUID, is_deleted: bool = False) -> Client | None:
     """
     Асинхронно получает детальную информацию о клиенте по ID.
 
@@ -66,13 +69,14 @@ async def get_client_by_id(client_id: UUID) -> Client | None:
 
     Args:
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        is_deleted (bool): Флаг поиска по мягко удалённым клиентам.
 
     Returns:
         Client | None: Объект клиента или None, если не найден/удален.
     """
     try:
         # Оптимизированный базовый QuerySet
-        queryset = _get_base_client_queryset()
+        queryset = _get_base_client_queryset(is_deleted)
 
         # .afirst() вместо .aget(), чтобы избежать исключения DoesNotExist и вернуть None
         return await queryset.filter(id=client_id).afirst()
@@ -81,61 +85,3 @@ async def get_client_by_id(client_id: UUID) -> Client | None:
         log.error(f"DB Error while fetching client. ID: {client_id}: {exc}")
         # Глобальный хендлер превратит это в 500
         raise
-
-
-async def get_client_history_queryset(client_id: UUID) -> list[dict[str, Any]]:
-    """
-    Получает агрегированную историю изменений клиента с вычисленными диффами.
-
-    Использует глобальную модель `pghistory.models.Events` для доступа к `pgh_diff`.
-
-    Args:
-        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
-
-    Returns:
-        list[dict[str, Any]]: Список словарей событий, готовых для сериализации в ClientHistoryOut.
-    """
-    # Используем глобальную модель Events, фильтруем вручную по модели и ID
-    # tracks() работает с объектами, а у нас ID + async, проще фильтровать сырым образом
-
-    events_queryset = (
-        pghistory.models.Events.objects.filter(
-            pgh_obj_model="clients.Client",
-            pgh_obj_id=client_id,
-        )
-        # Берем только нужные поля
-        .only(
-            "pgh_id",
-            "pgh_created_at",
-            "pgh_label",
-            "pgh_diff",
-            "pgh_context",
-            "pgh_data",
-        )
-        .order_by("-pgh_created_at")
-    )
-
-    events_data = []
-
-    # Итерируемся асинхронно
-    async for event in events_queryset:
-        # Собираем контекст
-        context_data = event.pgh_context or {}  # pgh_context - JSON поле с денормализованным контекстом
-
-        # Собираем словарь, который Pydantic превратит в схему ClientSnapshot
-        snapshot_data = event.pgh_data or {}  # pgh_data - JSON поле со снэпшотом модели
-
-        # Собираем полный словарь событий
-        events_data.append(
-            {
-                "pgh_id": event.pgh_id,
-                "pgh_created_at": event.pgh_created_at,
-                "pgh_label": event.pgh_label,
-                "pgh_diff": event.pgh_diff,
-                "pgh_context": context_data,
-                "snapshot": snapshot_data,
-            }
-        )
-
-    # Возвращаем список словарей событий
-    return events_data
