@@ -7,11 +7,11 @@
 from uuid import UUID
 
 from loguru import logger as log
-from pghistory import context as pghistory_context
 
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientUpdate
 from apps.clients.selectors import get_client_by_id
+from apps.common.utils.audit import aexecute_with_audit
 
 
 async def create_client(data: ClientCreate, initiator: UUID | str | None = None) -> Client:
@@ -42,17 +42,11 @@ async def create_client(data: ClientCreate, initiator: UUID | str | None = None)
         contact_info_json = data.contact_info.model_dump(mode="json", exclude_none=True)
 
         # Добавляем обработанный JSON в payload
+        # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
         payload["contact_info"] = contact_info_json
 
-        # Оборачиваем в контекст pghistory для записи автора
-        # pghistory работает через contextvars, это безопасно в async
-        # Это операция в памяти Python (установка переменной контекста)
-        # Она не делает запросов в БД в момент входа (__enter__), а просто говорит:
-        # "Следующий запрос в БД должен быть помечен этим юзером"
-        with pghistory_context(user=initiator):
-            # Создаем объект
-            # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
-            client = await Client.objects.acreate(**payload)
+        # Выполняем асинхронный acreate() через хелпер с аудитом
+        client = await aexecute_with_audit(initiator, Client.objects.acreate, **payload)
 
         log.info(f"Client created. ID: {client.id}")
 
@@ -115,10 +109,8 @@ async def update_client(client: Client, data: ClientUpdate, initiator: UUID | st
             client.patch_contact_data(contact_info_update)
 
         # Сохраняем изменения
-        # Оборачиваем в контекст pghistory для записи автора
-        # pghistory работает через contextvars, это безопасно в async
-        with pghistory_context(user=initiator):
-            await client.asave()
+        # Выполняем асинхронный .asave() через хелпер с аудитом
+        await aexecute_with_audit(initiator, client.asave)
 
         log.debug(f"Client updated: {client.id}")
 
@@ -152,12 +144,9 @@ async def delete_client(client: Client, initiator: UUID | str | None = None) -> 
     log.info(f"Start deleting client {client.id} (Soft Delete).")
 
     try:
-        # Оборачиваем в контекст pghistory для записи автора
-        # pghistory работает через contextvars, это безопасно в async
-        with pghistory_context(user=initiator):
-            # Soft delete - UPDATE запрос (ставит текущее время в deleted_at)
-            await client.adelete()
-
+        # Выполняем кастомный асинхронный .adelete() через хелпер с аудитом
+        # Soft delete - UPDATE запрос (ставит текущее время в deleted_at)
+        await aexecute_with_audit(initiator, client.adelete)
         log.info(f"Client {client.id} marked as deleted.")
 
     except Exception as exc:
@@ -182,12 +171,9 @@ async def restore_client(client: Client, initiator: UUID | str | None = None) ->
     log.info(f"Start restoring client {client.id}.")
 
     try:
-        # Оборачиваем в контекст pghistory для записи автора
-        # pghistory работает через contextvars, это безопасно в async
-        with pghistory_context(user=initiator):
-            # Restore - UPDATE запрос (ставит Null в deleted_at)
-            await client.arestore()
-
+        # Выполняем кастомный асинхронный .arestore() через хелпер с аудитом
+        # Restore - UPDATE запрос (ставит Null в deleted_at)
+        await aexecute_with_audit(initiator, client.arestore)
         log.info(f"Client {client.id} restored.")
 
         # Делаем рефреш через селектор с подгрузкой связей (актуальные связи и updated_at) для корректного ответа API
