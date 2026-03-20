@@ -24,35 +24,23 @@ class TestClientHistory(BaseAPITest):
 
     endpoint: str = "/api/audit/clients/"
 
-    async def test_history_logging(self, auth_client: AsyncClient) -> None:
+    async def test_history_logging(self, admin_client: AsyncClient) -> None:
         """Проверка эндпойнта получения списка событий изменения клиента."""
         # Создаем клиента
         client = await sync_to_async(ClientFactory)()
 
-        # Формируем эндпойнт
-        endpoint: str = f"{self.endpoint}{client.id}"
-
         # Делаем изменение через API
         patch_data = {"name": "Updated Name"}
 
-        # Обновляем клиента
-        patch_response = await auth_client.patch(
-            f"/api/clients/{client.id}", data=patch_data, content_type="application/json"
-        )
+        # Обновляем клиента от имени админа
+        await admin_client.patch(f"/api/clients/{client.id}", data=patch_data, content_type="application/json")
 
-        assert patch_response.status_code == 200
-
-        # Проверяем историю
+        # Запрашиваем историю от имени админа
         start = perf_counter()
-        history = await auth_client.get(endpoint)
+        history = await admin_client.get(f"{self.endpoint}{client.id}")
         elapsed_time = perf_counter() - start
 
-        data = history.json()
-        update_event = next(event for event in data if event["pgh_label"] == "update")
-
-        # Проверки
-        assert len(data) >= 1
-        assert update_event["pgh_diff"]["name"][1] == "Updated Name"
+        # --- Проверки ---
 
         # Статус код
         await self.assert_status(response=history, expected_status=200)
@@ -60,19 +48,23 @@ class TestClientHistory(BaseAPITest):
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
+        data = history.json()
+
         # Валидация схемы
         await self.validate_schema(data=data, schema=ClientHistoryOut, many=True)
 
-    async def test_history_initiator_sync(self, auth_client, api_user):
-        """Проверка: в записи истории лежит ID юзера, который изменил клиента."""
+        update_event = next(event for event in data if event["pgh_label"] == "update")
+        assert len(data) >= 1
+        assert update_event["pgh_diff"]["name"][1] == "Updated Name"
+
+    async def test_history_initiator_sync(self, auth_client: AsyncClient, api_user: Any):
+        """Проверка записи ID пользователя, изменившего клиента."""
         client = await sync_to_async(ClientFactory)(accountant=api_user)
 
         # Обновляем имя
-        await auth_client.patch(
-            f"{self.endpoint}{client.id}", data={"name": "New Name"}, content_type="application/json"
-        )
+        await auth_client.patch(f"/api/clients/{client.id}", data={"name": "New Name"}, content_type="application/json")
 
-        # Проверяем историю (используя pghistory модели или селектор)
+        # Проверяем историю используя  селектор
         from apps.audit.selectors import get_client_history_queryset
 
         history = await get_client_history_queryset(client.id)
@@ -80,7 +72,7 @@ class TestClientHistory(BaseAPITest):
         # Убеждаемся, что последний автор — наш api_user.id
         assert history[0]["pgh_context"]["user"] == str(api_user.id)
 
-    async def test_system_api_audit_logs_system_uuid(self, system_client):
+    async def test_system_api_audit_logs_system_uuid(self, system_client: AsyncClient):
         """Проверка: системный запрос записывает SYSTEM_USER_ID в историю."""
         payload: dict[str, Any] = {
             "name": "System Corp",
@@ -91,7 +83,7 @@ class TestClientHistory(BaseAPITest):
         }
 
         # Создаем клиента через систему
-        response = await system_client.post(self.endpoint, data=payload, content_type="application/json")
+        response = await system_client.post("/api/clients/", data=payload, content_type="application/json")
         assert response.status_code == 201
         client_id = response.json()["id"]
 
@@ -106,13 +98,44 @@ class TestClientHistory(BaseAPITest):
         # Убеждаемся, что pghistory зафиксировала SYSTEM_USER_ID
         assert str(last_event["pgh_context"]["user"]) == str(SYSTEM_USER_ID)
 
-    async def test_initiator_logging_with_details(self, system_client, settings):
+    async def test_initiator_logging_with_details(self, system_client: AsyncClient, settings):
         """Проверка: лог инициатора запроса к API содержит User-Agent, если флаг включен."""
         settings.LOG_DETAILED_AUDIT = True
 
-        # Делаем запрос с кастомным User-Agent
-        headers = {"HTTP_USER_AGENT": "Test-Bot/1.0"}
-        response = await system_client.get(self.endpoint, **headers)
+        # Создаем клиента
+        client = await sync_to_async(ClientFactory)()
 
-        assert response.status_code == 200
-        # В реальном логе (stderr) мы бы увидели "[IP: ..., UA: Test-Bot/1.0]"
+        # Делаем изменение через API
+        patch_data = {"name": "Updated Name"}
+
+        # Обновляем клиента от имени системного юзера с кастомным User-Agent
+        test_user_agent = "Test-System/1.0"
+        headers = {"HTTP_USER_AGENT": test_user_agent}
+        await system_client.patch(
+            f"/api/clients/{client.id}",
+            data=patch_data,
+            content_type="application/json",
+            **headers,
+        )
+
+        # Запрашиваем историю от имени системного юзера
+        start = perf_counter()
+        history = await system_client.get(f"{self.endpoint}{client.id}")
+        elapsed_time = perf_counter() - start
+
+        # --- Проверки ---
+
+        # Статус код
+        await self.assert_status(response=history, expected_status=200)
+
+        # Время ответа API
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+
+        data = history.json()
+
+        # Валидация схемы
+        await self.validate_schema(data=data, schema=ClientHistoryOut, many=True)
+
+        update_event = next(event for event in data if event["pgh_label"] == "update")
+        assert len(data) >= 1
+        assert update_event["user_agent"] == test_user_agent
