@@ -13,7 +13,7 @@ from django.core.handlers.asgi import ASGIRequest as DjangoASGIRequest
 from django.core.handlers.wsgi import WSGIRequest as DjangoWSGIRequest
 from django.http import HttpRequest, HttpResponse
 from django.http.response import HttpResponseBase
-from jwt import InvalidTokenError, decode
+from jwt import PyJWTError, decode
 from loguru import logger
 from pghistory import config as pghistory_config
 from pghistory import context as pghistory_context
@@ -37,7 +37,8 @@ class KrononHistoryMiddleware:
 
     def __init__(self, get_response: Any):
         self.get_response = get_response
-        # Флаг для Django, что middleware поддерживает async
+
+        # Флаги для Django, что middleware поддерживает async
         self.async_capable = True
         self.sync_capable = False
 
@@ -68,7 +69,11 @@ class KrononHistoryMiddleware:
         # Проверка на Soft Delete (если админ удалил юзера - мгновенное разлогинивание)
         if user.is_authenticated and getattr(user, "is_deleted", False):
             logger.warning(f"Force logout for deleted user: {user}")
-            await alogout(request)  # Нативный асинхронный логаут
+
+            # Нативный асинхронный логаут
+            await alogout(request)
+
+            # Возвращаем простой HTTP ответ вместо ошибки
             return HttpResponse("Account deactivated", status=401)
 
         # --- Sentry Tags (данные приклеятся ко всем ошибкам, возникшим в рамках запроса) ---
@@ -175,7 +180,7 @@ class KrononHistoryMiddleware:
             try:
                 # Декодируем токен без проверки подписи (это мгновенно)
                 # Валидацию подписи всё равно сделает Ninja позже
-                payload = decode(token, options={"verify_signature": False})
+                payload = decode(token, options={"verify_signature": False}, algorithms=["HS256"])
 
                 # Явно приводим динамический ключ из настроек к строке для mypy
                 claim_key = cast(str, settings.NINJA_JWT.get("USER_ID_CLAIM", "user_id"))
@@ -187,10 +192,10 @@ class KrononHistoryMiddleware:
                     # Используем асинхронный .afirst для email
                     user_email = await User.objects.filter(id=token_user_id).values_list("email", flat=True).afirst()
 
-            except InvalidTokenError:
+            except PyJWTError as exc:
                 # Токен недействителен, просрочен или поврежден
-                # Игнорируем ошибку, Ninja JWT отловит это позже и вернет 401
-                pass
+                # Логируем ошибку, Ninja JWT отловит это позже и вернет 401
+                logger.debug(f"JWT parsing failed in middleware: {exc}")
 
         # Проверяем Session Auth (Админка Django) - если нет валидного JWT
         if not user_id and request_user.is_authenticated:
