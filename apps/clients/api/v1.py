@@ -129,8 +129,11 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     # Проверяем права (RBAC)
     await is_admin_access(request)
 
+    # Достаем контекст, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
+
     # Вызываем сервис создания
-    client = await create_client(data=payload, initiator=initiator_id)
+    client = await create_client(data=payload, audit_context=audit_context, initiator=initiator_id)
 
     # Возвращаем созданного клиента
     return 201, client
@@ -165,8 +168,13 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
     # Проверяем существование клиента и права (RBAC + OLP)
     client = await get_client_for_edit_or_404(request=request, client_id=client_id)
 
+    # Достаем контекст, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
+
     # Вызываем сервис обновления
-    updated_client = await update_client(client=client, data=payload, initiator=initiator_id)
+    updated_client = await update_client(
+        client=client, data=payload, audit_context=audit_context, initiator=initiator_id
+    )
 
     # Возвращаем обновленного клиента
     return updated_client
@@ -200,8 +208,11 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     # Проверяем существование клиента и права (RBAC)
     client = await get_client_for_admin_or_404(request=request, client_id=client_id)
 
+    # Достаем контекст, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
+
     # Вызываем сервис удаления
-    await delete_client(client=client, initiator=initiator_id)
+    await delete_client(client=client, audit_context=audit_context, initiator=initiator_id)
 
     # Возвращаем код ответа
     return 204, None
@@ -233,8 +244,11 @@ async def restore_client_endpoint(request: HttpRequest, client_id: UUID) -> Clie
     # Проверяем существование клиента и права (RBAC)
     client = await get_client_for_admin_or_404(request=request, client_id=client_id, is_deleted=True)
 
+    # Достаем контекст, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
+
     # Вызываем сервис восстановления
-    restored_client = await restore_client(client=client, initiator=initiator_id)
+    restored_client = await restore_client(client=client, audit_context=audit_context, initiator=initiator_id)
 
     # Возвращаем восстановленного клиента
     return restored_client

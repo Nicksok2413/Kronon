@@ -145,11 +145,16 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
         # Извлекаем или генерируем Correlation ID
         correlation_id = self._get_correlation_id(request)
 
-        # Склеиваем Correlation ID во все системы (Sentry - Loguru - pghistory)
+        # Добавляем тэг correlation_id в Sentry
         set_tag("correlation_id", correlation_id)
 
+        # Достаем контекст, собранный в Middleware
+        audit_context = getattr(request, "audit_context", {})
+        # Переопределяем сервис для админки
+        audit_context["service"] = "Admin"
+
         with logger.contextualize(correlation_id=correlation_id):
-            with pghistory_context(correlation_id=correlation_id, service="Admin"):
+            with pghistory_context(**audit_context):
                 return func(*args, **kwargs)
 
     # --- Object manipulations ---

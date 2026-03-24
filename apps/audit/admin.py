@@ -77,6 +77,10 @@ class KrononEventsAdmin(EventsAdmin):
         """Отображает сервис - источник изменения объекта и детали (задачу или команду)."""
         service = obj.service
 
+        if service == "Admin":
+            return "🛠️ Admin"
+        if service == "System":
+            return "🤖 System"
         if service == "Celery":
             return f"⚙️ {obj.celery_task_name}"
         if service == "CLI":
