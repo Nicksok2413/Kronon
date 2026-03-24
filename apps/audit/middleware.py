@@ -1,198 +1,465 @@
 """
-Custom middleware for collecting pghistory context.
+Custom middleware for collecting pghistory context and security checks.
+Hybrid Asynchronous/Synchronous implementation based on Django 6.0 docs.
 """
 
 import uuid
 from typing import Any, cast
 
-from asgiref.sync import async_to_sync
+from asgiref.sync import iscoroutinefunction
 from django.conf import settings
-from django.contrib.auth import alogout
+from django.contrib.auth import alogout, logout
+from django.contrib.auth.models import AnonymousUser
+from django.core.handlers.asgi import ASGIRequest as DjangoASGIRequest
+from django.core.handlers.wsgi import WSGIRequest as DjangoWSGIRequest
 from django.http import HttpRequest, HttpResponse
+from django.http.response import HttpResponseBase
+from django.utils.decorators import sync_and_async_middleware
+from jwt import PyJWTError, decode
 from loguru import logger
-from pghistory.middleware import HistoryMiddleware
+from pghistory.middleware import ASGIRequest, WSGIRequest
 from sentry_sdk import set_tag, set_user
 
 from apps.users.constants import SYSTEM_USER_EMAIL, SYSTEM_USER_ID
+from apps.users.models import User
+
+# ==============================================================================
+# DRY HELPERS (общие вспомогательные функции)
+# ==============================================================================
 
 
-class KrononHistoryMiddleware(HistoryMiddleware):
+def _get_correlation_id(request: HttpRequest) -> str:
     """
-    Единая точка входа для аудита, трассировки ID корреляции и безопасности.
-    Адаптирована под асинхронный logout и системный API-инструментарий.
-    Использует async_to_sync, чтобы безопасно вызвать асинхронные методы в синхронном middleware.
-    Добавляет ID корреляции, Email пользователя, IP адрес, User-Agent, HTTP-метод и сервис в контекст pghistory.
+    Извлекает или генерирует ID корреляции (уникальная метка запроса для аналитика логов/ошибок).
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+
+    Returns:
+        str: ID корреляции.
+    """
+    correlation_id = request.headers.get("X-Correlation-ID") or request.META.get("HTTP_X_CORRELATION_ID")
+
+    if not correlation_id:
+        correlation_id = str(uuid.uuid7())
+
+    # Сохраняем в объект запроса
+    request.correlation_id = correlation_id  # type: ignore[attr-defined]
+
+    return correlation_id
+
+
+def _get_ip_address(request: HttpRequest) -> str | None:
+    """
+    Вспомогательный метод для получения IP адреса с учетом прокси.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+
+    Returns:
+        str | None: Строка с IP адресом или None.
+    """
+    x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+
+    if x_forwarded and isinstance(x_forwarded, str):
+        # Берем первый IP из списка (адрес клиента до прокси)
+        ip_address = x_forwarded.split(",")[0].strip()
+
+        return cast(str, ip_address)  # Явная типизация для mypy
+
+    remote_addr = request.META.get("REMOTE_ADDR")
+
+    if remote_addr and isinstance(remote_addr, str):
+        return cast(str, remote_addr)  # Явная типизация для mypy
+
+    return None
+
+
+def _get_user_agent(request: HttpRequest) -> str:
+    """
+    Вспомогательный метод для получения User-Agent.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+
+    Returns:
+        str: User-Agent или "Unknown".
+    """
+    user_agent = request.META.get("HTTP_USER_AGENT", "Unknown")[:255]  # Ограничиваем длину для БД
+    return cast(str, user_agent)  # Явная типизация для mypy
+
+
+def _apply_sentry(audit_context: dict[str, Any], correlation_id: str) -> None:
+    """
+    Устанавливает теги и юзера в Sentry на основе собранного контекста.
+
+    Args:
+        audit_context (dict[str, Any]): Словарь с контекстом
+        correlation_id (str): ID корреляции.
+    """
+    set_tag("correlation_id", correlation_id)
+    set_user({"id": str(audit_context.get("user")), "email": audit_context.get("user_email")})
+
+    service = audit_context.get("service")
+    auth_type = "api_key" if service == "System" else "jwt/session"
+
+    set_tag("service", service)
+    set_tag("auth_type", auth_type)
+
+
+def _patch_request_class(request: HttpRequest) -> None:
+    """
+    Хак pghistory: подменяем класс запроса для отслеживания поздней авторизации.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+    """
+    if isinstance(request, DjangoWSGIRequest):
+        request.__class__ = WSGIRequest
+    elif isinstance(request, DjangoASGIRequest):
+        request.__class__ = ASGIRequest
+
+
+def _process_response(response: HttpResponseBase, correlation_id: str) -> HttpResponseBase:
+    """
+    Добавляет заголовок 'X-Correlation-ID' с ID корреляции к ответу.
+
+    Args:
+        response (HttpResponseBase): Объект HTTP ответа.
+        correlation_id (str): ID корреляции.
+
+    Returns:
+        HttpResponseBase: HTTP ответ с ID корреляции.
+    """
+    if hasattr(response, "__setitem__"):
+        # Полезно для фронта/отладки
+        response["X-Correlation-ID"] = correlation_id
+
+    return response
+
+
+# ==============================================================================
+# AUDIT CONTEXT BUILDERS (сборка контекста)
+# ==============================================================================
+
+
+def _prepare_audit_context(request: HttpRequest, correlation_id: str) -> dict[str, Any]:
+    """
+    Формирует базовый словарь контекста для pghistory.
+
+    Проверяет наличие системного API-ключа в заголовках.
+    Если в запросе системны API-ключ - добавляет ID и Email системного юзера в контекст.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+        correlation_id (str): ID корреляции.
+
+    Returns:
+        dict[str, Any]: Словарь контекста.
+    """
+    # Базовый словарь контекста
+    base_context: dict[str, Any] = {
+        "url": request.path,  # URL
+        "method": request.method,  # HTTP-метод
+        "correlation_id": correlation_id,  # ID корреляции
+        "ip_address": _get_ip_address(request),  # IP адрес
+        "user_agent": _get_user_agent(request),  # User-Agent
+    }
+
+    # Проверяем заголовки на наличие системного API-ключа
+    api_key = request.headers.get("X-API-KEY") or request.META.get("HTTP_X_API_KEY")
+
+    # Если нашли системный API-ключ
+    if api_key == settings.INTERNAL_API_KEY:
+        # Добавляем ID и Email системного юзера в словарь контекста
+        base_context["user"] = str(SYSTEM_USER_ID)
+        base_context["user_email"] = SYSTEM_USER_EMAIL
+        base_context["service"] = "System"  # Помечаем сервис как System
+
+    # Иначе - это API/Web
+    else:
+        base_context["service"] = "API/Web"  # Помечаем сервис как API/Web
+
+    # Возвращаем словарь контекста
+    return base_context
+
+
+def _parse_jwt_user_id(request: HttpRequest) -> str | None:
+    """
+    Парсит токен и возвращает ID пользователя, если токен валиден.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+
+    Returns:
+        str | None: ID пользователя или None.
+    """
+    # Проверяем JWT Auth (Swagger / Frontend)
+    auth_header = request.headers.get("Authorization", "")
+
+    # Даем ему приоритет над сессией, чтобы Swagger честно логировал от имени токена,
+    # даже если в браузере висит кука авторизованного админа
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+
+        try:
+            # Декодируем токен без проверки подписи (это мгновенно)
+            # Валидацию подписи всё равно сделает Ninja позже
+            payload = decode(token, algorithms=["HS256"], options={"verify_signature": False})
+
+            # Явно приводим динамический ключ из настроек к строке для mypy
+            claim_key = cast(str, settings.NINJA_JWT.get("USER_ID_CLAIM", "user_id"))
+
+            # Получаем ID пользователя
+            token_user_id = payload.get(claim_key)
+
+            return str(token_user_id) if token_user_id else None
+
+        except PyJWTError as exc:
+            # Токен недействителен, просрочен или поврежден
+            # Логируем ошибку, Ninja JWT отловит это позже и вернет 401
+            logger.debug(f"JWT parsing failed in middleware: {exc}")
+            pass
+
+    return None
+
+
+def _finalize_audit_context(
+    base_context: dict[str, Any], user_id: str | None, user_email: str | None, request_user: User | AnonymousUser
+) -> dict[str, Any]:
+    """
+    Добавляет данные Session Auth (если JWT нет) и финализирует словарь контекста.
+
+    Args:
+        base_context (dict[str, Any]): Базовый словарь контекста.
+        user_id (str | None): ID пользователя или None.
+        user_email (str | None): Email пользователя или None.
+        request_user (User | AnonymousUser): Текущий пользователь, определенный Django (Session Auth).
+
+    Returns:
+        dict[str, Any]: Финальный словарь контекста.
     """
 
-    def __call__(self, request: HttpRequest) -> HttpResponse:
-        """
-        Асинхронная обработка запроса.
-        Переопределяем метод вызова для проброса ID корреляции в Response.
+    # Проверяем Session Auth (Админка Django) - если нет валидного JWT
+    if not user_id and request_user.is_authenticated:
+        user_id = str(request_user.id)
+        user_email = getattr(request_user, "email", None)
 
-        Args:
-            request (HttpRequest): Объект входящего HTTP запроса.
-        """
-        # Извлекаем или генерируем Correlation ID до начала обработки запроса
-        correlation_id = request.headers.get("X-Correlation-ID") or request.META.get("HTTP_X_CORRELATION_ID")
+    # Добавляем ID и Email юзера в словарь контекста
+    base_context.update({"user": user_id, "user_email": user_email})
 
-        if not correlation_id:
-            correlation_id = str(uuid.uuid7())
+    # Возвращаем финальный словарь контекста
+    return base_context
 
-        # Сохраняем в объект запроса
-        request.correlation_id = correlation_id  # type: ignore[attr-defined]
 
-        # --- Безопасность: Force Logout ---
+async def _get_audit_context_async(
+    request: HttpRequest, request_user: User | AnonymousUser, correlation_id: str
+) -> dict[str, Any]:
+    """
+    Асинхронная сборка контекста pghistory (для Ninja/Uvicorn).
 
-        # Используем auser(), чтобы не вызывать синхронный доступ к БД
-        user = async_to_sync(request.auser)()
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+        request_user (User | AnonymousUser): Текущий пользователь, определенный Django (SessionAuth).
+        correlation_id (str): ID корреляции.
 
-        # Проверка на Soft Delete (если админ удалил юзера - мгновенное разлогинивание)
-        if user.is_authenticated and getattr(user, "is_deleted", False):
-            logger.warning(f"Force logout for deleted user: {user}")
+    Returns:
+        dict[str, Any]: Словарь с контекстом.
+    """
 
-            # Используем alogout(), чтобы не вызывать синхронный доступ к БД
-            async_to_sync(alogout)(request)  # Force Logout
+    # Базовый контекст
+    base_context = _prepare_audit_context(request=request, correlation_id=correlation_id)
 
-            return HttpResponse("Account deactivated", status=401)
+    # Если сервис помечен как системный
+    if base_context["service"] == "System":
+        # Возвращаем базовый контекст
+        return base_context
 
-        # --- Sentry (данные приклеятся ко всем ошибкам, возникшим в рамках запроса) ---
+    # Иначе - это API/Web
 
-        set_tag("correlation_id", correlation_id)
+    # Парсим JWT-токен и получаем ID юзера, если токен валидный
+    user_id = _parse_jwt_user_id(request)
+    user_email = None
 
-        # Проверяем заголовки на наличие системного API-ключа
-        api_key = request.headers.get("X-API-KEY") or request.META.get("HTTP_X_API_KEY")
+    # Если получили ID юзера из JWT Auth, достаем email из БД
+    if user_id:
+        # Используем асинхронный .afirst()
+        user_email = await User.objects.filter(id=user_id).values_list("email", flat=True).afirst()
 
-        # Если нашли системный API-ключ
-        if api_key == settings.INTERNAL_API_KEY:
-            set_user({"id": str(SYSTEM_USER_ID), "email": SYSTEM_USER_EMAIL})
-            set_tag("auth_type", "api_key")
-            set_tag("service", "System")
+    # Финализируем и возвращаем словарь контекста
+    return _finalize_audit_context(
+        base_context=base_context,
+        user_id=user_id,
+        user_email=user_email,
+        request_user=request_user,
+    )
 
-        # Иначе - это JWT-юзер
-        else:
-            set_user({"id": str(user.id), "email": self._get_user_email(request)})
-            set_tag("auth_type", "jwt/session")
-            set_tag("service", "API/Web")
 
-        # --- Аудит: pghistory + Loguru ---
+def _get_audit_context_sync(
+    request: HttpRequest, request_user: User | AnonymousUser, correlation_id: str
+) -> dict[str, Any]:
+    """
+    Синхронная сборка контекста pghistory (для Admin Panel).
 
-        # logger.contextualize привязывает extra данные к текущему контексту выполнения
-        with logger.contextualize(correlation_id=correlation_id):
-            # Вызываем родительский __call__ (он внутри себя вызовет get_context)
-            response: HttpResponse = super().__call__(request)  # type: ignore[no-untyped-call]
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+        request_user (User | AnonymousUser): Текущий пользователь, определенный Django (SessionAuth).
+        correlation_id (str): ID корреляции.
 
-            # Если это HttpResponse, добавляем заголовок (отдаем Correlation ID обратно в Response)
-            if isinstance(response, HttpResponse):
-                response["X-Correlation-ID"] = correlation_id  # Полезно для фронтенда/отладки
+    Returns:
+        dict[str, Any]: Словарь с контекстом.
+    """
 
-            return response
+    # Базовый контекст
+    base_context = _prepare_audit_context(request=request, correlation_id=correlation_id)
 
-    @staticmethod
-    def _get_user_email(request: HttpRequest) -> str | None:
-        """
-        Вспомогательный метод для получения Email пользователя.
-        Полезно сохранить Email, чтобы он остался в истории при удалении юзера.
+    # Если сервис помечен как системный
+    if base_context["service"] == "System":
+        # Возвращаем базовый контекст
+        return base_context
 
-        Args:
-            request (HttpRequest): Объект входящего HTTP запроса.
+    # Иначе - это API/Web
 
-        Returns:
-            str | None: Email пользователя или None.
-        """
-        user = request.user
+    # Парсим JWT-токен и получаем ID юзера, если токен валидный
+    user_id = _parse_jwt_user_id(request)
+    user_email = None
 
-        if user and user.is_authenticated:
-            return getattr(user, "email", None)
+    # Если получили ID юзера из JWT Auth, достаем email из БД
+    if user_id:
+        # Используем синхронный .first()
+        user_email = User.objects.filter(id=user_id).values_list("email", flat=True).first()
 
-        return None
+    # Финализируем и возвращаем словарь контекста
+    return _finalize_audit_context(
+        base_context=base_context,
+        user_id=user_id,
+        user_email=user_email,
+        request_user=request_user,
+    )
 
-    @staticmethod
-    def _get_ip_address(request: HttpRequest) -> str | None:
-        """
-        Вспомогательный метод для получения IP адреса с учетом прокси.
 
-        Args:
-            request (HttpRequest): Объект входящего запроса.
+# ==============================================================================
+# MAIN MIDDLEWARE (FACTORY FUNCTION)
+# ==============================================================================
 
-        Returns:
-            str: Строка с IP адресом.
-        """
-        x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
 
-        if x_forwarded and isinstance(x_forwarded, str):
-            # Берем первый IP из списка (адрес клиента до прокси)
-            ip_address = x_forwarded.split(",")[0].strip()
+@sync_and_async_middleware
+def KrononHistoryMiddleware(get_response: Any) -> Any:
+    """
+    Фабрика гибридного middleware по стандартам Django 6.0.
+    Определяет тип следующего слоя в цепочке при инициализации сервера.
+    Использует @sync_and_async_middleware для гарантии сохранности ContextVars в гибридном ASGI/WSGI окружении.
 
-            return cast(str, ip_address)  # Явная типизация для mypy
+    Добавляет ID корреляции, ID пользователя, Email пользователя, IP адрес, User-Agent,
+    URL, HTTP-метод и сервис (источник запроса) в контекст pghistory с использованием ContextVars.
+    Полезно сохранять Email пользователя, чтобы он остался в истории при удалении пользователя.
 
-        remote_addr = request.META.get("REMOTE_ADDR")
+    Адаптирована под логику оригинального HistoryMiddleware (подмена классов запроса).
+    """
 
-        if remote_addr and isinstance(remote_addr, str):
-            return cast(str, remote_addr)  # Явная типизация для mypy
+    # Проверяем, является ли следующий обработчик асинхронным
+    is_async = iscoroutinefunction(get_response)
 
-        return None
+    if is_async:
 
-    @staticmethod
-    def _get_user_agent(request: HttpRequest) -> str:
-        """
-        Вспомогательный метод для получения User-Agent.
+        async def middleware(request: HttpRequest) -> HttpResponseBase:
+            """
+            Асинхронная ветка (выполняется в Event Loop для Uvicorn / Ninja API).
 
-        Args:
-            request (HttpRequest): Объект входящего запроса.
+            Args:
+                request (HttpRequest): Объект HTTP запроса.
 
-        Returns:
-            str: User-Agent или "Unknown".
-        """
-        user_agent = request.META.get("HTTP_USER_AGENT", "Unknown")[:255]  # Ограничиваем длину для БД
+            Returns:
+                HttpResponseBase: Объект HTTP ответа.
+            """
+            # Извлекаем или генерируем Correlation ID до начала обработки запроса
+            correlation_id = _get_correlation_id(request)
 
-        return cast(str, user_agent)  # Явная типизация для mypy
+            # --- Безопасность: Force Logout ---
 
-    def get_context(self, request: HttpRequest) -> dict[str, Any]:
-        """
-        Формирует расширенный словарь контекста (вызывается внутри super().__call__).
+            # Вызываем асинхронный .auser()
+            user = await request.auser()
 
-        Добавляет в контекст кроме базовых 'user' (ID) и 'url' (эндпойнт):
-            'correlation_id': ID корреляции (уникальная метка запроса для аналитика логов/ошибок),
-            'user_email': Email пользователя,
-            'ip_address': IP адрес,
-            'user_agent': User-Agent,
-            'method': HTTP метод,
-            'service': Сервис - источник изменения объекта (API/Web).
+            # Проверка на Soft Delete (если админ удалил юзера - мгновенное разлогинивание)
+            if user.is_authenticated and getattr(user, "is_deleted", False):
+                logger.warning(f"Force logout for deleted user: {user}")
+                # Вызываем асинхронный .alogout()
+                await alogout(request)  # Force Logout
+                # Возвращаем простой HTTP ответ вместо ошибки
+                return HttpResponse("Account deactivated", status=401)
 
-        Args:
-            request (HttpRequest): Объект входящего HTTP запроса.
+            # --- Собираем и прикрепляем контекст ---
 
-        Returns:
-            dict[str, Any]: Обновленный словарь контекста.
-        """
-        # Базовый контекст (user и url)
-        base_context = super().get_context(request)
+            audit_context = await _get_audit_context_async(
+                request=request,
+                request_user=user,
+                correlation_id=correlation_id,
+            )
+            request.audit_context = audit_context  # type: ignore[attr-defined]
 
-        # Проверяем заголовки на наличие системного API-ключа
-        api_key = request.headers.get("X-API-KEY") or request.META.get("HTTP_X_API_KEY")
+            # Устанавливает теги Sentry (данные приклеятся ко всем ошибкам, возникшим в рамках запроса)
+            _apply_sentry(audit_context=audit_context, correlation_id=correlation_id)
 
-        # Если нашли системный API-ключ
-        if api_key == settings.INTERNAL_API_KEY:
-            # Переопределяем ID юзера на системного в базовом контексте
-            base_context["user"] = SYSTEM_USER_ID
-            # Добавляем Email системного юзера в базовый контекст
-            base_context["user_email"] = SYSTEM_USER_EMAIL
-            service = "System"
+            # logger.contextualize привязывает extra данные к текущему контексту выполнения
+            # correlation_id передаем в контекст для всех HTTP-методов
+            with logger.contextualize(correlation_id=correlation_id):
+                # Патчим класс запроса (хак из pghistory)
+                _patch_request_class(request)
+                # Асинхронно вызываем следующий слой middleware / роутер
+                response = cast(HttpResponseBase, await get_response(request))  # Явная типизация для mypy
+                # Добавляем заголовок 'X-Correlation-ID' (отдаем Correlation ID в ответ)
+                response = _process_response(response=response, correlation_id=correlation_id)
+                return response
 
-        # Иначе - это JWT-юзер
-        else:
-            # Добавляем Email JWT-юзера в базовый контекст
-            base_context["user_email"] = self._get_user_email(request)
-            service = "API/Web"
+        return middleware
 
-        # Получаем Correlation ID (уже созданный в __call__)
-        correlation_id = getattr(request, "correlation_id", None)
+    else:
 
-        # Обновляем словарь контекста
-        return base_context | {
-            "correlation_id": correlation_id,
-            "ip_address": self._get_ip_address(request),
-            "user_agent": self._get_user_agent(request),
-            "method": request.method,
-            "service": service,
-        }
+        def middleware(request: HttpRequest) -> HttpResponseBase:
+            """
+            Синхронная ветка (выполняется в Thread Pool для Django Admin).
+
+            Args:
+                request (HttpRequest): Объект HTTP запроса.
+
+            Returns:
+                HttpResponseBase: Объект HTTP ответа.
+            """
+            # Извлекаем или генерируем Correlation ID до начала обработки запроса
+            correlation_id = _get_correlation_id(request)
+
+            # --- Безопасность: Force Logout ---
+
+            user = request.user
+
+            # Проверка на Soft Delete (если админ удалил юзера - мгновенное разлогинивание)
+            if user.is_authenticated and getattr(user, "is_deleted", False):
+                logger.warning(f"Force logout for deleted user: {user}")
+                logout(request)  # Force Logout
+                # Возвращаем простой HTTP ответ вместо ошибки
+                return HttpResponse("Account deactivated", status=401)
+
+            # --- Собираем и прикрепляем контекст ---
+
+            audit_context = _get_audit_context_sync(
+                request=request,
+                request_user=user,
+                correlation_id=correlation_id,
+            )
+            request.audit_context = audit_context  # type: ignore[attr-defined]
+
+            # Устанавливает теги Sentry (данные приклеятся ко всем ошибкам, возникшим в рамках запроса)
+            _apply_sentry(audit_context=audit_context, correlation_id=correlation_id)
+
+            # logger.contextualize привязывает extra данные к текущему контексту выполнения
+            # correlation_id передаем в контекст для всех HTTP-методов
+            with logger.contextualize(correlation_id=correlation_id):
+                # Патчим класс запроса (хак из pghistory)
+                _patch_request_class(request)
+                # Синхронно вызываем следующий слой middleware / роутер
+                response = cast(HttpResponseBase, get_response(request))  # Явная типизация для mypy
+                # Добавляем заголовок 'X-Correlation-ID' (отдаем Correlation ID в ответ)
+                response = _process_response(response=response, correlation_id=correlation_id)
+                return response
+
+        return middleware

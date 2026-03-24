@@ -4,6 +4,7 @@
 Отвечают за создание, обновление и удаление данных.
 """
 
+from typing import Any
 from uuid import UUID
 
 from loguru import logger as log
@@ -14,12 +15,17 @@ from apps.clients.selectors import get_client_by_id
 from apps.common.utils.audit import aexecute_with_audit
 
 
-async def create_client(data: ClientCreate, initiator: UUID | str | None = None) -> Client:
+async def create_client(
+    data: ClientCreate,
+    audit_context: dict[str, Any],
+    initiator: UUID | str | None = None,
+) -> Client:
     """
     Создает нового клиента в системе.
 
     Args:
         data (ClientCreate): Валидированные входные данные из API.
+        audit_context (dict[str, Any]): Словарь контекста.
         initiator (UUID | str | None): ID пользователя, инициирующего создание клиента (для аудита).
                                        Маркер для системы, что это программный доступ.
                                        Или None.
@@ -45,8 +51,8 @@ async def create_client(data: ClientCreate, initiator: UUID | str | None = None)
         # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
         payload["contact_info"] = contact_info_json
 
-        # Выполняем асинхронный acreate() через хелпер с аудитом
-        client = await aexecute_with_audit(initiator, Client.objects.acreate, **payload)
+        # Выполняем .create() асинхронно через хелпер с аудитом
+        client = await aexecute_with_audit(audit_context=audit_context, sync_func=Client.objects.create, **payload)
 
         log.info(f"Client created. ID: {client.id}")
 
@@ -68,7 +74,12 @@ async def create_client(data: ClientCreate, initiator: UUID | str | None = None)
         raise
 
 
-async def update_client(client: Client, data: ClientUpdate, initiator: UUID | str | None = None) -> Client:
+async def update_client(
+    client: Client,
+    data: ClientUpdate,
+    audit_context: dict[str, Any],
+    initiator: UUID | str | None = None,
+) -> Client:
     """
     Выполняет частичное обновление данных клиента (PATCH).
 
@@ -78,6 +89,7 @@ async def update_client(client: Client, data: ClientUpdate, initiator: UUID | st
     Args:
         client (Client): Объект клиента (уже полученный из БД).
         data (ClientUpdate): Данные для обновления.
+        audit_context (dict[str, Any]): Словарь контекста.
         initiator (UUID | str | None): ID пользователя, инициирующего обновление клиента (для аудита).
                                        Маркер для системы, что это программный доступ.
                                        Или None.
@@ -108,9 +120,8 @@ async def update_client(client: Client, data: ClientUpdate, initiator: UUID | st
             # Метод модели сам вызовет model_dump(mode="json")
             client.patch_contact_data(contact_info_update)
 
-        # Сохраняем изменения
-        # Выполняем асинхронный .asave() через хелпер с аудитом
-        await aexecute_with_audit(initiator, client.asave)
+        # Выполняем .save() асинхронно через хелпер с аудитом
+        await aexecute_with_audit(audit_context=audit_context, sync_func=client.save)
 
         log.debug(f"Client updated: {client.id}")
 
@@ -131,12 +142,17 @@ async def update_client(client: Client, data: ClientUpdate, initiator: UUID | st
         raise
 
 
-async def delete_client(client: Client, initiator: UUID | str | None = None) -> None:
+async def delete_client(
+    client: Client,
+    audit_context: dict[str, Any],
+    initiator: UUID | str | None = None,
+) -> None:
     """
     Выполняет мягкое удаление клиента.
 
     Args:
         client (Client): Объект клиента.
+        audit_context (dict[str, Any]): Словарь контекста.
         initiator (UUID | str | None): ID пользователя, инициирующего удаление клиента (для аудита).
                                        Маркер для системы, что это программный доступ.
                                        Или None.
@@ -144,9 +160,10 @@ async def delete_client(client: Client, initiator: UUID | str | None = None) -> 
     log.info(f"Start deleting client {client.id} (Soft Delete).")
 
     try:
-        # Выполняем кастомный асинхронный .adelete() через хелпер с аудитом
+        # Выполняем кастомный .delete() асинхронно через хелпер с аудитом
         # Soft delete - UPDATE запрос (ставит текущее время в deleted_at)
-        await aexecute_with_audit(initiator, client.adelete)
+        await aexecute_with_audit(audit_context=audit_context, sync_func=client.delete)
+
         log.info(f"Client {client.id} marked as deleted.")
 
     except Exception as exc:
@@ -155,12 +172,13 @@ async def delete_client(client: Client, initiator: UUID | str | None = None) -> 
         raise
 
 
-async def restore_client(client: Client, initiator: UUID | str | None = None) -> Client:
+async def restore_client(client: Client, audit_context: dict[str, Any], initiator: UUID | str | None = None) -> Client:
     """
     Выполняет восстановление клиента после мягкого удаления.
 
     Args:
         client (Client): Объект клиента.
+        audit_context (dict[str, Any]): Словарь контекста.
         initiator (UUID | str | None): ID пользователя, инициирующего восстановление клиента (для аудита).
                                        Маркер для системы, что это программный доступ.
                                        Или None.
@@ -171,9 +189,9 @@ async def restore_client(client: Client, initiator: UUID | str | None = None) ->
     log.info(f"Start restoring client {client.id}.")
 
     try:
-        # Выполняем кастомный асинхронный .arestore() через хелпер с аудитом
+        # Выполняем кастомный .restore() асинхронно через хелпер с аудитом
         # Restore - UPDATE запрос (ставит Null в deleted_at)
-        await aexecute_with_audit(initiator, client.arestore)
+        await aexecute_with_audit(audit_context=audit_context, sync_func=client.restore)
         log.info(f"Client {client.id} restored.")
 
         # Делаем рефреш через селектор с подгрузкой связей (актуальные связи и updated_at) для корректного ответа API

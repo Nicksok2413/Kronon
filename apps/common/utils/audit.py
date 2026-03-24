@@ -1,45 +1,35 @@
 """
-Утилиты для интеграции системы аудита (pghistory) с асинхронным кодом.
+Инструменты для интеграции бизнес-логики с аудитом (pghistory).
 """
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from typing import Any
-from uuid import UUID
 
+from asgiref.sync import sync_to_async
 from pghistory import context as pghistory_context
 
 
 async def aexecute_with_audit[T](
-    initiator: UUID | str | None,
-    async_func: Callable[..., Awaitable[T]],
+    audit_context: dict[str, Any],
+    sync_func: Callable[..., T],
     *args: Any,
     **kwargs: Any,
 ) -> T:
     """
-    Выполняет асинхронную функцию (ORM запрос), предварительно обернув её
-    в контекст аудита pghistory.
-
-    Сохраняет 100% нативную асинхронность (без использования Thread Pool),
-    максимально утилизируя возможности Psycopg 3.
+    Выполняет синхронную функцию (ORM запрос) асинхронно, гарантируя
+    сохранение контекста pghistory внутри Thread Pool.
 
     Args:
-        initiator (UUID | str | None): ID инициатора запроса.
-        async_func (Callable[..., Awaitable[T]]): Асинхронная функция (например, `client.asave`).
-        *args: Позиционные аргументы для `async_func`.
-        **kwargs: Именованные аргументы для `async_func`.
+        audit_context (dict[str, Any]): Словарь с контекстом из request.audit_context.
+        sync_func (Callable[..., _T]): Синхронная функция (например, Client.objects.create или client.save).
 
     Returns:
-        T: Результат выполнения `async_func` с сохранением оригинального типа.
+        _T: Результат выполнения функции.
     """
-    # Приводим initiator к строке, чтобы pghistory корректно сериализовал его в JSON
-    initiator_id = str(initiator) if initiator else None
 
-    # Оборачиваем в контекст pghistory для записи ID инициатора запроса
-    # pghistory работает через ContextVars, которые нативно поддерживаются в asyncio
-    # Это операция в памяти Python (установка переменной контекста)
-    # Она не делает запросов в БД в момент входа (__enter__), а просто говорит:
-    # "Следующий запрос в БД должен быть помечен этим юзером"
+    def _wrapper() -> T:
+        # Выполняем в синхронном потоке, чтобы контекст не потерялся
+        with pghistory_context(**audit_context):
+            return sync_func(*args, **kwargs)
 
-    # Контекст устанавливается для текущей асинхронной задачи
-    with pghistory_context(user=initiator_id):
-        return await async_func(*args, **kwargs)
+    return await sync_to_async(_wrapper)()

@@ -57,23 +57,23 @@ class TestClientHistory(BaseAPITest):
         assert len(data) >= 1
         assert update_event["pgh_diff"]["name"][1] == "Updated Name"
 
-    # async def test_history_initiator_sync(self, admin_client: AsyncClient, admin_user: Any):
-    #     """Проверка записи ID пользователя, изменившего клиента."""
-    #     # Создаем клиента
-    #     client = await sync_to_async(ClientFactory)()
-    #
-    #     # Патчим клиента от имени админа
-    #     patch_data = {"name": "Updated Name"}
-    #     await admin_client.patch(f"/api/clients/{client.id}", data=patch_data, content_type="application/json")
-    #
-    #     # Проверяем историю в БД напрямую (что в pghistory записался admin_user.id)
-    #     from apps.audit.selectors import get_client_history_queryset
-    #
-    #     history = await get_client_history_queryset(client.id)
-    #
-    #     # Проверяем, что в контексте зафиксирован ID админа
-    #     assert str(history[0]["pgh_context"]["user"]) == str(admin_user.id)
-    #
+    async def test_history_initiator_sync(self, admin_client: AsyncClient, admin_user: Any):
+        """Проверка записи ID пользователя, изменившего клиента."""
+        # Создаем клиента
+        client = await sync_to_async(ClientFactory)()
+
+        # Патчим клиента от имени админа
+        patch_data = {"name": "Updated Name"}
+        await admin_client.patch(f"/api/clients/{client.id}", data=patch_data, content_type="application/json")
+
+        # Проверяем историю в БД напрямую (что в pghistory записался admin_user.id)
+        from apps.audit.selectors import get_client_history_queryset
+
+        history = await get_client_history_queryset(client.id)
+
+        # Проверяем, что в контексте зафиксирован ID админа
+        assert str(history[0]["pgh_context"]["user"]) == str(admin_user.id)
+
     # TODO: исправиль AssertionError: assert 'None' == '019d0ba0-4a6...-2c07410a4e46'
 
     async def test_system_api_audit_logs_system_uuid(self, system_client: AsyncClient):
