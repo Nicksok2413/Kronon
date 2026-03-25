@@ -125,7 +125,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # Кастомный middleware для сбора контекста (расширяет pghistory.middleware.HistoryMiddleware)
-    "apps.audit.middleware.KrononHistoryMiddleware",
+    "apps.audit.middleware.kronon_history_middleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "axes.middleware.AxesMiddleware",  # Middleware безопасности Axes

@@ -344,7 +344,7 @@ def _get_audit_context_sync(
 
 
 @sync_and_async_middleware
-def KrononHistoryMiddleware(get_response: Any) -> Any:
+def kronon_history_middleware(get_response: Any) -> Any:
     """
     Фабрика гибридного middleware по стандартам Django 6.0.
     Определяет тип следующего слоя в цепочке при инициализации сервера.
