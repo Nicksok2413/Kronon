@@ -45,12 +45,12 @@ class TestGlobalExceptions(BaseAPITest):
 
         json_response: dict[str, Any] = response.json()
 
+        # Валидация схемы
+        await self.validate_schema(data=json_response, schema=ErrorOut)
+
         assert json_response["code"] == "validation_error"
         assert "details" in json_response
         assert "unp" in str(json_response["details"])
-
-        # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ErrorOut)
 
     async def test_integrity_error_409(self, admin_client: AsyncClient) -> None:
         """
@@ -83,11 +83,11 @@ class TestGlobalExceptions(BaseAPITest):
 
         json_response: dict[str, Any] = response.json()
 
-        assert json_response["code"] == "duplicate_unp"
-        assert "УНП" in json_response["message"]
-
         # Валидация схемы
         await self.validate_schema(data=json_response, schema=ErrorOut)
+
+        assert json_response["code"] == "duplicate_unp"
+        assert "УНП" in json_response["message"]
 
     async def test_not_found_404(self, admin_client: AsyncClient) -> None:
         """
@@ -113,7 +113,7 @@ class TestGlobalExceptions(BaseAPITest):
 
         json_response: dict[str, Any] = response.json()
 
-        assert json_response["code"] == "http_error_404"
-
         # Валидация схемы
         await self.validate_schema(data=json_response, schema=ErrorOut)
+
+        assert json_response["code"] == "http_error_404"
