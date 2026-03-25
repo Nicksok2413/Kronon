@@ -86,7 +86,6 @@ class TestClientAPI(BaseAPITest):
 
         # Статус код
         await self.assert_status(response=response_page_1, expected_status=200)
-
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
@@ -108,7 +107,6 @@ class TestClientAPI(BaseAPITest):
 
         # Статус код
         await self.assert_status(response=response_page_2, expected_status=200)
-
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
@@ -184,7 +182,6 @@ class TestClientAPI(BaseAPITest):
 
         # Статус код
         await self.assert_status(response=del_response, expected_status=204)
-
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
@@ -192,22 +189,40 @@ class TestClientAPI(BaseAPITest):
         list_response = await admin_client.get(self.endpoint)
         assert list_response.json()["count"] == 0
 
+        # Проверяем, что GET по ID выдает 404 (так как селектор фильтрует по active())
+        start = perf_counter()
+        get_response = await admin_client.get(f"{self.endpoint}{client.id}")
+        elapsed_time = perf_counter() - start
+
+        # Статус код
+        await self.assert_status(response=get_response, expected_status=404)
+        # Время ответа API
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+
         # Восстановление
         start = perf_counter()
         restore_response = await admin_client.patch(f"{self.endpoint}{client.id}/restore")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
-
         # Статус код
         await self.assert_status(response=restore_response, expected_status=200)
-
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
-
         # Валидация схемы
         await self.validate_schema(data=restore_response.json(), schema=ClientOut)
 
         # Проверяем, что он вернулся в список
         list_response_2 = await admin_client.get(self.endpoint)
         assert list_response_2.json()["count"] == 1
+
+        # Проверяем, что он доступен по ID
+        start = perf_counter()
+        get_response_2 = await admin_client.get(f"{self.endpoint}{client.id}")
+        elapsed_time = perf_counter() - start
+
+        # Статус код
+        await self.assert_status(response=get_response_2, expected_status=200)
+        # Время ответа API
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        # Валидация схемы
+        await self.validate_schema(data=restore_response.json(), schema=ClientOut)
