@@ -10,6 +10,7 @@ from django.test import AsyncClient
 
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientOut
+from apps.users.models import User
 from tests.utils.base import BaseAPITest
 from tests.utils.factories import ClientFactory
 
@@ -55,17 +56,23 @@ class TestClientAPI(BaseAPITest):
 
         json_response: dict[str, Any] = response.json()
 
-        assert json_response["name"] == "Test Company"
-        assert json_response["contact_info"]["general_email"] == "test@test.com"
-
         # Валидация схемы
         await self.validate_schema(data=json_response, schema=ClientOut)
+
+        assert json_response["name"] == "Test Company"
+        assert json_response["contact_info"]["general_email"] == "test@test.com"
 
         # Проверяем, что клиент реально создался в БД (асинхронно)
         assert await Client.objects.filter(id=json_response["id"]).aexists()
 
-    async def test_get_client_list_paginated(self, auth_client: AsyncClient, api_user: Any) -> None:
-        """Проверка получения списка клиентов с пагинацией и учетом OLP."""
+    async def test_get_client_list_paginated(self, auth_client: AsyncClient, api_user: User) -> None:
+        """
+        Проверка получения списка клиентов с пагинацией и учетом OLP.
+
+        Args:
+            auth_client (AsyncClient): Авторизованный асинхронный клиент (с правами бухгалтера).
+            api_user (User): Обычный пользователь (бухгалтер).
+        """
         # Создаем 25 клиентов через фабрику, назначаем accountant=api_user, чтобы OLP пропустил их для бухгалтера
         # Используем create_batch внутри sync_to_async для оптимизации
         await sync_to_async(ClientFactory.create_batch)(25, accountant=api_user)
@@ -113,8 +120,57 @@ class TestClientAPI(BaseAPITest):
         # Проверка количества элементов второй страницы
         assert len(json_response_page_2["items"]) == 5
 
+    async def test_update_client_contact_info_deep_merge(self, admin_client: AsyncClient) -> None:
+        """
+        Проверка умного слияния JSON (patch_contact_data).
+        Убеждаемся, что обновление email не затирает телефон.
+
+        Args:
+            admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
+        """
+        # Создаем клиента с контактами
+        initial_contacts = {
+            "general_email": "old@test.com",
+            "general_phone": "+375291111111",
+        }
+        client = await sync_to_async(ClientFactory)(contact_info=initial_contacts)
+
+        # Подготавливаем данные (обновляем только email)
+        patch_payload = {"contact_info": {"general_email": "new@test.com"}}
+
+        # Выполняем запрос
+        start = perf_counter()
+        patch_response = await admin_client.patch(
+            f"{self.endpoint}{client.id}",
+            data=patch_payload,
+            content_type="application/json",
+        )
+        elapsed_time = perf_counter() - start
+
+        # --- Проверки ---
+
+        # Статус код
+        await self.assert_status(response=patch_response, expected_status=200)
+        # Время ответа API
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+
+        json_response: dict[str, Any] = patch_response.json()
+
+        # Валидация схемы
+        await self.validate_schema(data=json_response, schema=ClientOut)
+
+        # Проверяем, что email обновился
+        assert json_response["contact_info"]["general_email"] == "new@test.com"
+        # Проверяем, что телефон не исчез (Deep Merge сработал)
+        assert json_response["contact_info"]["general_phone"] == "+375291111111"
+
     async def test_soft_delete_and_restore(self, admin_client: AsyncClient) -> None:
-        """Комплексная проверка Soft Delete и восстановления клиента."""
+        """
+        Комплексная проверка Soft Delete и восстановления клиента.
+
+        Args:
+            admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
+        """
 
         # Создаем клиента
         client = await sync_to_async(ClientFactory)()
