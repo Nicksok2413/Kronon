@@ -52,9 +52,9 @@ async def aexecute_with_audit[T](
 
     Args:
         audit_context (dict[str, Any]): Словарь с контекстом из request.audit_context.
-        sync_func (Callable[..., _T]): Синхронная функция (например, Client.objects.create или client.save).
-        *args: Позиционные аргументы для `sync_func`.
-        **kwargs: Именованные аргументы для `sync_func`.
+        sync_func (Callable[..., T]): Синхронная функция (например, Client.objects.create или client.save).
+        *args (Any): Позиционные аргументы для `sync_func`.
+        **kwargs (Any): Именованные аргументы для `sync_func`.
 
     Returns:
         T: Результат выполнения `sync_func` с сохранением оригинального типа.

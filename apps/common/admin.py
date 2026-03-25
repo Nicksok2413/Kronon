@@ -2,9 +2,8 @@
 Базовая админка для всего проекта.
 """
 
-import uuid
 from collections.abc import Callable
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from django.contrib import admin, messages
 from django.db.models import Model, QuerySet
@@ -16,9 +15,7 @@ from django.urls import URLPattern, path, reverse
 from django.utils.html import format_html
 from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
-from loguru import logger
 from pghistory import context as pghistory_context
-from sentry_sdk import set_tag
 
 # Generic тип для моделей, ограниченный базовым классом Model
 _MT = TypeVar("_MT", bound=Model)
@@ -113,49 +110,30 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
 
     # --- Audit ---
 
-    @staticmethod
-    def _get_correlation_id(request: HttpRequest) -> str:
-        """
-        Извлекает существующий или генерирует новый Correlation ID.
-
-        Args:
-            request (HttpRequest): Объект входящего HTTP-запроса.
-
-        Returns:
-            str: Строка с уникальным идентификатором корреляции (UUID7).
-        """
-        correlation_id = getattr(request, "correlation_id", None)
-        return cast(str, correlation_id) if correlation_id else str(uuid.uuid7())
-
     def _run_with_audit(self, request: HttpRequest, func: Callable[..., _RT], *args: Any, **kwargs: Any) -> _RT:
         """
-        Оборачивает выполнение функции в контекст аудита и трассировки.
-
-        Создает контекст для Loguru (поле extra['correlation_id']) и pghistory (JSONB контекст события).
+        Оборачивает выполнение функции (например, save_model) в контекст аудита и трассировки.
 
         Args:
-            request (HttpRequest): Объект входящего HTTP-запроса.
-            func (Callable[..., _RT]): Функция или метод для выполнения (например, super().save_model).
-            *args (Any): Позиционные аргументы для вызываемой функции.
-            **kwargs (Any): Именованные аргументы для вызываемой функции.
+            request (HttpRequest): Объект HTTP-запроса.
+            func (Callable[..., _RT]): Функция или метод для выполнения.
+            *args (Any): Позиционные аргументы для `func`.
+            **kwargs (Any): Именованные аргументы для `func`.
 
         Returns:
-            _RT: Результат выполнения переданной функции `func`.
+            _RT: Результат выполнения`func`.
         """
-        # Извлекаем или генерируем Correlation ID
-        correlation_id = self._get_correlation_id(request)
-
-        # Добавляем тэг correlation_id в Sentry
-        set_tag("correlation_id", correlation_id)
-
-        # Достаем контекст, собранный в Middleware
+        # Достаем контекст аудита, собранный в Middleware
         audit_context = getattr(request, "audit_context", {})
-        # Переопределяем сервис для админки
-        audit_context["service"] = "Admin"
 
-        with logger.contextualize(correlation_id=correlation_id):
-            with pghistory_context(**audit_context):
-                return func(*args, **kwargs)
+        # Создаем копию словаря, чтобы случайно не изменить глобальный контекст запроса
+        admin_audit_context = dict(audit_context)
+
+        # Переопределяем сервис для админки
+        admin_audit_context["service"] = "Admin"
+
+        with pghistory_context(**admin_audit_context):
+            return func(*args, **kwargs)
 
     # --- Object manipulations ---
 
