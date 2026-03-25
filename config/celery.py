@@ -15,13 +15,10 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 
 class PghistoryTask(Task):
-    """
-    Базовый класс задач Celery с интеграцией аудита pghistory и логирования.
-    Автоматически добавляет имя задачи в контекст аудита.
-    """
+    """Базовый класс задач Celery с интеграцией аудита pghistory и логирования."""
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        # Извлекаем ID 'correlation_id' из заголовков сообщения (прилетает из Django)
+        # Извлекаем correlation_id из заголовков сообщения (прилетает из Django)
         # Если задача запущена не из веба (например, через beat) - генерим новый ID
         correlation_id = self.request.get("correlation_id") or str(uuid.uuid7())
 

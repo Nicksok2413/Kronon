@@ -344,7 +344,7 @@ def _get_audit_context_sync(
 
 
 @sync_and_async_middleware
-def KrononHistoryMiddleware(get_response: Any) -> Any:
+def kronon_history_middleware(get_response: Any) -> Any:
     """
     Фабрика гибридного middleware по стандартам Django 6.0.
     Определяет тип следующего слоя в цепочке при инициализации сервера.
@@ -396,6 +396,7 @@ def KrononHistoryMiddleware(get_response: Any) -> Any:
                 correlation_id=correlation_id,
             )
 
+            # Сохраняем контекст в объект запроса
             request.audit_context = audit_context  # type: ignore[attr-defined]
 
             # Устанавливает теги Sentry (данные приклеятся ко всем ошибкам, возникшим в рамках запроса)
@@ -448,6 +449,7 @@ def KrononHistoryMiddleware(get_response: Any) -> Any:
                 correlation_id=correlation_id,
             )
 
+            # Сохраняем контекст в объект запроса
             request.audit_context = audit_context  # type: ignore[attr-defined]
 
             # Устанавливает теги Sentry (данные приклеятся ко всем ошибкам, возникшим в рамках запроса)

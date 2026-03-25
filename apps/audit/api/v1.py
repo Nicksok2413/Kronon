@@ -15,8 +15,9 @@ from ninja_jwt.authentication import AsyncJWTAuth
 
 from apps.audit.schemas import ClientHistoryOut
 from apps.audit.selectors import get_client_history_queryset
+from apps.audit.utils import get_initiator_log_str
 from apps.clients.models import Client
-from apps.common.auth import AsyncApiKeyAuth, get_request_initiator
+from apps.common.auth import AsyncApiKeyAuth
 from apps.common.permissions import is_admin_access
 from apps.common.schemas import STANDARD_ERRORS
 
@@ -44,9 +45,11 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     Returns:
         list[dict[str, Any]]: Список событий изменения клиента.
     """
-    # Получаем инициатора запроса (id для аудита здесь не нужен, str для логов)
-    _, initiator_str = await get_request_initiator(request)
+    # Достаем контекст аудита, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
 
+    # Логируем инициатора запроса
+    initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' requested history for client {client_id}.")
 
     # Проверяем права (RBAC)

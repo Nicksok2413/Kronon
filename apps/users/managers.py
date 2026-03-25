@@ -49,7 +49,7 @@ class CustomUserManager(BaseUserManager["User"].from_queryset(SoftDeleteQuerySet
         # Создаем модель, используя текущий класс (self.model)
         user: User = self.model(email=email, **extra_fields)
 
-        # Хешируем пароль
+        # Хэшируем пароль
         user.set_password(password)
 
         # Сохраняем, используя базу данных, к которой привязан менеджер

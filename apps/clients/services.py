@@ -5,36 +5,28 @@
 """
 
 from typing import Any
-from uuid import UUID
 
 from loguru import logger as log
 
+from apps.audit.utils import aexecute_with_audit
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientUpdate
 from apps.clients.selectors import get_client_by_id
-from apps.common.utils.audit import aexecute_with_audit
 
 
-async def create_client(
-    data: ClientCreate,
-    audit_context: dict[str, Any],
-    initiator: UUID | str | None = None,
-) -> Client:
+async def create_client(data: ClientCreate, audit_context: dict[str, Any]) -> Client:
     """
     Создает нового клиента в системе.
 
     Args:
         data (ClientCreate): Валидированные входные данные из API.
-        audit_context (dict[str, Any]): Словарь контекста.
-        initiator (UUID | str | None): ID пользователя, инициирующего создание клиента (для аудита).
-                                       Маркер для системы, что это программный доступ.
-                                       Или None.
+        audit_context (dict[str, Any]): Словарь контекста аудита.
 
     Returns:
         Client: Созданный объект клиента с подгруженными связями.
     """
     # Логируем бизнес-контекст операции
-    log.info(f"User {initiator} creating client. UNP: {data.unp}, Name: {data.name}")
+    log.info(f"Creating client. UNP: {data.unp}, Name: {data.name}")
 
     try:
         # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
@@ -51,7 +43,7 @@ async def create_client(
         # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
         payload["contact_info"] = contact_info_json
 
-        # Выполняем .create() асинхронно через хелпер с аудитом
+        # Выполняем .create() асинхронно через утилиту (функцию-обертку с аудитом)
         client = await aexecute_with_audit(audit_context=audit_context, sync_func=Client.objects.create, **payload)
 
         log.info(f"Client created. ID: {client.id}")
@@ -74,12 +66,7 @@ async def create_client(
         raise
 
 
-async def update_client(
-    client: Client,
-    data: ClientUpdate,
-    audit_context: dict[str, Any],
-    initiator: UUID | str | None = None,
-) -> Client:
+async def update_client(client: Client, data: ClientUpdate, audit_context: dict[str, Any]) -> Client:
     """
     Выполняет частичное обновление данных клиента (PATCH).
 
@@ -89,17 +76,14 @@ async def update_client(
     Args:
         client (Client): Объект клиента (уже полученный из БД).
         data (ClientUpdate): Данные для обновления.
-        audit_context (dict[str, Any]): Словарь контекста.
-        initiator (UUID | str | None): ID пользователя, инициирующего обновление клиента (для аудита).
-                                       Маркер для системы, что это программный доступ.
-                                       Или None.
+        audit_context (dict[str, Any]): Словарь контекста аудита.
 
     Returns:
         Client: Обновленный объект клиента с подгруженными связями.
     """
     # Логируем, какие поля меняются
     changed_fields = data.model_dump(exclude_unset=True).keys()
-    log.info(f"User {initiator} updating client {client.id}. Fields: {list(changed_fields)}")
+    log.info(f"Updating client {client.id}. Fields: {list(changed_fields)}")
 
     try:
         # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
@@ -120,7 +104,7 @@ async def update_client(
             # Метод модели сам вызовет model_dump(mode="json")
             client.patch_contact_data(contact_info_update)
 
-        # Выполняем .save() асинхронно через хелпер с аудитом
+        # Выполняем .save() асинхронно через утилиту (функцию-обертку с аудитом)
         await aexecute_with_audit(audit_context=audit_context, sync_func=client.save)
 
         log.debug(f"Client updated: {client.id}")
@@ -142,25 +126,18 @@ async def update_client(
         raise
 
 
-async def delete_client(
-    client: Client,
-    audit_context: dict[str, Any],
-    initiator: UUID | str | None = None,
-) -> None:
+async def delete_client(client: Client, audit_context: dict[str, Any]) -> None:
     """
     Выполняет мягкое удаление клиента.
 
     Args:
         client (Client): Объект клиента.
-        audit_context (dict[str, Any]): Словарь контекста.
-        initiator (UUID | str | None): ID пользователя, инициирующего удаление клиента (для аудита).
-                                       Маркер для системы, что это программный доступ.
-                                       Или None.
+        audit_context (dict[str, Any]): Словарь контекста аудита.
     """
     log.info(f"Start deleting client {client.id} (Soft Delete).")
 
     try:
-        # Выполняем кастомный .delete() асинхронно через хелпер с аудитом
+        # Выполняем кастомный .delete() асинхронно через утилиту (функцию-обертку с аудитом)
         # Soft delete - UPDATE запрос (ставит текущее время в deleted_at)
         await aexecute_with_audit(audit_context=audit_context, sync_func=client.delete)
 
@@ -172,16 +149,13 @@ async def delete_client(
         raise
 
 
-async def restore_client(client: Client, audit_context: dict[str, Any], initiator: UUID | str | None = None) -> Client:
+async def restore_client(client: Client, audit_context: dict[str, Any]) -> Client:
     """
     Выполняет восстановление клиента после мягкого удаления.
 
     Args:
         client (Client): Объект клиента.
-        audit_context (dict[str, Any]): Словарь контекста.
-        initiator (UUID | str | None): ID пользователя, инициирующего восстановление клиента (для аудита).
-                                       Маркер для системы, что это программный доступ.
-                                       Или None.
+        audit_context (dict[str, Any]): Словарь контекста аудита.
 
     Returns:
         Client: Восстановленный объект клиента с подгруженными связями.
@@ -189,7 +163,7 @@ async def restore_client(client: Client, audit_context: dict[str, Any], initiato
     log.info(f"Start restoring client {client.id}.")
 
     try:
-        # Выполняем кастомный .restore() асинхронно через хелпер с аудитом
+        # Выполняем кастомный .restore() асинхронно через утилиту (функцию-обертку с аудитом)
         # Restore - UPDATE запрос (ставит Null в deleted_at)
         await aexecute_with_audit(audit_context=audit_context, sync_func=client.restore)
         log.info(f"Client {client.id} restored.")
