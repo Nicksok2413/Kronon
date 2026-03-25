@@ -14,13 +14,14 @@ from ninja.errors import HttpError
 from ninja.pagination import PageNumberPagination, paginate
 from ninja_jwt.authentication import AsyncJWTAuth
 
+from apps.audit.utils import get_initiator_log_str
 from apps.clients.guards import get_client_for_admin_or_404, get_client_for_edit_or_404
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
 from apps.clients.selectors import get_client_queryset
 from apps.clients.services import create_client, delete_client, restore_client, update_client
-from apps.common.auth import AsyncApiKeyAuth, get_request_initiator
+from apps.common.auth import AsyncApiKeyAuth
 from apps.common.managers import SoftDeleteQuerySet
 from apps.common.permissions import is_admin_access
 from apps.common.schemas import STANDARD_ERRORS
@@ -50,9 +51,11 @@ async def list_clients(
     Returns:
         SoftDeleteQuerySet[Client]: Отфильтрованный список клиентов (пагинация применяется декоратором).
     """
-    # Получаем инициатора запроса (id для аудита, str для логов)
-    initiator_id, initiator_str = await get_request_initiator(request)
+    # Достаем контекст аудита, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
 
+    # Логируем инициатора запроса
+    initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' fetching clients list.")
 
     # Проверяем права (RBAC) без рейза ошибки, просто для фильтрации
@@ -61,8 +64,11 @@ async def list_clients(
     except HttpError:
         is_admin = False
 
+    # Извлекаем данные для бизнес-логики (OLP)
+    user_id = UUID(audit_context.get("user"))
+
     # Получаем базовый QuerySet (Lazy) с OLP-фильтрацией на уровне БД
-    query_set = get_client_queryset(user_id=initiator_id, is_admin=is_admin)
+    query_set = get_client_queryset(user_id=user_id, is_admin=is_admin)
 
     # Применяем фильтры из запроса: строим SQL-запрос, в БД не идем (Lazy)
     # Ninja.FilterSchema применяет фильтры к QuerySet'у, возвращая новый QuerySet
@@ -89,9 +95,11 @@ async def get_client(request: HttpRequest, client_id: UUID) -> Client:
     Returns:
         Client: Объект клиента.
     """
-    # Получаем инициатора запроса (id для аудита, str для логов)
-    initiator_id, initiator_str = await get_request_initiator(request)
+    # Достаем контекст аудита, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
 
+    # Логируем инициатора запроса
+    initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' requesting client {client_id}.")
 
     # Проверяем существование клиента и права (RBAC + OLP)
@@ -121,19 +129,18 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     Returns:
         tuple[int, Client]: Код ответа, созданный объект клиента.
     """
-    # Получаем инициатора запроса (id для аудита, str для логов)
-    initiator_id, initiator_str = await get_request_initiator(request)
+    # Достаем контекст аудита, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
 
+    # Логируем инициатора запроса
+    initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' attempts to create client '{payload.name}'.")
 
     # Проверяем права (RBAC)
     await is_admin_access(request)
 
-    # Достаем контекст, собранный в Middleware
-    audit_context = getattr(request, "audit_context", {})
-
     # Вызываем сервис создания
-    client = await create_client(data=payload, audit_context=audit_context, initiator=initiator_id)
+    client = await create_client(data=payload, audit_context=audit_context)
 
     # Возвращаем созданного клиента
     return 201, client
@@ -160,21 +167,18 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
     Returns:
         Client: Обновленный объект клиента.
     """
-    # Получаем инициатора запроса (id для аудита, str для логов)
-    initiator_id, initiator_str = await get_request_initiator(request)
+    # Достаем контекст аудита, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
 
+    # Логируем инициатора запроса
+    initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' attempts to update client {client_id}.")
 
     # Проверяем существование клиента и права (RBAC + OLP)
     client = await get_client_for_edit_or_404(request=request, client_id=client_id)
 
-    # Достаем контекст, собранный в Middleware
-    audit_context = getattr(request, "audit_context", {})
-
     # Вызываем сервис обновления
-    updated_client = await update_client(
-        client=client, data=payload, audit_context=audit_context, initiator=initiator_id
-    )
+    updated_client = await update_client(client=client, data=payload, audit_context=audit_context)
 
     # Возвращаем обновленного клиента
     return updated_client
@@ -200,19 +204,18 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     Returns:
         tuple[int, None]: Код ответа 204 (No Content), None
     """
-    # Получаем инициатора запроса (id для аудита, str для логов)
-    initiator_id, initiator_str = await get_request_initiator(request)
+    # Достаем контекст аудита, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
 
+    # Логируем инициатора запроса
+    initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' attempts to delete client {client_id}.")
 
     # Проверяем существование клиента и права (RBAC)
     client = await get_client_for_admin_or_404(request=request, client_id=client_id)
 
-    # Достаем контекст, собранный в Middleware
-    audit_context = getattr(request, "audit_context", {})
-
     # Вызываем сервис удаления
-    await delete_client(client=client, audit_context=audit_context, initiator=initiator_id)
+    await delete_client(client=client, audit_context=audit_context)
 
     # Возвращаем код ответа
     return 204, None
@@ -236,19 +239,18 @@ async def restore_client_endpoint(request: HttpRequest, client_id: UUID) -> Clie
     Returns:
         Client: Восстановленный объект клиента.
     """
-    # Получаем инициатора запроса (id для аудита, str для логов)
-    initiator_id, initiator_str = await get_request_initiator(request)
+    # Достаем контекст аудита, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
 
+    # Логируем инициатора запроса
+    initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' attempts to restore client {client_id}.")
 
     # Проверяем существование клиента и права (RBAC)
     client = await get_client_for_admin_or_404(request=request, client_id=client_id, is_deleted=True)
 
-    # Достаем контекст, собранный в Middleware
-    audit_context = getattr(request, "audit_context", {})
-
     # Вызываем сервис восстановления
-    restored_client = await restore_client(client=client, audit_context=audit_context, initiator=initiator_id)
+    restored_client = await restore_client(client=client, audit_context=audit_context)
 
     # Возвращаем восстановленного клиента
     return restored_client
