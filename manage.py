@@ -32,7 +32,7 @@ def main() -> None:
         and not sys.argv[1].startswith("runserver")
         and sys.argv[1] not in ["migrate", "makemigrations", "test"]
     ):
-        # Генерируем ID 'correlation_id'
+        # Генерируем correlation_id
         correlation_id = str(uuid.uuid7())
 
         command: str = " ".join(sys.argv[1:])
