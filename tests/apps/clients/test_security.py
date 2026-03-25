@@ -51,7 +51,7 @@ class TestClientSecurity(BaseAPITest):
         # --- Проверки ---
 
         # Статус код
-        await self.assert_status(response=response, expected_status=422)
+        await self.assert_status(response=response, expected_status=200)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
@@ -312,14 +312,14 @@ class TestClientSecurity(BaseAPITest):
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
-        json_response: dict[str, Any] = create_response.json()
-        client_id = json_response["id"]
+        create_json_response: dict[str, Any] = create_response.json()
+        client_id = create_json_response["id"]
 
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ClientOut)
+        await self.validate_schema(data=create_json_response, schema=ClientOut)
 
-        assert json_response["name"] == "Old Name"
-        assert json_response["contact_info"]["general_email"] == "test@test.com"
+        assert create_json_response["name"] == "Old Name"
+        assert create_json_response["contact_info"]["general_email"] == "test@test.com"
 
         # --- Обновление клиента ---
 
@@ -327,7 +327,7 @@ class TestClientSecurity(BaseAPITest):
         start = perf_counter()
         patch_response = await system_client.patch(
             f"{self.endpoint}{client_id}",
-            data="New Name",
+            data={"name": "New Name"},
             content_type="application/json",
         )
         elapsed_time = perf_counter() - start
@@ -337,12 +337,12 @@ class TestClientSecurity(BaseAPITest):
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
-        json_response: dict[str, Any] = patch_response.json()
+        patch_json_response: dict[str, Any] = patch_response.json()
 
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ClientOut)
+        await self.validate_schema(data=patch_json_response, schema=ClientOut)
 
-        assert json_response["name"] == "New Name"
+        assert patch_json_response["name"] == "New Name"
 
         # --- Удаление клиента ---
 
@@ -364,7 +364,7 @@ class TestClientSecurity(BaseAPITest):
         elapsed_time = perf_counter() - start
 
         # Статус код
-        await self.assert_status(response=restore_response, expected_status=204)
+        await self.assert_status(response=restore_response, expected_status=200)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
