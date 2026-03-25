@@ -6,7 +6,8 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from ninja import Field, Schema
+from ninja import Schema
+from pydantic import Field
 
 from apps.clients.models import ClientStatus, OrganizationType, TaxSystem
 
@@ -16,12 +17,15 @@ class HistoryContextMetadata(Schema):
 
     user: str | None = Field(default=None, description="ID пользователя")
     user_email: str | None = Field(default=None, description="Email пользователя")
-    app_source: str | None = Field(default=None, description="Источник изменения (API, Celery, CLI)")
+    correlation_id: str | None = Field(default=None, description="ID корреляции")
     ip_address: str | None = Field(default=None, description="IP адрес инициатора")
-    method: str | None = Field(default=None, description="HTTP метод")
+    user_agent: str | None = Field(default=None, description="User-Agent инициатора")
     url: str | None = Field(default=None, description="URL запроса")
-    celery_task: str | None = Field(default=None, description="Имя задачи Celery")
-    command: str | None = Field(default=None, description="Команда CLI")
+    method: str | None = Field(default=None, description="HTTP метод")
+    service: str | None = Field(default=None, description="Сервис - источник изменения объекта (API, Celery, CLI)")
+    celery_task_name: str | None = Field(default=None, description="Название Celery-задачи")
+    celery_task_id: str | None = Field(default=None, description="ID Celery-задачи")
+    cli_command: str | None = Field(default=None, description="CLI команда")
 
 
 class ClientSnapshot(Schema):

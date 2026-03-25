@@ -76,6 +76,7 @@ def setup_sentry(settings: SentrySettingsProtocol) -> None:
                 ThreadingIntegration(propagate_hub=True),
             ],
         )
+
         log.success("✅ Sentry SDK successfully initialized.")
 
     except Exception as exc:

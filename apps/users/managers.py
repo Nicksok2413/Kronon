@@ -7,18 +7,24 @@ from typing import TYPE_CHECKING, Any
 from django.contrib.auth.base_user import BaseUserManager
 from django.utils.translation import gettext_lazy as _
 
+from apps.common.managers import SoftDeleteQuerySet
+
 if TYPE_CHECKING:
     from apps.users.models import User
 
 
-class CustomUserManager(BaseUserManager["User"]):
+# Наследуем класс менеджера от BaseUserManager через from_queryset
+# Позволяет использовать методы SoftDeleteQuerySet напрямую через objects
+class CustomUserManager(BaseUserManager["User"].from_queryset(SoftDeleteQuerySet)):  # type: ignore[misc]
     """
     Кастомный менеджер модели пользователя.
 
-    Использует email в качестве уникального идентификатора для аутентификации
+    Использует email в качестве уникального идентификатора для аутентификации (Email-auth)
     вместо стандартного имени пользователя (username).
+    Наследует логику мягкого удаления и OLP-фильтрацию.
     """
 
+    # TODO: подумать над async
     def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> User:
         """
         Создает и сохраняет пользователя с указанным email и паролем.
@@ -41,7 +47,7 @@ class CustomUserManager(BaseUserManager["User"]):
         email = self.normalize_email(email)
 
         # Создаем модель, используя текущий класс (self.model)
-        user = self.model(email=email, **extra_fields)
+        user: User = self.model(email=email, **extra_fields)
 
         # Хешируем пароль
         user.set_password(password)
@@ -70,7 +76,9 @@ class CustomUserManager(BaseUserManager["User"]):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_active", True)
+        extra_fields.setdefault("role", "sys_admin")
 
+        # TODO: подумать нужны ли эти проверки
         if extra_fields.get("is_staff") is not True:
             raise ValueError(_("Суперпользователь должен иметь is_staff=True."))
         if extra_fields.get("is_superuser") is not True:

@@ -19,7 +19,7 @@ dependencies = [
     "django-ninja-extra (>=0.31.0,<0.32.0)",
     "django-pghistory (>=3.9.2,<4.0.0)",
     "gunicorn (>=25.1.0,<26.0.0)",
-    "uvicorn[standard] (>=0.41.0,<0.42.0)",
+    "uvicorn[standard] (>=0.42.0,<0.43.0)",
     "whitenoise (>=6.11.0,<7.0.0)",
     # Database & Cache
     "psycopg[binary,pool] (>=3.3.0,<4.0.0)",
@@ -142,6 +142,11 @@ exclude = [
 module = "apps.*.models"
 disable_error_code = ["django-manager-missing"]
 
+# Разрешаем наследование от Any (EventsAdmin, KrononBaseAdmin[Any]) для админки истории
+[[tool.mypy.overrides]]
+module = "apps.audit.admin"
+allow_subclassing_any = true
+
 [tool.django-stubs]
 # Конфигурация плагина Django-stubs
 django_settings_module = "config.settings"  # Указываем путь к настройкам Django
@@ -245,6 +250,8 @@ env = [
     "DEBUG=True",
     # Заглушка секретного ключа django
     "SECRET_KEY=pytest-test-key-at-least-32-characters-long-for-security",
+    # Заглушка API-ключа
+    "INTERNAL_API_KEY=pytest-test-internal-api-key",
     # Передаем DATABASE_URL для автоматического подхвата в settings.py (порт 5433 из docker-compose.test.yml)
     "DATABASE_URL=postgres://postgres:postgres@localhost:5433/postgres",
     # Передаем REDIS_URL для автоматического подхвата в settings.py (порт 6380 из docker-compose.test.yml)

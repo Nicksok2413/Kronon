@@ -6,14 +6,16 @@ COMPOSE_TEST = docker compose -f docker-compose.test.yml
 COMPOSE_INFRA = docker compose --profile infra
 
 # .PHONY гарантирует, что make не будет путать эти команды с именами файлов
-.PHONY: help install run up down rebuild infra-up prune logs migrations migrate superuser clear_migrations lint lint-fix format types populate test-up test-down test test-clean check check-all clean
+.PHONY: help install run up down rebuild infra-up prune logs migrations migrate superuser clear-migrations reset-migrations lint lint-fix format types populate test-up test-down test test-clean check check-all clean
 
 # Команда по умолчанию, которая будет вызвана при запуске `make`
 default: help
 
 # Цвета
-GREEN  := $(shell tput -Txterm setaf 2)
 RESET  := $(shell tput -Txterm sgr0)
+RED    := $(shell tput -Txterm setaf 1)
+GREEN  := $(shell tput -Txterm setaf 2)
+YELLOW := $(shell tput -Txterm setaf 3)
 
 help:
 	@echo "${GREEN}Kronon Management Commands:${RESET}"
@@ -34,7 +36,8 @@ help:
 	@echo "  migrations     	- Создать новые миграции"
 	@echo "  migrate        	- Применить миграции"
 	@echo "  superuser      	- Создать суперпользователя (администратора)"
-	@echo "  clear_migrations   - Удалить все файлы миграций (для удобства разработки)"
+	@echo "  clear-migrations   - Удалить все файлы миграций (для удобства разработки)"
+	@echo "  reset-migrations  	- Удалить все данные и пересоздать миграции (для удобства разработки)"
 	@echo ""
 	@echo "Проверка качества кода (Ruff + mypy):"
 	@echo "  lint           	- Проверить код код с помощью Ruff"
@@ -65,14 +68,15 @@ install:
 	@echo "-> Зависимости успешно установлены."
 
 run:
-	@echo "-> Запуск локального сервера разработки..."
-	poetry run python manage.py runserver
-	@echo "-> Локальный сервер разработки успешно запущен."
+	@echo "-> Запуск локального ASGI сервера разработки (Uvicorn)..."
+	poetry run uvicorn config.asgi:application --host 127.0.0.1 --port 8000 --reload
+	@echo "-> Локальный сервер разработки остановлен."
 
 # ------------------------------------------------------------------------------
 # Управление Docker окружением
 # ------------------------------------------------------------------------------
 up:
+	mkdir -p static media
 	@echo "-> Запуск всех сервисов в фоновом режиме..."
 	$(COMPOSE_DEV) up -d
 	@echo "-> Сервисы успешно запущены."
@@ -93,14 +97,15 @@ infra-up:
 	@echo "-> Сервисы успешно запущены. Теперь можно подключиться к порту 6432."
 
 prune:
-	@echo "ВНИМАНИЕ: Эта команда остановит контейнеры и УДАЛИТ ВСЕ ДАННЫЕ В ТОМАХ (volumes)."
-	@read -p "Вы уверены, что хотите продолжить? [y/N] " confirm && \
+	@if [ "$(CONFIRM)" != "y" ]; then \
+		echo "${RED}ВНИМАНИЕ: Удаление всех данных в томах!${RESET}"; \
+		read -p "Вы уверены? [y/N] " confirm; \
+	else confirm="y"; fi; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
-		echo "-> Начинаем полную очистку..."; \
 		$(COMPOSE_DEV) down -v; \
-		echo "-> Окружение полностью очищено."; \
+		echo "-> Окружение очищено."; \
 	else \
-		echo "-> Очистка отменена."; \
+		echo "-> Отмена."; exit 1; \
 	fi
 
 logs:
@@ -110,10 +115,11 @@ logs:
 # Управление миграциями БД
 # ------------------------------------------------------------------------------
 migrations:
+	poetry run python manage.py fix_migrations --hide
 	@echo "-> Создание новых миграций..."
 	poetry run python manage.py makemigrations
-	@echo "-> Добавляем зависимость на pg_trgm для приложений, где есть GinIndex..."
-	poetry run python manage.py add_trigram_dependency
+	@echo "-> Восстановление дерева зависимостей..."
+	poetry run python manage.py fix_migrations --repair
 	@echo "-> Миграции успешно созданы."
 
 migrate:
@@ -126,16 +132,25 @@ superuser:
 	poetry run python manage.py createsuperuser
 	@echo "-> Суперпользователь успешно создан."
 
-clear_migrations:
-	@echo "ВНИМАНИЕ: Эта команда УДАЛИТ ВСЕ ФАЙЛЫ МИГРАЦИЙ."
-	@read -p "Вы уверены, что хотите продолжить? [y/N] " confirm && \
+clear-migrations:
+	@if [ "$(CONFIRM)" != "y" ]; then \
+		echo "${YELLOW}ВНИМАНИЕ: Удаление файлов миграций!${RESET}"; \
+		read -p "Вы уверены? [y/N] " confirm; \
+	else confirm="y"; fi; \
 	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
-		echo "-> Начинаем удаление файлов миграций..."; \
+		echo "-> Удаление файлов..."; \
 		scripts/clear_migrations.sh; \
 		echo "-> Очистка завершена."; \
 	else \
-		echo "-> Очистка отменена."; \
+		echo "-> Отмена."; exit 1; \
 	fi
+
+reset-migrations:
+	@echo "${RED}ЗАПУСК ПОЛНОГО СБРОСА ПРОЕКТА...${RESET}"
+	@$(MAKE) prune CONFIRM=y
+	@$(MAKE) clear-migrations CONFIRM=y
+	@$(MAKE) migrations
+	@echo "${GREEN}Проект успешно сброшен и пересоздан.${RESET}"
 
 # ------------------------------------------------------------------------------
 # Проверка качества кода (Ruff + mypy)
@@ -175,10 +190,8 @@ test-down:
 	@echo "-> Тестовое окружение остановлено."
 
 test:
-	$(MAKE) test-up
 	@echo "-> ${GREEN}Запуск тестов с (подключение к localhost:5433)...${RESET}"
 	poetry run pytest
-	$(MAKE) test-down
 
 test-clean:
 	$(COMPOSE_TEST) down -v

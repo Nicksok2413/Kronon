@@ -31,7 +31,7 @@ def manage_user_profile(sender: type[User], instance: User, created: bool, **kwa
     try:
         if created:
             Profile.objects.create(user=instance)
-            log.info(f"Signal: profile created for user {instance.email}. ID={instance.pk}")
+            log.info(f"Signal: profile created for user {instance.email} ID={instance.pk}")
         else:
             # Если профиль уже есть, просто сохраняем его
             # Используем hasattr, чтобы не упасть, если профиль вдруг удалили вручную

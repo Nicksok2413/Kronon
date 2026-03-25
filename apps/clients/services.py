@@ -4,29 +4,37 @@
 Отвечают за создание, обновление и удаление данных.
 """
 
+from typing import Any
 from uuid import UUID
 
 from loguru import logger as log
-from pghistory import context as pghistory_context
 
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientCreate, ClientUpdate
 from apps.clients.selectors import get_client_by_id
+from apps.common.utils.audit import aexecute_with_audit
 
 
-async def create_client(data: ClientCreate, user_id: UUID | None = None) -> Client:
+async def create_client(
+    data: ClientCreate,
+    audit_context: dict[str, Any],
+    initiator: UUID | str | None = None,
+) -> Client:
     """
     Создает нового клиента в системе.
 
     Args:
         data (ClientCreate): Валидированные входные данные из API.
-        user_id (UUID | None): ID пользователя, инициирующего создание клиента (для аудита) или None.
+        audit_context (dict[str, Any]): Словарь контекста.
+        initiator (UUID | str | None): ID пользователя, инициирующего создание клиента (для аудита).
+                                       Маркер для системы, что это программный доступ.
+                                       Или None.
 
     Returns:
-        Client: Созданный объект с подгруженными связями.
+        Client: Созданный объект клиента с подгруженными связями.
     """
     # Логируем бизнес-контекст операции
-    log.info(f"User {user_id} creating client. UNP: {data.unp}, Name: {data.name}")
+    log.info(f"User {initiator} creating client. UNP: {data.unp}, Name: {data.name}")
 
     try:
         # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
@@ -40,17 +48,11 @@ async def create_client(data: ClientCreate, user_id: UUID | None = None) -> Clie
         contact_info_json = data.contact_info.model_dump(mode="json", exclude_none=True)
 
         # Добавляем обработанный JSON в payload
+        # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
         payload["contact_info"] = contact_info_json
 
-        # Создаем объект
-        # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
-        # Оборачиваем в контекст pghistory для записи автора
-        # pghistory работает через contextvars, это безопасно в async
-        # Это операция в памяти Python (установка переменной контекста)
-        # Она не делает запросов в БД в момент входа (__enter__), а просто говорит:
-        # "Следующий запрос в БД должен быть помечен этим юзером"
-        with pghistory_context(user=user_id):
-            client = await Client.objects.acreate(**payload)
+        # Выполняем .create() асинхронно через хелпер с аудитом
+        client = await aexecute_with_audit(audit_context=audit_context, sync_func=Client.objects.create, **payload)
 
         log.info(f"Client created. ID: {client.id}")
 
@@ -72,7 +74,12 @@ async def create_client(data: ClientCreate, user_id: UUID | None = None) -> Clie
         raise
 
 
-async def update_client(client: Client, data: ClientUpdate, user_id: UUID | None = None) -> Client:
+async def update_client(
+    client: Client,
+    data: ClientUpdate,
+    audit_context: dict[str, Any],
+    initiator: UUID | str | None = None,
+) -> Client:
     """
     Выполняет частичное обновление данных клиента (PATCH).
 
@@ -82,14 +89,17 @@ async def update_client(client: Client, data: ClientUpdate, user_id: UUID | None
     Args:
         client (Client): Объект клиента (уже полученный из БД).
         data (ClientUpdate): Данные для обновления.
-        user_id (UUID | None): ID пользователя, инициирующего обновление клиента (для аудита) или None.
+        audit_context (dict[str, Any]): Словарь контекста.
+        initiator (UUID | str | None): ID пользователя, инициирующего обновление клиента (для аудита).
+                                       Маркер для системы, что это программный доступ.
+                                       Или None.
 
     Returns:
-        Client: Обновленный объект с подгруженными связями.
+        Client: Обновленный объект клиента с подгруженными связями.
     """
     # Логируем, какие поля меняются
     changed_fields = data.model_dump(exclude_unset=True).keys()
-    log.info(f"User {user_id} updating client {client.id}. Fields: {list(changed_fields)}")
+    log.info(f"User {initiator} updating client {client.id}. Fields: {list(changed_fields)}")
 
     try:
         # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
@@ -110,11 +120,8 @@ async def update_client(client: Client, data: ClientUpdate, user_id: UUID | None
             # Метод модели сам вызовет model_dump(mode="json")
             client.patch_contact_data(contact_info_update)
 
-        # Сохраняем изменения
-        # Оборачиваем в контекст pghistory для записи автора
-        # pghistory работает через contextvars, это безопасно в async
-        with pghistory_context(user=user_id):
-            await client.asave()
+        # Выполняем .save() асинхронно через хелпер с аудитом
+        await aexecute_with_audit(audit_context=audit_context, sync_func=client.save)
 
         log.debug(f"Client updated: {client.id}")
 
@@ -135,26 +142,70 @@ async def update_client(client: Client, data: ClientUpdate, user_id: UUID | None
         raise
 
 
-async def delete_client(client: Client, user_id: UUID | None = None) -> None:
+async def delete_client(
+    client: Client,
+    audit_context: dict[str, Any],
+    initiator: UUID | str | None = None,
+) -> None:
     """
     Выполняет мягкое удаление клиента.
 
     Args:
         client (Client): Объект клиента.
-        user_id (UUID | None): ID пользователя, инициирующего удаление клиента (для аудита) или None.
+        audit_context (dict[str, Any]): Словарь контекста.
+        initiator (UUID | str | None): ID пользователя, инициирующего удаление клиента (для аудита).
+                                       Маркер для системы, что это программный доступ.
+                                       Или None.
     """
     log.info(f"Start deleting client {client.id} (Soft Delete).")
 
     try:
-        # Оборачиваем в контекст pghistory для записи автора
-        # pghistory работает через contextvars, это безопасно в async
-        # Soft delete - это UPDATE запрос (ставит deleted_at), поэтому pghistory зафиксирует это изменение
-        with pghistory_context(user=user_id):
-            await client.adelete()
+        # Выполняем кастомный .delete() асинхронно через хелпер с аудитом
+        # Soft delete - UPDATE запрос (ставит текущее время в deleted_at)
+        await aexecute_with_audit(audit_context=audit_context, sync_func=client.delete)
 
         log.info(f"Client {client.id} marked as deleted.")
 
     except Exception as exc:
         # Логируем контекст ошибки перед тем, как она уйдет в глобальный хендлер
         log.error(f"Error deleting client {client.id}: {exc}")
+        raise
+
+
+async def restore_client(client: Client, audit_context: dict[str, Any], initiator: UUID | str | None = None) -> Client:
+    """
+    Выполняет восстановление клиента после мягкого удаления.
+
+    Args:
+        client (Client): Объект клиента.
+        audit_context (dict[str, Any]): Словарь контекста.
+        initiator (UUID | str | None): ID пользователя, инициирующего восстановление клиента (для аудита).
+                                       Маркер для системы, что это программный доступ.
+                                       Или None.
+
+    Returns:
+        Client: Восстановленный объект клиента с подгруженными связями.
+    """
+    log.info(f"Start restoring client {client.id}.")
+
+    try:
+        # Выполняем кастомный .restore() асинхронно через хелпер с аудитом
+        # Restore - UPDATE запрос (ставит Null в deleted_at)
+        await aexecute_with_audit(audit_context=audit_context, sync_func=client.restore)
+        log.info(f"Client {client.id} restored.")
+
+        # Делаем рефреш через селектор с подгрузкой связей (актуальные связи и updated_at) для корректного ответа API
+        restored_client = await get_client_by_id(client_id=client.id)
+
+        # Теоретически невозможно, что его нет, но для Mypy:
+        if not restored_client:
+            log.critical(f"Client {client.id} disappeared after restore!")
+            raise RuntimeError("Client not found after restore")
+
+        # Возвращаем актуальные данные
+        return restored_client
+
+    except Exception as exc:
+        # Логируем контекст ошибки перед тем, как она уйдет в глобальный хендлер
+        log.error(f"Error restoring client {client.id}: {exc}")
         raise
