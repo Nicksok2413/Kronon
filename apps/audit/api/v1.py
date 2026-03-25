@@ -50,7 +50,6 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
 
     # Логируем инициатора запроса
     initiator_str = get_initiator_log_str(audit_context)
-
     log.info(f"Initiator '{initiator_str}' requested history for client {client_id}.")
 
     # Проверяем права (RBAC)
