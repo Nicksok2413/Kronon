@@ -10,6 +10,7 @@ from django.test import AsyncClient
 
 from apps.clients.models import Client
 from apps.clients.schemas.client import ClientOut
+from apps.common.schemas import ErrorOut
 from apps.users.models import User
 from tests.utils.base import BaseAPITest
 from tests.utils.factories import ClientFactory
@@ -136,7 +137,7 @@ class TestClientAPI(BaseAPITest):
         # Подготавливаем данные (обновляем только email)
         patch_payload = {"contact_info": {"general_email": "new@test.com"}}
 
-        # Выполняем запрос
+        # Патчим клиента
         start = perf_counter()
         patch_response = await admin_client.patch(
             f"{self.endpoint}{client.id}",
@@ -198,6 +199,8 @@ class TestClientAPI(BaseAPITest):
         await self.assert_status(response=get_response, expected_status=404)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        # Валидация схемы
+        await self.validate_schema(data=get_response.json(), schema=ErrorOut)
 
         # Восстановление
         start = perf_counter()
