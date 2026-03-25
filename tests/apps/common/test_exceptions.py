@@ -23,7 +23,7 @@ class TestGlobalExceptions(BaseAPITest):
         Проверка перехвата ошибок Pydantic/Ninja ValidationError (422).
 
         Args:
-            admin_client: Авторизованный асинхронный клиент (с правами админа).
+            admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
         # Подготавливаем данные
         payload = {
@@ -57,7 +57,7 @@ class TestGlobalExceptions(BaseAPITest):
         Проверка перехвата IntegrityError (409) при дубликате УНП.
 
         Args:
-            admin_client: Авторизованный асинхронный клиент (с правами админа).
+            admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
 
         # Создаем клиента
@@ -94,7 +94,7 @@ class TestGlobalExceptions(BaseAPITest):
         Проверка перехвата HttpError(404).
 
         Args:
-            admin_client: Авторизованный асинхронный клиент (с правами админа).
+            admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
         # Генерируем несуществующий UUID
         fake_id = "019d0b27-0000-7000-8000-000000000000"
