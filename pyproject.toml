@@ -183,7 +183,7 @@ select = [
     "B",   # flake8-bugbear (поиск вероятных багов)
     "S",   # flake8-bandit (безопасность: пароли, eval, слабые шифры)
     "C4",  # flake8-comprehensions (оптимизация list comprehensions)
-    "UP",  # pyupgrade (обновление синтаксиса до Python 3.12)
+    "UP",  # pyupgrade (обновление синтаксиса Python)
 ]
 
 # Игнорируем правила:
