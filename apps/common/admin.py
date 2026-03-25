@@ -110,7 +110,6 @@ class KrononBaseAdmin(admin.ModelAdmin[_MT]):
 
     # --- Audit ---
 
-    @staticmethod
     def _run_with_audit(self, request: HttpRequest, func: Callable[..., _RT], *args: Any, **kwargs: Any) -> _RT:
         """
         Оборачивает выполнение функции (например, save_model) в контекст аудита и трассировки.
