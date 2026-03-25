@@ -396,6 +396,7 @@ def kronon_history_middleware(get_response: Any) -> Any:
                 correlation_id=correlation_id,
             )
 
+            # Сохраняем контекст в объект запроса
             request.audit_context = audit_context  # type: ignore[attr-defined]
 
             # Устанавливает теги Sentry (данные приклеятся ко всем ошибкам, возникшим в рамках запроса)
@@ -448,6 +449,7 @@ def kronon_history_middleware(get_response: Any) -> Any:
                 correlation_id=correlation_id,
             )
 
+            # Сохраняем контекст в объект запроса
             request.audit_context = audit_context  # type: ignore[attr-defined]
 
             # Устанавливает теги Sentry (данные приклеятся ко всем ошибкам, возникшим в рамках запроса)
