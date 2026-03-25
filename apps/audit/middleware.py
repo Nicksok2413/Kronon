@@ -362,7 +362,7 @@ def KrononHistoryMiddleware(get_response: Any) -> Any:
 
     if is_async:
 
-        async def middleware(request: HttpRequest) -> HttpResponseBase:
+        async def async_middleware(request: HttpRequest) -> HttpResponseBase:
             """
             Асинхронная ветка (выполняется в Event Loop для Uvicorn / Ninja API).
 
@@ -384,7 +384,7 @@ def KrononHistoryMiddleware(get_response: Any) -> Any:
             if user.is_authenticated and getattr(user, "is_deleted", False):
                 logger.warning(f"Force logout for deleted user: {user}")
                 # Вызываем асинхронный .alogout()
-                await alogout(request)  # Force Logout
+                await alogout(request)
                 # Возвращаем простой HTTP ответ вместо ошибки
                 return HttpResponse("Account deactivated", status=401)
 
@@ -395,6 +395,7 @@ def KrononHistoryMiddleware(get_response: Any) -> Any:
                 request_user=user,
                 correlation_id=correlation_id,
             )
+
             request.audit_context = audit_context  # type: ignore[attr-defined]
 
             # Устанавливает теги Sentry (данные приклеятся ко всем ошибкам, возникшим в рамках запроса)
@@ -408,14 +409,13 @@ def KrononHistoryMiddleware(get_response: Any) -> Any:
                 # Асинхронно вызываем следующий слой middleware / роутер
                 response = cast(HttpResponseBase, await get_response(request))  # Явная типизация для mypy
                 # Добавляем заголовок 'X-Correlation-ID' (отдаем Correlation ID в ответ)
-                response = _process_response(response=response, correlation_id=correlation_id)
-                return response
+                return _process_response(response=response, correlation_id=correlation_id)
 
-        return middleware
+        return async_middleware
 
     else:
 
-        def middleware(request: HttpRequest) -> HttpResponseBase:
+        def sync_middleware(request: HttpRequest) -> HttpResponseBase:
             """
             Синхронная ветка (выполняется в Thread Pool для Django Admin).
 
@@ -435,7 +435,8 @@ def KrononHistoryMiddleware(get_response: Any) -> Any:
             # Проверка на Soft Delete (если админ удалил юзера - мгновенное разлогинивание)
             if user.is_authenticated and getattr(user, "is_deleted", False):
                 logger.warning(f"Force logout for deleted user: {user}")
-                logout(request)  # Force Logout
+                # Вызываем синхронный .logout()
+                logout(request)
                 # Возвращаем простой HTTP ответ вместо ошибки
                 return HttpResponse("Account deactivated", status=401)
 
@@ -446,6 +447,7 @@ def KrononHistoryMiddleware(get_response: Any) -> Any:
                 request_user=user,
                 correlation_id=correlation_id,
             )
+
             request.audit_context = audit_context  # type: ignore[attr-defined]
 
             # Устанавливает теги Sentry (данные приклеятся ко всем ошибкам, возникшим в рамках запроса)
@@ -459,7 +461,6 @@ def KrononHistoryMiddleware(get_response: Any) -> Any:
                 # Синхронно вызываем следующий слой middleware / роутер
                 response = cast(HttpResponseBase, get_response(request))  # Явная типизация для mypy
                 # Добавляем заголовок 'X-Correlation-ID' (отдаем Correlation ID в ответ)
-                response = _process_response(response=response, correlation_id=correlation_id)
-                return response
+                return _process_response(response=response, correlation_id=correlation_id)
 
-        return middleware
+        return sync_middleware

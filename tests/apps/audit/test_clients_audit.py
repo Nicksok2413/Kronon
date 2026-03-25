@@ -74,8 +74,6 @@ class TestClientHistory(BaseAPITest):
         # Проверяем, что в контексте зафиксирован ID админа
         assert str(history[0]["pgh_context"]["user"]) == str(admin_user.id)
 
-    # TODO: исправиль AssertionError: assert 'None' == '019d0ba0-4a6...-2c07410a4e46'
-
     async def test_system_api_audit_logs_system_uuid(self, system_client: AsyncClient):
         """Проверка: системный запрос записывает SYSTEM_USER_ID в историю."""
         payload: dict[str, Any] = {
