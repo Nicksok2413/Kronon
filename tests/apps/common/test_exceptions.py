@@ -81,7 +81,7 @@ class TestGlobalExceptions(BaseAPITest):
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
-        json_response = response.json()
+        json_response: dict[str, Any] = response.json()
 
         assert json_response["code"] == "duplicate_unp"
         assert "УНП" in json_response["message"]
@@ -111,7 +111,7 @@ class TestGlobalExceptions(BaseAPITest):
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
 
-        json_response = response.json()
+        json_response: dict[str, Any] = response.json()
 
         assert json_response["code"] == "http_error_404"
 
