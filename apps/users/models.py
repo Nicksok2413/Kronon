@@ -88,6 +88,7 @@ class Department(BaseModel):
     InsertEvent(),
     UpdateEvent(),
     DeleteEvent(),
+    exclude=["last_login"],
     meta={
         "indexes": [
             # Функциональный B-tree индекс для correlation_id
