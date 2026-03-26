@@ -1,3 +1,9 @@
+"""
+Celery configuration.
+
+The base Celery task class has been extended with pghistory auditing and logging integration.
+"""
+
 import os
 import uuid
 from typing import Any
@@ -14,13 +20,13 @@ from sentry_sdk import set_context, set_tag
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 
-class PghistoryTask(Task):
+class TaskWithAudit(Task):
     """Базовый класс задач Celery с интеграцией аудита pghistory и логирования."""
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        # Извлекаем correlation_id из заголовков сообщения (прилетает из Django)
-        # Если задача запущена не из веба (например, через beat) - генерим новый ID
-        correlation_id = self.request.get("correlation_id") or str(uuid.uuid7())
+        # Извлекаем Correlation ID из заголовков сообщения (прилетает из Django)
+        # Если задача запущена не из веба (например, через beat) - генерим новый Correlation ID
+        correlation_id = self.request.get("X-Correlation-ID") or str(uuid.uuid7())
 
         # Данные для Sentry: приклеятся ко всем ошибкам этой конкретной задачи
         set_tag("correlation_id", correlation_id)
@@ -48,10 +54,13 @@ class PghistoryTask(Task):
 
 @before_task_publish.connect  # type: ignore
 def add_correlation_id_to_headers(headers: dict[str, Any], **kwargs: Any) -> None:
-    """Автоматически подхватывает ID из текущего контекста Loguru и упаковывает его в транспортный заголовок Celery."""
+    """
+    Автоматически подхватывает Correlation ID из текущего контекста Loguru
+    и упаковывает его в транспортный заголовок Celery.
+    """
     correlation_id = None
 
-    # "Патчим" временный логгер, чтобы просто вытащить из его контекста ID 'correlation_id'
+    # "Патчим" временный логгер, чтобы просто вытащить из его контекста Correlation ID
     # Это официальный и безопасный способ доступа к extra-полям в Loguru
     def capture(record: Any) -> None:
         nonlocal correlation_id
@@ -60,7 +69,7 @@ def add_correlation_id_to_headers(headers: dict[str, Any], **kwargs: Any) -> Non
     logger.patch(capture).debug("Checking context")  # Этот лог никуда не уйдет
 
     if correlation_id and correlation_id != "-":
-        headers["correlation_id"] = correlation_id
+        headers["X-Correlation-ID"] = correlation_id
 
 
 # Создаем экземпляр приложения Celery
@@ -70,7 +79,7 @@ app = Celery("kronon")
 app.config_from_object("django.conf:settings", namespace="CELERY")
 
 # Подменяем базовый класс задачи
-app.Task = PghistoryTask
+app.Task = TaskWithAudit
 
 # Автоматически обнаруживаем и регистрируем задачи из всех файлов tasks.py в установленных приложениях Django
 app.autodiscover_tasks()
