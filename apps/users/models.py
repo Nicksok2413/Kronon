@@ -18,6 +18,10 @@ from apps.common.utils.paths import RandomFileName
 from apps.common.validators import validate_image_size, validate_international_phone_number
 from apps.users.managers import CustomUserManager
 
+# ==============================================================================
+# Department, User & Profile
+# ==============================================================================
+
 
 class UserRole(models.TextChoices):
     """
@@ -275,3 +279,98 @@ class Profile(models.Model):
 
     def __str__(self) -> str:
         return f"Профиль {self.user.email}"
+
+
+# ==============================================================================
+# Absence (отсутствие сотрудника)
+# ==============================================================================
+
+
+class AbsenceType(models.TextChoices):
+    """
+    Типы отсутствий сотрудника на рабочем месте.
+    """
+
+    VACATION = "vacation", "Трудовой отпуск"
+    SICK_LEAVE = "sick_leave", "Больничный"
+    SICK_DAY = "sick_day", "Оплачиваемый отгул по болезни"
+    UNPAID = "unpaid", "Отпуск за свой счет"
+    MATERNITY = "maternity", "Декретный отпуск"
+    BUSINESS_TRIP = "business_trip", "Командировка"
+
+
+class AbsenceStatus(models.TextChoices):
+    """
+    Статусы согласования отсутствия.
+    """
+
+    PLANNED = "planned", "Запланирован"
+    PENDING = "pending", "На согласовании"
+    APPROVED = "approved", "Утвержден"
+    REJECTED = "rejected", "Отклонен"
+    COMPLETED = "completed", "Завершен"
+    CANCELLED = "cancelled", "Отменен"
+
+
+class Absence(BaseModel):
+    """
+    Запись об отсутствии сотрудника (отпуск, больничный и т.д.).
+
+    Наследуется от BaseModel (UUIDv7, SoftDelete).
+    Используется для учета рабочего времени и блокировки назначения новых задач.
+
+    Attrs:
+        user (User): Сотрудник, который будет отсутствовать.
+        absence_type (AbsenceType): Тип отсутствия.
+        status (AbsenceStatus): Текущий статус согласования.
+        start_date (date): Дата начала.
+        end_date (date): Дата окончания.
+        reason (str): Примечание или причина.
+        approved_by (User): Кто согласовал (если статус APPROVED).
+    """
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="absences",
+        verbose_name=_("Сотрудник"),
+    )
+
+    absence_type = models.CharField(
+        _("Тип отсутствия"),
+        max_length=20,
+        choices=AbsenceType.choices,
+    )
+
+    status = models.CharField(
+        _("Статус"),
+        max_length=20,
+        choices=AbsenceStatus.choices,
+        default=AbsenceStatus.PLANNED,
+        db_index=True,
+    )
+
+    start_date = models.DateField(_("Дата начала"), db_index=True)
+    end_date = models.DateField(_("Дата окончания"), db_index=True)
+
+    reason = models.TextField(
+        _("Причина / Примечание"),
+        blank=True,
+        null=True,
+        help_text=_("Дополнительная информация (например, номер больничного листа)"),
+    )
+
+    approved_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_absences",
+        verbose_name=_("Согласующий"),
+    )
+
+    class Meta:
+        verbose_name = _("Отсутствие")
+        verbose_name_plural = _("Отсутствия")
+        # Сортировка по умолчанию: новые сверху
+        ordering = ["-start_date"]
