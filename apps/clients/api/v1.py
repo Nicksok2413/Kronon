@@ -23,7 +23,7 @@ from apps.clients.selectors import get_client_queryset
 from apps.clients.services import create_client, delete_client, restore_client, update_client
 from apps.common.auth import AsyncApiKeyAuth
 from apps.common.managers import SoftDeleteQuerySet
-from apps.common.permissions import is_admin_access
+from apps.common.permissions import enforce_admin_access
 from apps.common.schemas import STANDARD_ERRORS
 
 # Эндпоинты доступны как по JWT, так и по API Ключу (для скриптов)
@@ -60,7 +60,7 @@ async def list_clients(
 
     # Проверяем права (RBAC) без рейза ошибки, просто для фильтрации
     try:
-        is_admin = await is_admin_access(request)
+        is_admin = await enforce_admin_access(request)
     except HttpError:
         is_admin = False
 
@@ -137,7 +137,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     log.info(f"Initiator '{initiator_str}' attempts to create client '{payload.name}'.")
 
     # Проверяем права (RBAC)
-    await is_admin_access(request)
+    await enforce_admin_access(request)
 
     # Вызываем сервис создания
     client = await create_client(data=payload, audit_context=audit_context)

@@ -18,7 +18,7 @@ from apps.audit.selectors import get_client_history_queryset
 from apps.audit.utils import get_initiator_log_str
 from apps.clients.models import Client
 from apps.common.auth import AsyncApiKeyAuth
-from apps.common.permissions import is_admin_access
+from apps.common.permissions import enforce_admin_access
 from apps.common.schemas import STANDARD_ERRORS
 
 # Эндпоинты доступны как по JWT, так и по API Ключу (для скриптов)
@@ -53,7 +53,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     log.info(f"Initiator '{initiator_str}' requested history for client {client_id}.")
 
     # Проверяем права (RBAC)
-    await is_admin_access(request)
+    await enforce_admin_access(request)
 
     # Проверяем существование клиента (сам объект не нужен, поэтому .aexists для скорости)
     # TODO: можно искать также по удаленным клиентам через менеджер .all_objects

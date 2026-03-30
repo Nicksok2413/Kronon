@@ -10,7 +10,7 @@ from ninja.errors import HttpError
 
 from apps.clients.models import Client
 from apps.clients.selectors import get_client_by_id
-from apps.common.permissions import check_client_access, is_admin_access
+from apps.common.permissions import enforce_admin_access, enforce_client_access
 
 
 async def get_client_or_404(client_id: UUID, is_deleted: bool = False) -> Client:
@@ -59,7 +59,7 @@ async def get_client_for_admin_or_404(request: HttpRequest, client_id: UUID, is_
     client = await get_client_or_404(client_id=client_id, is_deleted=is_deleted)
 
     # Проверка прав (RBAC)
-    await is_admin_access(request)
+    await enforce_admin_access(request)
 
     return client
 
@@ -82,6 +82,6 @@ async def get_client_for_edit_or_404(request: HttpRequest, client_id: UUID) -> C
     client = await get_client_or_404(client_id)
 
     # Проверка прав (RBAC + OLP)
-    await check_client_access(request=request, client=client)
+    await enforce_client_access(request=request, client=client)
 
     return client
