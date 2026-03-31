@@ -6,8 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from ninja import Schema
-from pydantic import Field
+from ninja import Field, Schema
 
 from apps.clients.models import ClientStatus, OrganizationType, TaxSystem
 

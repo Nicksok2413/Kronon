@@ -10,7 +10,7 @@ from pydantic import ConfigDict
 
 from apps.clients.models import ClientStatus, OrganizationType, TaxSystem
 from apps.clients.schemas.contacts import ClientContactInfo, ClientContactInfoUpdate
-from apps.users.schemas import DepartmentOut, UserOut
+from apps.users.schemas.directory import DepartmentDirectoryOut, UserDirectoryOut
 
 
 class ClientCreate(Schema):
@@ -113,7 +113,7 @@ class ClientOut(Schema):
     # Брать данные из ORM объектов (в Ninja Schema включено по умолчанию)
     # model_config = ConfigDict(from_attributes=True)
 
-    id: UUID = Field(..., description="Уникальный идентификатор клиента (UUIDv7)")
+    id: UUID = Field(..., description="ID клиента (UUIDv7)")
 
     # Enum поля автоматически сериализуются в строки (значения)
     status: ClientStatus = Field(..., description="Текущий статус")
@@ -125,11 +125,11 @@ class ClientOut(Schema):
     unp: str = Field(..., description="УНП")
 
     # Вложенные объекты (Nested objects)
-    department: DepartmentOut | None = Field(default=None, description="Обслуживающий отдел")
-    accountant: UserOut | None = Field(default=None, description="Ведущий бухгалтер")
-    primary_accountant: UserOut | None = Field(default=None, description="Бухгалтер по первичной документации")
-    payroll_accountant: UserOut | None = Field(default=None, description="Бухгалтер по заработной плате")
-    hr_specialist: UserOut | None = Field(default=None, description="Специалист по кадрам")
+    department: DepartmentDirectoryOut | None = Field(default=None, description="Обслуживающий отдел")
+    accountant: UserDirectoryOut | None = Field(default=None, description="Ведущий бухгалтер")
+    primary_accountant: UserDirectoryOut | None = Field(default=None, description="Бухгалтер по первичной документации")
+    payroll_accountant: UserDirectoryOut | None = Field(default=None, description="Бухгалтер по заработной плате")
+    hr_specialist: UserDirectoryOut | None = Field(default=None, description="Специалист по кадрам")
 
     contact_info: ClientContactInfo | None = Field(default=None, description="Структурированные контактные данные")
     google_folder_id: str | None = Field(default=None, description="ID папки Google Drive")
