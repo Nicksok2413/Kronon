@@ -68,12 +68,13 @@ async def list_clients(
     user_id = UUID(audit_context.get("user"))
 
     # Получаем базовый QuerySet (Lazy) с OLP-фильтрацией на уровне БД
-    query_set = get_client_queryset(user_id=user_id, is_admin=is_admin)
+    query_set = get_client_queryset(user_id=user_id, is_admin=is_admin, status="active")
 
     # Применяем фильтры из запроса: строим SQL-запрос, в БД не идем (Lazy)
     # Ninja.FilterSchema применяет фильтры к QuerySet'у, возвращая новый QuerySet
     query_set = filters.filter(query_set)
 
+    # Возвращаем QuerySet (Ninja сделает `aexecute()` с лимитом 20 записей)
     return query_set
 
 
@@ -247,7 +248,7 @@ async def restore_client_endpoint(request: HttpRequest, client_id: UUID) -> Clie
     log.info(f"Initiator '{initiator_str}' attempts to restore client {client_id}.")
 
     # Проверяем существование клиента и права (RBAC)
-    client = await get_client_for_admin_or_404(request=request, client_id=client_id, is_deleted=True)
+    client = await get_client_for_admin_or_404(request=request, client_id=client_id, status="deleted")
 
     # Вызываем сервис восстановления
     restored_client = await restore_client(client=client, audit_context=audit_context)

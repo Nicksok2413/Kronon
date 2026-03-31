@@ -1,7 +1,8 @@
 """
-Гарды  для приложения Clients.
+Гарды для приложения Clients.
 """
 
+from typing import Literal
 from uuid import UUID
 
 from django.http import HttpRequest
@@ -13,13 +14,13 @@ from apps.clients.selectors import get_client_by_id
 from apps.common.permissions import enforce_admin_access, enforce_client_access
 
 
-async def get_client_or_404(client_id: UUID, is_deleted: bool = False) -> Client:
+async def get_client_or_404(client_id: UUID, status: Literal["active", "deleted", "all"] = "active") -> Client:
     """
     Проверяет существование клиента.
 
     Args:
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
-        is_deleted (bool): Флаг поиска по мягко удалённым клиентам.
+        status (Literal): Флаг поиска (по умолчанию ищет только среди активных).
 
     Raises:
         HttpError(404): Если клиент не найден.
@@ -28,7 +29,7 @@ async def get_client_or_404(client_id: UUID, is_deleted: bool = False) -> Client
         Client: Объект клиента.
     """
     # Находим клиента, используя селектор для поиска
-    client = await get_client_by_id(client_id=client_id, is_deleted=is_deleted)
+    client = await get_client_by_id(client_id=client_id, status=status)
 
     # Проверяем существование клиента
     if client:
@@ -40,14 +41,18 @@ async def get_client_or_404(client_id: UUID, is_deleted: bool = False) -> Client
     return client
 
 
-async def get_client_for_admin_or_404(request: HttpRequest, client_id: UUID, is_deleted: bool = False) -> Client:
+async def get_client_for_admin_or_404(
+    request: HttpRequest,
+    client_id: UUID,
+    status: Literal["active", "deleted", "all"] = "active",
+) -> Client:
     """
     Проверяет существование клиента и RBAC-права (система/админ/директор/главбух).
 
     Args:
         request (HttpRequest): Объект входящего запроса.
         client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
-        is_deleted (bool): Флаг поиска по мягко удалённым клиентам.
+        status (Literal): Флаг поиска (по умолчанию ищет только среди активных).
 
     Raises:
         HttpError(404): Если клиент не найден.
@@ -56,7 +61,7 @@ async def get_client_for_admin_or_404(request: HttpRequest, client_id: UUID, is_
     Returns:
         Client: Объект клиента.
     """
-    client = await get_client_or_404(client_id=client_id, is_deleted=is_deleted)
+    client = await get_client_or_404(client_id=client_id, status=status)
 
     # Проверка прав (RBAC)
     await enforce_admin_access(request)
