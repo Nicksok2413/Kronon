@@ -13,6 +13,7 @@ from django.utils.safestring import SafeString
 from django.utils.translation import gettext_lazy as _
 
 from apps.common.admin import KrononBaseAdmin
+from apps.users.constants import SYSTEM_USER_ID
 from apps.users.models import Department, EmploymentStatus, Profile, User
 
 
@@ -117,6 +118,24 @@ class UserAdmin(KrononBaseAdmin[User], DjangoUserAdmin[User]):
         ]
 
         return soft_delete_filter + filters
+
+    # --- Делаем системного юзера неизменяемым (Read-only) ---
+
+    def has_change_permission(self, request: HttpRequest, obj: Any | None = None) -> bool:
+        """Запрещаем редактировать системного пользователя."""
+        if obj and str(obj.id) == str(SYSTEM_USER_ID):
+            return False
+
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any | None = None) -> bool:
+        """Запрещаем удалять системного пользователя."""
+        if obj and str(obj.id) == str(SYSTEM_USER_ID):
+            return False
+
+        return super().has_delete_permission(request, obj)
+
+    # --- UI helpers ---
 
     @classmethod
     def _render_badge(cls, text: str, color_style: str) -> SafeString:
