@@ -39,7 +39,8 @@ class UserRole(models.TextChoices):
     ACCOUNTANT = "accountant", "Бухгалтер"
     JUNIOR_ACCOUNTANT = "junior", "Младший бухгалтер"
     LAWYER = "lawyer", "Юрисконсульт"
-    HR = "hr", "Специалист по кадрам"
+    HR = "hr", "Специалист по кадрам (аутсорс)"
+    INTERNAL_HR = "internal_hr", "Внутренний HR"
     IT_SPECIALIST = "it", "IT-специалист"
     SECURITY_GUARD = "security_guard", "Охранник"
 
@@ -220,7 +221,7 @@ class User(AbstractUser, TimeStampedModel):
         return self.deleted_at is not None
 
     def delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
-        """Мягкое удаление пользователя (Soft Delete)."""
+        """Синхронное мягкое удаление пользователя (Soft Delete)."""
         self.deleted_at = timezone.now()
 
         # Деактивируем (чтобы мягко удалённый юзер не мог залогиниться)
@@ -230,8 +231,19 @@ class User(AbstractUser, TimeStampedModel):
         self.save(update_fields=["deleted_at", "is_active", "updated_at"])
         return 1, {self._meta.label: 1}
 
+    async def adelete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
+        """Асинхронное мягкое удаление пользователя (Soft Delete)."""
+        self.deleted_at = timezone.now()
+
+        # Деактивируем (чтобы мягко удалённый юзер не мог залогиниться)
+        self.is_active = False
+
+        # Используем update_fields для оптимизации SQL запроса
+        await self.asave(using=using, update_fields=["deleted_at", "is_active", "updated_at"])
+        return 1, {self._meta.label: 1}
+
     def restore(self) -> None:
-        """Восстановление удаленного пользователя."""
+        """Синхронное восстановление удаленного пользователя."""
         self.deleted_at = None
 
         # Активируем
@@ -240,9 +252,23 @@ class User(AbstractUser, TimeStampedModel):
         # Используем update_fields для оптимизации SQL запроса
         self.save(update_fields=["deleted_at", "is_active", "updated_at"])
 
+    async def arestore(self) -> None:
+        """Асинхронное восстановление удаленного пользователя."""
+        self.deleted_at = None
+
+        # Активируем
+        self.is_active = True
+
+        # Используем update_fields для оптимизации SQL запроса
+        await self.asave(update_fields=["deleted_at", "is_active", "updated_at"])
+
     def hard_delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
-        """Физическое удаление пользователя из БД (Hard Delete)."""
+        """Синхронное физическое удаление пользователя из БД (Hard Delete)."""
         return super().delete(using=using, keep_parents=keep_parents)
+
+    async def ahard_delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
+        """Асинхронное физическое удаление пользователя из БД (Hard Delete)."""
+        return await super().adelete(using=using, keep_parents=keep_parents)
 
 
 class Profile(models.Model):
@@ -306,7 +332,7 @@ class AbsenceType(models.TextChoices):
     """
 
     VACATION = "vacation", "Трудовой отпуск"
-    SICK_LEAVE = "sick_leave", "Больничный"
+    SICK_LEAVE = "sick_leave", "Больничный (официальный)"
     SICK_DAY = "sick_day", "День здоровья (без справки)"
     UNPAID = "unpaid", "Отпуск за свой счет"
     MATERNITY = "maternity", "Декретный отпуск"
@@ -331,7 +357,7 @@ class Absence(BaseModel):
     Запись об отсутствии сотрудника (отпуск, больничный и т.д.).
 
     Наследуется от BaseModel (UUIDv7, SoftDelete).
-    Используется для учета рабочего времени и блокировки назначения новых задач.
+    Используется для учета рабочего времени и передачи дел.
 
     Attrs:
         user (User): Сотрудник, который будет отсутствовать.
@@ -390,12 +416,13 @@ class Absence(BaseModel):
         blank=True,
         related_name="approved_absences",
         verbose_name=_("Согласующий"),
+        help_text=_("Кто утвердил отсутствие (HR или Директор)"),
     )
 
     class Meta:
         verbose_name = _("Отсутствие")
         verbose_name_plural = _("Отсутствия")
-        # Сортировка по умолчанию: по дате самого события
+        # Сортировка по умолчанию: по началу события (для календаря)
         ordering = ["-start_date"]
 
     def __str__(self) -> str:
