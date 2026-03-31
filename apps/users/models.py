@@ -12,10 +12,13 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from pghistory import DeleteEvent, InsertEvent, UpdateEvent
 from pghistory import track as pghistory_track
+from pgtrigger.contrib import Protect
+from pgtrigger.core import Delete, Q, Update
 
 from apps.common.models import BaseModel, TimeStampedModel
 from apps.common.utils.paths import RandomFileName
 from apps.common.validators import validate_image_size, validate_international_phone_number
+from apps.users.constants import SYSTEM_USER_ID
 from apps.users.managers import CustomUserManager
 
 # ==============================================================================
@@ -184,6 +187,11 @@ class User(AbstractUser, TimeStampedModel):
         # Сортировка по умолчанию (обратный порядок - новые сверху)
         # UUIDv7 сортируется по времени быстрее, чем created_at
         ordering = ["-id"]
+
+        # Защищаем системного юзера от изменения/удаления на уровне БД
+        triggers = [
+            Protect(name="protect_system_user", operation=(Update | Delete), condition=Q(old__id=SYSTEM_USER_ID))
+        ]
 
     def __str__(self) -> str:
         return self.email
