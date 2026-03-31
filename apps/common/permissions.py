@@ -9,7 +9,6 @@ from ninja.errors import HttpError
 
 from apps.clients.models import Client
 from apps.common.auth import get_auth_identity
-from apps.users.constants import SYSTEM_USER_ID
 from apps.users.models import User, UserRole
 
 # ==============================================================================
@@ -32,13 +31,8 @@ def has_admin_access(user: User) -> bool:
 
     allower_roles = (UserRole.DIRECTOR, UserRole.SYSTEM_ADMINISTRATOR, UserRole.CHIEF_ACCOUNTANT)
 
-    # TODO: подумать не лишняя ли это проверка
-    # Если это система, возвращаем True (у системы абсолютные права)
-    # Системный юзер и так имеет роль SYSTEM_ADMINISTRATOR (из миграции), но проверяем явно по ID для надежности
-    if user.id == SYSTEM_USER_ID:
-        return True
-
-    # Если это админ/директор/главбух, возвращаем True
+    # Если это система/админ/директор/главбух, возвращаем True
+    # Системный юзер имеет роль SYSTEM_ADMINISTRATOR (из миграции)
     return user.role in allower_roles
 
 
