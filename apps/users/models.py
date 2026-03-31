@@ -281,6 +281,12 @@ class Profile(models.Model):
     birth_date = models.DateField(_("Дата рождения"), null=True, blank=True)
     bio = models.TextField(_("О себе"), blank=True, help_text=_("Краткая информация, навыки, хобби"))
 
+    allowed_sick_days = models.PositiveSmallIntegerField(
+        _("Доступно дней здоровья в год"),
+        default=3,
+        help_text=_("Количество оплачиваемых отгулов по болезни без справки"),
+    )
+
     class Meta:
         verbose_name = _("Профиль")
         verbose_name_plural = _("Профили")
@@ -301,7 +307,7 @@ class AbsenceType(models.TextChoices):
 
     VACATION = "vacation", "Трудовой отпуск"
     SICK_LEAVE = "sick_leave", "Больничный"
-    SICK_DAY = "sick_day", "Оплачиваемый отгул по болезни"
+    SICK_DAY = "sick_day", "День здоровья (без справки)"
     UNPAID = "unpaid", "Отпуск за свой счет"
     MATERNITY = "maternity", "Декретный отпуск"
     BUSINESS_TRIP = "business_trip", "Командировка"
@@ -359,7 +365,16 @@ class Absence(BaseModel):
     )
 
     start_date = models.DateField(_("Дата начала"), db_index=True)
-    end_date = models.DateField(_("Дата окончания"), db_index=True)
+
+    # Дата окончания опциональна (если отпуск - дата обязательна, если больничный - может быть null)
+    # TODO: сервисный слой должен реализовать валидацию этой логики при создание объекта
+    end_date = models.DateField(
+        _("Дата окончания"),
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text=_("Оставьте пустым для открытого больничного"),
+    )
 
     reason = models.TextField(
         _("Причина / Примечание"),
@@ -380,5 +395,9 @@ class Absence(BaseModel):
     class Meta:
         verbose_name = _("Отсутствие")
         verbose_name_plural = _("Отсутствия")
-        # Сортировка по умолчанию: новые сверху
+        # Сортировка по умолчанию: по дате самого события
         ordering = ["-start_date"]
+
+    def __str__(self) -> str:
+        end = self.end_date if self.end_date else "По н.в."
+        return f"{self.user.email} ({self.get_absence_type_display()}): {self.start_date} - {end}"
