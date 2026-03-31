@@ -1,5 +1,5 @@
 """
-Common schemas of Kronon project
+Глобальные схемы данных (DTO) для всего проекта.
 """
 
 from typing import Any
@@ -9,12 +9,13 @@ from ninja import Field, Schema
 
 class ErrorOut(Schema):
     """
-    Единый формат ответа с ошибкой.
+    Унифицированная схема для возврата ошибок API.
+    Гарантирует, что фронтенд всегда получает ошибки в одном формате.
     Используется для 400, 401, 403, 404, 409, 422 и 500 ответов.
     """
 
     message: str = Field(..., description="Человекочитаемое сообщение об ошибке")
-    code: str = Field(..., description="Машинный код ошибки (например: validation_error, not_found)")
+    code: str = Field(..., description="Машинный код ошибки (например: not_found, permission_denied)")
     details: dict[str, Any] | list[Any] | None = Field(
         default=None,
         description="Детали ошибки (например, список невалидных полей)",
