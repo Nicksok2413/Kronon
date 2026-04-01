@@ -10,7 +10,6 @@ from uuid import UUID
 from django.http import HttpRequest
 from loguru import logger as log
 from ninja import Query, Router
-from ninja.errors import HttpError
 from ninja.pagination import PageNumberPagination, paginate
 from ninja_jwt.authentication import AsyncJWTAuth
 
@@ -21,9 +20,9 @@ from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
 from apps.clients.selectors import get_client_queryset
 from apps.clients.services import create_client, delete_client, restore_client, update_client
-from apps.common.auth import AsyncApiKeyAuth
+from apps.common.auth import AsyncApiKeyAuth, get_auth_identity
 from apps.common.managers import SoftDeleteQuerySet
-from apps.common.permissions import enforce_admin_access
+from apps.common.permissions import enforce_admin_access, has_admin_access
 from apps.common.schemas import STANDARD_ERRORS
 
 # Эндпоинты доступны как по JWT, так и по API Ключу (для скриптов)
@@ -58,17 +57,14 @@ async def list_clients(
     initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' fetching clients list.")
 
-    # Проверяем права (RBAC) без рейза ошибки, просто для фильтрации
-    try:
-        is_admin = await enforce_admin_access(request)
-    except HttpError:
-        is_admin = False
+    # Получаем юзера из запроса
+    user = await get_auth_identity(request)
 
-    # Извлекаем данные для бизнес-логики (OLP)
-    user_id = UUID(audit_context.get("user"))
+    # Проверяем административные права (через чекер, без рейза) для флага фильтрации
+    is_admin = has_admin_access(user)
 
     # Получаем базовый QuerySet (Lazy) с OLP-фильтрацией на уровне БД
-    query_set = get_client_queryset(user_id=user_id, is_admin=is_admin, status="active")
+    query_set = get_client_queryset(user_id=user.id, is_admin=is_admin, status="active")
 
     # Применяем фильтры из запроса: строим SQL-запрос, в БД не идем (Lazy)
     # Ninja.FilterSchema применяет фильтры к QuerySet'у, возвращая новый QuerySet
@@ -137,7 +133,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' attempts to create client '{payload.name}'.")
 
-    # Проверяем права (RBAC)
+    # Проверяем административные права (RBAC)
     await enforce_admin_access(request)
 
     # Вызываем сервис создания
