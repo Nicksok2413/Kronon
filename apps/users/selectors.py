@@ -16,8 +16,8 @@ def _get_base_user_queryset(status: Literal["active", "deleted", "all"] = "activ
     """
     Технический метод для оптимизации и сортировки базового "ленивого" (Lazy) QuerySet для списка пользователей.
 
-    Использует select_related для ForeignKey и OneToOneField, чтобы избежать N+1 запросов.
-    Гарантирует сортировку по ID (в обратном порядке).
+    Применяет `select_related` для связанных профилей и отделов, избегая N+1.
+    Сортирует по убыванию ID (что эквивалентно дате регистрации благодаря UUIDv7).
 
     Args:
         status (Literal): Статус записей ("active" - активные, "deleted" - удаленные/неактивные, "all" - все).
@@ -39,60 +39,46 @@ def _get_base_user_queryset(status: Literal["active", "deleted", "all"] = "activ
     return search_users.select_related("department", "profile").order_by("-id")
 
 
-async def get_directory_users() -> list[User]:
+def get_directory_user_queryset() -> SoftDeleteQuerySet[User]:
     """
-    Асинхронно получает список активных сотрудников для публичного справочника.
+    Возвращает QuerySet активных сотрудников для публичного справочника.
+    Возвращаемый QuerySet готов к применению фильтров и пагинации в API.
 
     Returns:
-        list[User]: Список сотрудников.
+        SoftDeleteQuerySet[User]: Ленивый (Lazy) QuerySet для публичного справочника сотрудников.
     """
-    log.info("Fetching public directory users list")
-
-    try:
-        # Для публичного справочника берем только активных сотрудников (status="active")
-        queryset = _get_base_user_queryset(status="active")
-
-        return [user async for user in queryset]
-
-    except Exception as exc:
-        log.error(f"DB Error while fetching directory users: {exc}")
-        # Глобальный хендлер превратит это в 500
-        raise
+    # Для публичного справочника берем только активных сотрудников (status="active")
+    return _get_base_user_queryset(status="active")
 
 
-async def get_hr_users() -> list[User]:
+def get_internal_hr_user_queryset(status: Literal["active", "deleted", "all"] = "all") -> SoftDeleteQuerySet[User]:
     """
-    Асинхронно получает полный список сотрудников (включая уволенных/неактивных) для внутреннего HR.
+    Возвращает QuerySet сотрудников для внутреннего HR (включает уволенных/неактивных/удаленных по умолчанию).
+    Возвращаемый QuerySet готов к применению фильтров и пагинации в API.
+
+    Args:
+        status (Literal): Статус записей ("active" - активные, "deleted" - удаленные/неактивные, "all" - все).
 
     Returns:
-        list[User]: Список сотрудников.
+        SoftDeleteQuerySet[User]: Ленивый (Lazy) QuerySet сотрудников для внутреннего HR.
     """
-    log.info("Fetching HR employees list")
-
-    try:
-        # Для внутреннего HR берем всех сотрудников (status="all")
-        queryset = _get_base_user_queryset(status="all")
-
-        return [user async for user in queryset]
-
-    except Exception as exc:
-        log.error(f"DB Error while fetching Internal HR users: {exc}")
-        # Глобальный хендлер превратит это в 500
-        raise
+    # Для внутреннего HR берем всех сотрудников (status="all")
+    return _get_base_user_queryset(status=status)
 
 
 async def get_user_by_id(user_id: UUID, status: Literal["active", "deleted", "all"] = "active") -> User | None:
     """
-    Асинхронно получает пользователя по ID с подгруженными связями.
+    Асинхронно получает детальную информацию о сотруднике по ID с подгруженными связями.
 
     Args:
-        user_id (UUID): ID сотрудника.
-        status (Literal): Статус записей ("active" - активные, "deleted" - удаленные/неактивные, "all" - все).
+        user_id (UUID): ID сотрудника (UUIDv7).
+        status (Literal): Флаг поиска (по умолчанию ищет только среди активных).
 
     Returns:
-        User | None: Объект пользователя или None.
+        User | None: Объект сотруднике или None, если не найден.
     """
-    log.debug(f"Fetching user ID: {user_id}")
+    # TODO: добавить логирование в эндпойнты
+    # log.debug(f"Fetching user ID: {user_id}")
 
     try:
         # Оптимизированный базовый QuerySet
