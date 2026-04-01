@@ -33,11 +33,11 @@ class ClientContactInfoUpdate(Schema):
     Используется в PATCH запросах.
     """
 
-    general_email: EmailStr | None = Field(default=None, description="Обновить Email организации")
+    general_email: EmailStr | None = Field(default=None, description="Обновить email организации")
     general_phone: PhoneNumber | None = Field(default=None, description="Обновить телефон организации")
     address_legal: str | None = Field(default=None, description="Обновить юридический адрес организации")
     address_mailing: str | None = Field(default=None, description="Обновить почтовый адрес организации")
-    website: str | None = Field(default=None, description="Обновить Веб-сайт организации")
+    website: str | None = Field(default=None, description="Обновить веб-сайт организации")
 
     # Списком управляем целиком: если прислали новый список - заменяем старый
     # Если нужно будет менять контакты точечно, будем делать через отдельные эндпоинты

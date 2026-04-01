@@ -48,14 +48,14 @@ async def create_client(data: ClientCreate, audit_context: dict[str, Any]) -> Cl
 
         log.info(f"Client created. ID: {client.id}")
 
-        # .acreate возвращает "чистый" объект (ID и базовые поля), а схема ClientOut требует вложенных объектов
+        # .create() возвращает "чистый" объект (ID и базовые поля)
         # Делаем рефреш через селектор с подгрузкой связей (department, accountant и т.д.) для корректного ответа API
         full_client = await get_client_by_id(client.id)
 
-        # Теоретически невозможно, что его нет, но для Mypy:
+        # Теоретически невозможно, что его нет, но для mypy:
         if not full_client:
             log.critical(f"Client {client.id} disappeared after creation!")
-            raise RuntimeError(f"Client {client.id} not found immediately after creation.")
+            raise RuntimeError("Client not found after creation.")
 
         # Возвращаем созданный объект с полными данными
         return full_client
@@ -112,10 +112,10 @@ async def update_client(client: Client, data: ClientUpdate, audit_context: dict[
         # Делаем рефреш через селектор с подгрузкой связей (актуальные связи и updated_at) для корректного ответа API
         updated_client = await get_client_by_id(client_id=client.id)
 
-        # Теоретически невозможно, что его нет, но для Mypy:
+        # Теоретически невозможно, что его нет, но для mypy:
         if not updated_client:
             log.critical(f"Client {client.id} disappeared after update!")
-            raise RuntimeError("Client not found after update")
+            raise RuntimeError("Client not found after update.")
 
         # Возвращаем актуальные данные
         return updated_client
@@ -128,7 +128,7 @@ async def update_client(client: Client, data: ClientUpdate, audit_context: dict[
 
 async def delete_client(client: Client, audit_context: dict[str, Any]) -> None:
     """
-    Выполняет мягкое удаление клиента.
+    Выполняет мягкое удаление клиента (Soft Delete).
 
     Args:
         client (Client): Объект клиента.
@@ -171,10 +171,10 @@ async def restore_client(client: Client, audit_context: dict[str, Any]) -> Clien
         # Делаем рефреш через селектор с подгрузкой связей (актуальные связи и updated_at) для корректного ответа API
         restored_client = await get_client_by_id(client_id=client.id)
 
-        # Теоретически невозможно, что его нет, но для Mypy:
+        # Теоретически невозможно, что его нет, но для mypy:
         if not restored_client:
             log.critical(f"Client {client.id} disappeared after restore!")
-            raise RuntimeError("Client not found after restore")
+            raise RuntimeError("Client not found after restore.")
 
         # Возвращаем актуальные данные
         return restored_client

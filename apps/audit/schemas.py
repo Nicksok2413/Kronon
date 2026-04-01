@@ -11,8 +11,10 @@ from ninja import Field, Schema
 from apps.clients.models import ClientStatus, OrganizationType, TaxSystem
 
 
-class HistoryContextMetadata(Schema):
-    """Метаданные контекста из pgh_context."""
+class HistoryContextData(Schema):
+    """
+    Данные контекста из pgh_context.
+    """
 
     user: str | None = Field(default=None, description="ID пользователя")
     user_email: str | None = Field(default=None, description="Email пользователя")
@@ -44,10 +46,10 @@ class ClientSnapshot(Schema):
 
     # Связи (хранятся как UUID)
     department_id: UUID | None = Field(default=None, description="ID обслуживающего отдела")
-    accountant_id: UUID | None = Field(default=None, description="ID Ведущего бухгалтера")
-    primary_accountant_id: UUID | None = Field(default=None, description="ID Бухгалтера по первичной документации")
-    payroll_accountant_id: UUID | None = Field(default=None, description="ID Бухгалтера по заработной плате")
-    hr_specialist_id: UUID | None = Field(default=None, description="ID Специалиста по кадрам")
+    accountant_id: UUID | None = Field(default=None, description="ID ведущего бухгалтера")
+    primary_accountant_id: UUID | None = Field(default=None, description="ID бухгалтера по первичной документации")
+    payroll_accountant_id: UUID | None = Field(default=None, description="ID бухгалтера по заработной плате")
+    hr_specialist_id: UUID | None = Field(default=None, description="ID специалиста по кадрам")
 
     # JSON поле
     contact_info: dict[str, Any] = Field(default_factory=dict, description="Контактная информация")
@@ -63,21 +65,21 @@ class ClientSnapshot(Schema):
 
 class ClientHistoryOut(Schema):
     """
-    Схема одной записи в истории изменений клиента.
+    Схема одной записи в истории изменений клиента (ответ API).
     Включает Snapshot данных, Diff и Context.
     """
 
     # Системные поля pghistory
     pgh_id: int = Field(..., description="ID события")
     pgh_created_at: datetime = Field(..., description="Дата и время изменения")
-    pgh_label: str = Field(..., description="Тип события (snapshot, insert, update)")
+    pgh_label: str = Field(..., description="Тип события (insert, update, delete)")
 
     # Разница изменений (автоматически считается базой)
     # Пример: {"status": ["old", "new"], "name": ["OldName", "NewName"]}
     pgh_diff: dict[str, list[Any]] | None = Field(default=None, description="Разница изменений (Old -> New)")
 
     # Контекст
-    pgh_context: HistoryContextMetadata | None = Field(default=None, description="Денормализованный контекст")
+    pgh_context: HistoryContextData | None = Field(default=None, description="Денормализованный контекст")
 
     # Snapshot данных (вложенная схема)
     snapshot: ClientSnapshot = Field(..., description="Состояние объекта после изменения")

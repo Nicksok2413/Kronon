@@ -11,6 +11,7 @@ from apps.clients.api.v1.clients import router as clients_v1_router
 from apps.common.auth import AsyncApiKeyAuth
 from apps.common.exceptions import setup_exception_handlers
 from apps.users.api.v1.directory import router as directory_v1_router
+from apps.users.api.v1.internal_hr import router as internal_hr_v1_router
 
 # Инициализируем API
 # NinjaExtraAPI дает больше возможностей, чем просто NinjaAPI
@@ -42,6 +43,7 @@ api.add_router("/clients", clients_v1_router)
 
 # Users API (Пользователи/Сотрудники)
 api.add_router("/directory", directory_v1_router)  # Публичный справочник сотрудников
+api.add_router("/internal-hr/employees", internal_hr_v1_router)  # Управление кадрами самой компании
 
 
 # --- Подключаем обработчики ошибок ---

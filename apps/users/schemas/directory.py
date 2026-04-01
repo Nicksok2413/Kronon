@@ -12,7 +12,7 @@ from apps.users.models import User, UserRole
 
 class DepartmentDirectoryOut(Schema):
     """
-    Схема отдела для публичного справочника.
+    Схема отдела для публичного справочника (ответ API).
     """
 
     id: UUID = Field(..., description="ID отдела (UUIDv7)")
@@ -21,7 +21,7 @@ class DepartmentDirectoryOut(Schema):
 
 class UserDirectoryOut(Schema):
     """
-    Схема сотрудника для публичного справочника.
+    Схема сотрудника для публичного справочника (ответ API).
     Доступна всем авторизованным пользователям системы.
     """
 
@@ -35,7 +35,7 @@ class UserDirectoryOut(Schema):
     # Ninja/Pydantic умеет вызывать методы модели, если имя совпадает
     full_name_rus: str | None = Field(default=None, description="ФИО сотрудника")
 
-    role: UserRole = Field(..., description="Должность / Роль")
+    role: UserRole = Field(..., description="Должность")
 
     # Вложенная схема
     department: DepartmentDirectoryOut | None = Field(default=None, description="Отдел")

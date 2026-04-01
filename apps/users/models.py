@@ -134,8 +134,11 @@ class User(AbstractUser, TimeStampedModel):
 
     email = models.EmailField(_("Email"), unique=True)
 
+    # Отчество (необязательное поле)
+    middle_name = models.CharField(_("Отчество"), max_length=150, blank=True)
+
     role = models.CharField(
-        _("Роль"),
+        _("Должность"),
         max_length=50,
         choices=UserRole.choices,
         default=UserRole.ACCOUNTANT,
@@ -157,11 +160,11 @@ class User(AbstractUser, TimeStampedModel):
         default=EmploymentStatus.PROBATION,  # По умолчанию все новые сотрудники на испытательном сроке
     )
 
+    # Контрактные данные
     probation_end_date = models.DateField(
         _("Конец испытательного срока"), null=True, blank=True, help_text=_("Дата окончания испытательного срока")
     )
 
-    # Контрактные данные
     contract_start_date = models.DateField(
         _("Начало контракта"), null=True, blank=True, help_text=_("Дата приема на работу или начала текущего контракта")
     )
@@ -169,9 +172,6 @@ class User(AbstractUser, TimeStampedModel):
     contract_end_date = models.DateField(
         _("Окончание контракта"), null=True, blank=True, help_text=_("Дата истечения срока действия контракта")
     )
-
-    # Отчество (необязательное поле)
-    middle_name = models.CharField(_("Отчество"), max_length=150, blank=True)
 
     # Используем кастомный менеджер
     objects = CustomUserManager()  # type: ignore
@@ -393,7 +393,6 @@ class Absence(BaseModel):
     start_date = models.DateField(_("Дата начала"), db_index=True)
 
     # Дата окончания опциональна (если отпуск - дата обязательна, если больничный - может быть null)
-    # TODO: сервисный слой должен реализовать валидацию этой логики при создание объекта
     end_date = models.DateField(
         _("Дата окончания"),
         blank=True,

@@ -34,4 +34,4 @@ class UserFilter(FilterSchema):
     role: UserRole | None = Field(default=None, description="Фильтр по должности")
     department_id: UUID | None = Field(default=None, description="Фильтр по отделу")
     # Специфичный HR-фильтр (в публичном справочнике он не будет находить ничего секретного, но позволит фильтровать)
-    employment_status: EmploymentStatus | None = Field(default=None, description="Статус трудоустройства (Штат/Подряд)")
+    employment_status: EmploymentStatus | None = Field(default=None, description="Статус трудоустройства (штат/подряд)")

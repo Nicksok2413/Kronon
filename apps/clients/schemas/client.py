@@ -37,10 +37,10 @@ class ClientCreate(Schema):
     department_id: UUID | None = Field(default=None, description="ID обслуживающего отдела")
 
     # Ответственные
-    accountant_id: UUID | None = Field(default=None, description="ID Ведущего бухгалтера")
-    primary_accountant_id: UUID | None = Field(default=None, description="ID Бухгалтера по первичной документации")
-    payroll_accountant_id: UUID | None = Field(default=None, description="ID Бухгалтера по заработной плате")
-    hr_specialist_id: UUID | None = Field(default=None, description="ID Специалиста по кадрам")
+    accountant_id: UUID | None = Field(default=None, description="ID ведущего бухгалтера")
+    primary_accountant_id: UUID | None = Field(default=None, description="ID бухгалтера по первичной документации")
+    payroll_accountant_id: UUID | None = Field(default=None, description="ID бухгалтера по заработной плате")
+    hr_specialist_id: UUID | None = Field(default=None, description="ID специалиста по кадрам")
 
     # Вложенная схема для контактов
     # Фронтенд будет слать JSON: {"contact_info": {"contacts": [{"role": "Директор", ...}]}}
@@ -80,22 +80,23 @@ class ClientUpdate(Schema):
     # Ответственные
     accountant_id: UUID | None = Field(
         default=None,
-        description="Обновить ID Ведущего бухгалтера",
+        description="Обновить ID ведущего бухгалтера",
     )
     primary_accountant_id: UUID | None = Field(
         default=None,
-        description="Обновить ID Бухгалтера по первичной документации",
+        description="Обновить ID бухгалтера по первичной документации",
     )
     payroll_accountant_id: UUID | None = Field(
         default=None,
-        description="Обновить ID Бухгалтера по заработной плате",
+        description="Обновить ID бухгалтера по заработной плате",
     )
     hr_specialist_id: UUID | None = Field(
         default=None,
-        description="Обновить ID Специалиста по кадрам",
+        description="Обновить ID специалиста по кадрам",
     )
 
-    # Вложенная схема для PATCH (позволяет обновлять email, не трогая телефон)
+    # Вложенная схема для PATCH
+    # Позволяет обновлять одни данные (например, email) не трогая другие данные (например, телефон)
     contact_info: ClientContactInfoUpdate | None = Field(
         default=None,
         description="Обновить контактную информацию",
