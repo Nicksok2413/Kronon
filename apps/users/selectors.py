@@ -77,9 +77,6 @@ async def get_user_by_id(user_id: UUID, status: Literal["active", "deleted", "al
     Returns:
         User | None: Объект сотруднике или None, если не найден.
     """
-    # TODO: добавить логирование в эндпойнты
-    # log.debug(f"Fetching user ID: {user_id}")
-
     try:
         # Оптимизированный базовый QuerySet
         queryset = _get_base_user_queryset(status=status)
