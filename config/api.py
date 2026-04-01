@@ -19,7 +19,9 @@ api = NinjaExtraAPI(
     version="1.0.0",
     description="Enterprise Accounting OS API",
     urls_namespace="api",  # Важно для reverse()
-    auth=[AsyncJWTAuth(), AsyncApiKeyAuth()],  # Аутентификация по умолчанию для всех эндпоинтов
+    # Аутентификация по умолчанию для всех эндпоинтов
+    # Доступ только по JWT и по внутреннему API-Ключу (для межсервисного взаимодействия)
+    auth=[AsyncJWTAuth(), AsyncApiKeyAuth()],
 )
 
 

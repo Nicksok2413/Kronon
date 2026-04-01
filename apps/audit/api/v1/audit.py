@@ -11,18 +11,16 @@ from django.http import HttpRequest
 from loguru import logger as log
 from ninja import Router
 from ninja.errors import HttpError
-from ninja_jwt.authentication import AsyncJWTAuth
 
 from apps.audit.schemas import ClientHistoryOut
 from apps.audit.selectors import get_client_history_queryset
 from apps.audit.utils import get_initiator_log_str
 from apps.clients.models import Client
-from apps.common.auth import AsyncApiKeyAuth
 from apps.common.permissions import enforce_admin_access
 from apps.common.schemas import STANDARD_ERRORS
 
-# Эндпоинты доступны как по JWT, так и по API Ключу (для межсервисного взаимодействия)
-router = Router(auth=[AsyncJWTAuth(), AsyncApiKeyAuth()], tags=["Audit"])
+# Эндпоинты по умолчанию доступны только по JWT и по внутреннему API-Ключу (для межсервисного взаимодействия)
+router = Router(tags=["Audit"])
 
 
 @router.get("/clients/{client_id}", response={200: list[ClientHistoryOut], **STANDARD_ERRORS})

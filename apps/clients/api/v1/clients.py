@@ -11,7 +11,6 @@ from django.http import HttpRequest
 from loguru import logger as log
 from ninja import Query, Router
 from ninja.pagination import PageNumberPagination, paginate
-from ninja_jwt.authentication import AsyncJWTAuth
 
 from apps.audit.utils import get_initiator_log_str
 from apps.clients.guards import get_client_for_admin_or_404, get_client_for_edit_or_404
@@ -20,13 +19,13 @@ from apps.clients.schemas.client import ClientCreate, ClientOut, ClientUpdate
 from apps.clients.schemas.filters import ClientFilter
 from apps.clients.selectors import get_client_queryset
 from apps.clients.services import create_client, delete_client, restore_client, update_client
-from apps.common.auth import AsyncApiKeyAuth, get_auth_identity
+from apps.common.auth import get_auth_identity
 from apps.common.managers import SoftDeleteQuerySet
 from apps.common.permissions import enforce_admin_access, has_admin_access
 from apps.common.schemas import STANDARD_ERRORS
 
-# Эндпоинты доступны как по JWT, так и по API Ключу (для межсервисного взаимодействия)
-router = Router(auth=[AsyncJWTAuth(), AsyncApiKeyAuth()], tags=["Clients"])
+# Эндпоинты по умолчанию доступны только по JWT и по внутреннему API-Ключу (для межсервисного взаимодействия)
+router = Router(tags=["Clients"])
 
 
 @router.get("/", response={200: list[ClientOut], **STANDARD_ERRORS})

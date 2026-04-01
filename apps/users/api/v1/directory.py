@@ -13,9 +13,7 @@ from loguru import logger as log
 from ninja import Query, Router
 from ninja.errors import HttpError
 from ninja.pagination import PageNumberPagination, paginate
-from ninja_jwt.authentication import AsyncJWTAuth
 
-from apps.common.auth import AsyncApiKeyAuth
 from apps.common.managers import SoftDeleteQuerySet
 from apps.common.schemas import STANDARD_ERRORS
 from apps.users.models import User
@@ -23,8 +21,8 @@ from apps.users.schemas.directory import UserDirectoryOut
 from apps.users.schemas.filters import UserFilter
 from apps.users.selectors import get_directory_user_queryset, get_user_by_id
 
-# Эндпоинты доступны как по JWT, так и по API Ключу (для межсервисного взаимодействия)
-router = Router(auth=[AsyncJWTAuth(), AsyncApiKeyAuth()], tags=["Directory"])
+# Эндпоинты по умолчанию доступны только по JWT и по внутреннему API-Ключу (для межсервисного взаимодействия)
+router = Router(tags=["Directory"])
 
 
 @router.get("/", response={200: list[UserDirectoryOut], **STANDARD_ERRORS})
@@ -78,10 +76,15 @@ async def get_directory_user(request: HttpRequest, user_id: UUID) -> User:
     """
     log.info(f"User {request.user.id} requested directory profile for {user_id}.")
 
-    # Ищем только среди активных
+    # Находим сотрудника (ищем только среди активных)
     user = await get_user_by_id(user_id=user_id, status="active")
 
-    if not user:
+    # Проверяем существование сотрудника
+    if user:
+        log.debug(f"User found. Email: {user.email}")
+    else:
+        log.debug(f"User {user_id} not found.")
         raise HttpError(status_code=404, message="Сотрудник не найден.")
 
-    return 200, user
+    # Ninja сам преобразует User в UserDirectoryOut
+    return user
