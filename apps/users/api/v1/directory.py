@@ -14,6 +14,7 @@ from ninja import Query, Router
 from ninja.errors import HttpError
 from ninja.pagination import PageNumberPagination, paginate
 
+from apps.audit.utils import get_initiator_log_str
 from apps.common.managers import SoftDeleteQuerySet
 from apps.common.schemas import STANDARD_ERRORS
 from apps.users.models import User
@@ -45,7 +46,12 @@ async def list_directory_users(
     Returns:
         SoftDeleteQuerySet[User]: Отфильтрованный ленивый список сотрудников (пагинация применяется декоратором).
     """
-    log.info(f"User {request.user.id} requested directory list.")
+    # Достаем контекст аудита, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
+
+    # Логируем инициатора запроса
+    initiator_str = get_initiator_log_str(audit_context)
+    log.info(f"Initiator '{initiator_str}' requested directory list.")
 
     # Получаем базовый ленивый QuerySet (только активные юзеры)
     query_set = get_directory_user_queryset()
@@ -74,7 +80,12 @@ async def get_directory_user(request: HttpRequest, user_id: UUID) -> User:
     Returns:
         User: Объект сотрудника (сериализуется в UserDirectoryOut).
     """
-    log.info(f"User {request.user.id} requested directory profile for {user_id}.")
+    # Достаем контекст аудита, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
+
+    # Логируем инициатора запроса
+    initiator_str = get_initiator_log_str(audit_context)
+    log.info(f"Initiator '{initiator_str}' requested directory profile for {user_id}.")
 
     # Находим сотрудника (ищем только среди активных)
     user = await get_user_by_id(user_id=user_id, status="active")
