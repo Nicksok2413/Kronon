@@ -12,8 +12,8 @@ from config.api import api
 urlpatterns: list[URLPattern | URLResolver] = [
     # Админка
     path("admin/", admin.site.urls),
-    # API
-    path("api/", api.urls),
+    # API v1
+    path("api/v1/", api.urls),
 ]
 
 
