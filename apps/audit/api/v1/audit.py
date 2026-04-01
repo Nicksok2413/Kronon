@@ -21,8 +21,8 @@ from apps.common.auth import AsyncApiKeyAuth
 from apps.common.permissions import enforce_admin_access
 from apps.common.schemas import STANDARD_ERRORS
 
-# Эндпоинты доступны как по JWT, так и по API Ключу (для скриптов)
-router = Router(auth=[AsyncJWTAuth(), AsyncApiKeyAuth()])
+# Эндпоинты доступны как по JWT, так и по API Ключу (для межсервисного взаимодействия)
+router = Router(auth=[AsyncJWTAuth(), AsyncApiKeyAuth()], tags=["Audit"])
 
 
 @router.get("/clients/{client_id}", response={200: list[ClientHistoryOut], **STANDARD_ERRORS})
@@ -34,8 +34,8 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     Доступно только системе и администраторам.
 
     Args:
-        request (HttpRequest): Объект входящего HTTP запроса.
-        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        request (HttpRequest): Объект HTTP запроса.
+        client_id (UUID): ID клиента (UUIDv7).
 
     Raises:
         HttpError(401): Токен отсутствует или недействителен.
@@ -56,7 +56,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     await enforce_admin_access(request)
 
     # Проверяем существование клиента (сам объект не нужен, поэтому .aexists для скорости)
-    # TODO: можно искать также по удаленным клиентам через менеджер .all_objects
+    # TODO: можно искать также по удаленным клиентам
     client_exists = await Client.objects.filter(id=client_id).aexists()
 
     if not client_exists:

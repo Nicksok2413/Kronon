@@ -25,8 +25,8 @@ from apps.common.managers import SoftDeleteQuerySet
 from apps.common.permissions import enforce_admin_access, has_admin_access
 from apps.common.schemas import STANDARD_ERRORS
 
-# Эндпоинты доступны как по JWT, так и по API Ключу (для скриптов)
-router = Router(auth=[AsyncJWTAuth(), AsyncApiKeyAuth()])
+# Эндпоинты доступны как по JWT, так и по API Ключу (для межсервисного взаимодействия)
+router = Router(auth=[AsyncJWTAuth(), AsyncApiKeyAuth()], tags=["Clients"])
 
 
 @router.get("/", response={200: list[ClientOut], **STANDARD_ERRORS})
@@ -40,7 +40,7 @@ async def list_clients(
     Доступно системе, администраторам и ответственным лицам.
 
     Args:
-        request (HttpRequest): Объект входящего HTTP запроса.
+        request (HttpRequest): Объект HTTP запроса.
         filters (ClientFilter): Параметры фильтрации из Query Params.
 
     Raises:
@@ -48,7 +48,7 @@ async def list_clients(
         HttpError(500): Внутренняя ошибка сервера.
 
     Returns:
-        SoftDeleteQuerySet[Client]: Отфильтрованный список клиентов (пагинация применяется декоратором).
+        SoftDeleteQuerySet[Client]: Отфильтрованный ленивый список клиентов (пагинация применяется декоратором).
     """
     # Достаем контекст аудита, собранный в Middleware
     audit_context = getattr(request, "audit_context", {})
@@ -63,14 +63,14 @@ async def list_clients(
     # Проверяем административные права (через чекер, без рейза) для флага фильтрации
     is_admin = has_admin_access(user)
 
-    # Получаем базовый QuerySet (Lazy) с OLP-фильтрацией на уровне БД
+    # Получаем базовый ленивый QuerySet с OLP-фильтрацией на уровне БД
     query_set = get_client_queryset(user_id=user.id, is_admin=is_admin, status="active")
 
-    # Применяем фильтры из запроса: строим SQL-запрос, в БД не идем (Lazy)
+    # Применяем фильтры из запроса (Query Params): строим SQL-запрос, в БД не идем (Lazy)
     # Ninja.FilterSchema применяет фильтры к QuerySet'у, возвращая новый QuerySet
     query_set = filters.filter(query_set)
 
-    # Возвращаем QuerySet (Ninja сделает `aexecute()` с лимитом 20 записей)
+    # Возвращаем QuerySet (Ninja применит LIMIT/OFFSET - сделает `aexecute()` с лимитом 20 записей)
     return query_set
 
 
@@ -81,8 +81,8 @@ async def get_client(request: HttpRequest, client_id: UUID) -> Client:
     Доступно системе, администраторам и ответственным лицам.
 
     Args:
-        request (HttpRequest): Объект входящего HTTP запроса.
-        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        request (HttpRequest): Объект HTTP запроса.
+        client_id (UUID): ID клиента (UUIDv7).
 
     Raises:
         HttpError(401): Токен отсутствует или недействителен.
@@ -90,7 +90,7 @@ async def get_client(request: HttpRequest, client_id: UUID) -> Client:
         HttpError(404): Если клиент не найден.
 
     Returns:
-        Client: Объект клиента.
+        Client: Объект клиента (сериализуется в ClientOut).
     """
     # Достаем контекст аудита, собранный в Middleware
     audit_context = getattr(request, "audit_context", {})
@@ -113,7 +113,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
     Доступно только системе и администраторам.
 
     Args:
-        request (HttpRequest): Объект входящего HTTP запроса.
+        request (HttpRequest): Объект HTTP запроса.
         payload (ClientCreate): Данные для создания.
 
     Raises:
@@ -124,7 +124,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
         HttpError(422): Ошибка структуры передаваемых данных.
 
     Returns:
-        tuple[int, Client]: Код ответа, созданный объект клиента.
+        tuple[int, Client]: Код ответа, созданный объект клиента (сериализуется в ClientOut).
     """
     # Достаем контекст аудита, собранный в Middleware
     audit_context = getattr(request, "audit_context", {})
@@ -150,8 +150,8 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
     Доступно системе, администраторам и ответственным лицам.
 
     Args:
-        request (HttpRequest): Объект входящего HTTP запроса.
-        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        request (HttpRequest): Объект HTTP запроса.
+        client_id (UUID): ID клиента (UUIDv7).
         payload (ClientUpdate): Данные для обновления.
 
     Raises:
@@ -162,7 +162,7 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
         HttpError(422): Ошибка структуры передаваемых данных.
 
     Returns:
-        Client: Обновленный объект клиента.
+        Client: Обновленный объект клиента (сериализуется в ClientOut).
     """
     # Достаем контекст аудита, собранный в Middleware
     audit_context = getattr(request, "audit_context", {})
@@ -190,8 +190,8 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
     Доступно только системе и администраторам.
 
     Args:
-        request (HttpRequest): Объект входящего HTTP запроса.
-        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        request (HttpRequest): Объект HTTP запроса.
+        client_id (UUID): ID клиента (UUIDv7).
 
     Raises:
         HttpError(401): Токен отсутствует или недействителен.
@@ -225,8 +225,8 @@ async def restore_client_endpoint(request: HttpRequest, client_id: UUID) -> Clie
     Доступно только системе и администраторам.
 
     Args:
-        request (HttpRequest): Объект входящего HTTP запроса.
-        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        request (HttpRequest): Объект HTTP запроса.
+        client_id (UUID): ID клиента (UUIDv7).
 
     Raises:
         HttpError(401): Токен отсутствует или недействителен.
@@ -234,7 +234,7 @@ async def restore_client_endpoint(request: HttpRequest, client_id: UUID) -> Clie
         HttpError(404): Если клиент не найден.
 
     Returns:
-        Client: Восстановленный объект клиента.
+        Client: Восстановленный объект клиента (сериализуется в ClientOut).
     """
     # Достаем контекст аудита, собранный в Middleware
     audit_context = getattr(request, "audit_context", {})
