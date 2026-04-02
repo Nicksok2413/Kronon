@@ -10,16 +10,16 @@ from uuid import UUID
 from django.http import HttpRequest
 from loguru import logger as log
 from ninja import Query, Router
-from ninja.errors import HttpError
 from ninja.pagination import PageNumberPagination, paginate
 
 from apps.audit.utils import get_initiator_log_str
 from apps.common.managers import SoftDeleteQuerySet
 from apps.common.schemas import STANDARD_ERRORS
+from apps.users.guards import get_employee_or_404
 from apps.users.models import User
 from apps.users.schemas.directory import UserDirectoryOut
 from apps.users.schemas.filters import UserFilter
-from apps.users.selectors import get_directory_user_queryset, get_user_by_id
+from apps.users.selectors import get_directory_user_queryset
 
 # Эндпоинты по умолчанию доступны только по JWT и по внутреннему API-Ключу (для межсервисного взаимодействия)
 router = Router(tags=["Directory"])
@@ -94,15 +94,8 @@ async def get_directory_user_endpoint(request: HttpRequest, user_id: UUID) -> Us
     initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' requested directory profile for {user_id}.")
 
-    # Находим сотрудника (ищем только среди активных)
-    user = await get_user_by_id(user_id=user_id, status="active")
-
-    # Проверяем существование сотрудника
-    if user:
-        log.debug(f"User found. Email: {user.email}")
-    else:
-        log.debug(f"User {user_id} not found.")
-        raise HttpError(status_code=404, message="Сотрудник не найден.")
+    # Находим сотрудника (ищем только среди активных, по умолчанию status="active")
+    user = await get_employee_or_404(user_id=user_id)
 
     # Ninja сам преобразует User в UserDirectoryOut
     return user
