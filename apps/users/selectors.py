@@ -3,7 +3,7 @@
 Обеспечивают асинхронный и оптимизированный доступ к данным сотрудников.
 """
 
-from typing import Literal
+from typing import Literal, cast
 from uuid import UUID
 
 from loguru import logger as log
@@ -36,7 +36,9 @@ def _get_base_user_queryset(status: Literal["active", "deleted", "all"] = "activ
     else:
         search_users = User.objects.active()
 
-    return search_users.select_related("department", "profile").order_by("-id")
+    return cast(
+        SoftDeleteQuerySet[User], search_users.select_related("department", "profile").order_by("-id")
+    )  # Явная типизация для mypy
 
 
 def get_directory_user_queryset() -> SoftDeleteQuerySet[User]:

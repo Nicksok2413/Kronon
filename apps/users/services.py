@@ -31,23 +31,17 @@ async def hire_employee(data: EmployeeCreate, audit_context: dict[str, Any]) -> 
     # exclude_unset=True: берем только то, что пришло с фронта
     payload = data.model_dump(exclude_unset=True)
 
-    # Генерируем временный пароль
+    # Генерируем временный пароль и добавляем его в payload
     temporary_password = generate_temporary_password()
+    payload["password"] = temporary_password
 
     # Логируем бизнес-контекст операции
     log.info(f"Hiring employee. Email: {data.email}, Role: {data.role}")
 
     try:
-        # Синхронная функция для выполнения внутри пула потоков
-        def _create_employee() -> User:
-            employee = User.objects.create(**payload)
-            employee.set_password(temporary_password)
-            employee.save(update_fields=["password"])
-            return employee
-
-        # Выполняем _create_employee асинхронно через утилиту (функцию-обертку с аудитом)
+        # Выполняем кастомный .create_user() асинхронно через утилиту (функцию-обертку с аудитом)
         # Профиль будет создан автоматически через сигнал
-        user = await aexecute_with_audit(audit_context=audit_context, sync_func=_create_employee)
+        user = await aexecute_with_audit(audit_context=audit_context, sync_func=User.objects.create_user, **payload)
 
         log.info(f"Employee hired. ID: {user.id}")
 
