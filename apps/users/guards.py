@@ -14,7 +14,7 @@ from apps.users.models import User
 from apps.users.selectors import get_user_by_id
 
 
-async def get_employee_for_hr_or_404(request: HttpRequest, user_id: UUID) -> User:
+async def get_employee_for_internal_hr_or_404(request: HttpRequest, user_id: UUID) -> User:
     """
     Проверяет права внутреннего HR и существование сотрудника.
 
@@ -23,8 +23,8 @@ async def get_employee_for_hr_or_404(request: HttpRequest, user_id: UUID) -> Use
         user_id (UUID): ID сотрудника (UUIDv7).
 
     Raises:
-        HttpError(404): Если сотрудник не найден.
         HttpError(403): Если нет прав доступа.
+        HttpError(404): Если сотрудник не найден.
 
     Returns:
         User: Объект сотрудника.

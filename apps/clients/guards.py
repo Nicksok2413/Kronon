@@ -55,8 +55,8 @@ async def get_client_for_admin_or_404(
         status (Literal): Флаг поиска (по умолчанию ищет только среди активных).
 
     Raises:
-        HttpError(404): Если клиент не найден.
         HttpError(403): Если нет прав доступа.
+        HttpError(404): Если клиент не найден.
 
     Returns:
         Client: Объект клиента.
@@ -78,8 +78,8 @@ async def get_client_for_edit_or_404(request: HttpRequest, client_id: UUID) -> C
         client_id (UUID): ID клиента (UUIDv7).
 
     Raises:
-        HttpError(404): Если клиент не найден.
         HttpError(403): Если нет прав доступа.
+        HttpError(404): Если клиент не найден.
 
     Returns:
         Client: Объект клиента.
