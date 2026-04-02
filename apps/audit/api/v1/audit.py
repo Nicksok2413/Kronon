@@ -55,7 +55,6 @@ async def get_client_history_endpoint(request: HttpRequest, client_id: UUID) -> 
     await enforce_admin_access(request)
 
     # Проверяем существование клиента (сам объект не нужен, поэтому .aexists() для скорости)
-    # TODO: можно искать также по удаленным клиентам
     client_exists = await Client.objects.filter(id=client_id).aexists()
 
     if not client_exists:
