@@ -99,7 +99,7 @@ async def get_client_endpoint(request: HttpRequest, client_id: UUID) -> Client:
 
     # Логируем инициатора запроса
     initiator_str = get_initiator_log_str(audit_context)
-    log.info(f"Initiator '{initiator_str}' requesting client {client_id}.")
+    log.info(f"Initiator '{initiator_str}' requested client {client_id}.")
 
     # Проверяем существование клиента и права (RBAC + OLP)
     client = await get_client_for_edit_or_404(request=request, client_id=client_id)
