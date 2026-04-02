@@ -43,7 +43,6 @@ async def create_client(data: ClientCreate, audit_context: dict[str, Any]) -> Cl
         # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
         payload["contact_info"] = contact_info_json
 
-        # TODO: мб нужно обернуть в try/except для обработки IntegrityError (дубликат УНП)
         # Выполняем .create() асинхронно через утилиту (функцию-обертку с аудитом)
         client = await aexecute_with_audit(audit_context=audit_context, sync_func=Client.objects.create, **payload)
 
@@ -82,19 +81,24 @@ async def update_client(client: Client, data: ClientUpdate, audit_context: dict[
     Returns:
         Client: Обновленный объект клиента с подгруженными связями.
     """
+    # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
+    # Исключаем contact_info, чтобы обработать его отдельно
+    # exclude_unset=True: берем только то, что пришло с фронта
+    payload = data.model_dump(exclude_unset=True, exclude={"contact_info"})
+
+    # JSON поле (если оно было передано)
+    contact_info_update = data.contact_info
+
+    # Early Exit
+    if not payload and contact_info_update is None:
+        log.debug(f"Empty update payload for client {client.id}. Early exit.")
+        return client
+
     # Логируем, какие поля меняются
     changed_fields = data.model_dump(exclude_unset=True).keys()
     log.info(f"Updating client {client.id}. Fields: {list(changed_fields)}")
 
     try:
-        # Формируем основной payload для полей модели (name, unp, accountant_id и т.д.)
-        # Исключаем contact_info, чтобы обработать его отдельно
-        # exclude_unset=True: берем только то, что пришло с фронта
-        payload = data.model_dump(exclude_unset=True, exclude={"contact_info"})
-
-        # JSON поле (если оно было передано)
-        contact_info_update = data.contact_info
-
         # Обновляем стандартные поля (name, unp, accountant_id и т.д.)
         for field, value in payload.items():
             setattr(client, field, value)
@@ -135,6 +139,11 @@ async def delete_client(client: Client, audit_context: dict[str, Any]) -> None:
         client (Client): Объект клиента.
         audit_context (dict[str, Any]): Словарь контекста аудита.
     """
+    # Early Exit
+    if client.is_deleted:
+        log.info(f"Client {client.id} is already deleted. Early Exit.")
+        return
+
     log.info(f"Start deleting client {client.id} (Soft Delete).")
 
     try:
@@ -161,6 +170,11 @@ async def restore_client(client: Client, audit_context: dict[str, Any]) -> Clien
     Returns:
         Client: Восстановленный объект клиента с подгруженными связями.
     """
+    # Early Exit
+    if not client.is_deleted:
+        log.info(f"Client {client.id} is already active. Early Exit.")
+        return client
+
     log.info(f"Start restoring client {client.id}.")
 
     try:

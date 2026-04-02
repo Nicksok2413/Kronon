@@ -83,7 +83,7 @@ async def update_employee(user: User, data: EmployeeUpdate, audit_context: dict[
 
     # Early Exit
     if not payload:
-        log.debug(f"Empty payload for employee {user.id}. Skipping update.")
+        log.debug(f"Empty update payload for employee {user.id}. Early exit.")
         return user
 
     # Логируем, какие поля меняются
@@ -138,10 +138,6 @@ def _fire_and_handover(user: User, successor_id: UUID | None) -> None:
             if not successor:
                 raise ValueError("Сотрудник-преемник не найден или уволен.")
 
-            # Проверяем что преемник - это не сам увольняемый сотрудник
-            if successor.id == user.id:
-                raise ValueError("Нельзя передать дела самому себе.")
-
             log.info(f"Transferring clients from {user.id} to successor {successor_id}...")
 
             # Массово обновляем клиентов (запишется в аудит pghistory благодаря триггерам БД)
@@ -164,10 +160,17 @@ async def fire_employee(user: User, data: FireEmployeeIn, audit_context: dict[st
         audit_context (dict[str, Any]): Словарь контекста аудита.
     """
     initiator_id = audit_context.get("user")
+    successor_id = data.successor_id
 
+    # Early Exit
     if str(user.id) == str(initiator_id):
         raise ValueError("Вы не можете уволить сами себя.")
 
+    # Early Exit
+    if str(user.id) == str(successor_id):
+        raise ValueError("Нельзя передать дела сотруднику, которого сейчас удаляете.")
+
+    # Early Exit
     if not user.is_active:
         raise ValueError("Сотрудник уже уволен.")
 
@@ -177,7 +180,7 @@ async def fire_employee(user: User, data: FireEmployeeIn, audit_context: dict[st
             audit_context=audit_context,
             sync_func=_fire_and_handover,  # Синхронная функция, в которой работает transaction.atomic()
             user=user,
-            successor_id=data.successor_id,
+            successor_id=successor_id,
         )
 
         log.info(f"Employee {user.id} successfully fired.")
