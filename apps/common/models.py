@@ -84,7 +84,7 @@ class BaseModel(TimeStampedModel):
         self.deleted_at = timezone.now()
 
         # Используем update_fields для оптимизации SQL запроса
-        self.save(update_fields=["deleted_at", "updated_at"])
+        self.save(using=using, update_fields=["deleted_at", "updated_at"])
         return 1, {self._meta.label: 1}
 
     async def adelete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
@@ -95,19 +95,19 @@ class BaseModel(TimeStampedModel):
         await self.asave(using=using, update_fields=["deleted_at", "updated_at"])
         return 1, {self._meta.label: 1}
 
-    def restore(self) -> None:
+    def restore(self, using: Any = None) -> None:
         """Синхронное восстановление удаленного объекта."""
         self.deleted_at = None
 
         # Используем update_fields для оптимизации SQL запроса
-        self.save(update_fields=["deleted_at", "updated_at"])
+        self.save(using=using, update_fields=["deleted_at", "updated_at"])
 
-    async def arestore(self) -> None:
+    async def arestore(self, using: Any = None) -> None:
         """Асинхронное восстановление удаленного объекта."""
         self.deleted_at = None
 
         # Используем update_fields для оптимизации SQL запроса
-        await self.asave(update_fields=["deleted_at", "updated_at"])
+        await self.asave(using=using, update_fields=["deleted_at", "updated_at"])
 
     def hard_delete(self, using: Any = None, keep_parents: bool = False) -> tuple[int, dict[str, int]]:
         """Синхронное физическое удаление объекта из БД (Hard Delete)."""
