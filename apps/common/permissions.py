@@ -12,6 +12,7 @@ from django.http import HttpRequest
 from loguru import logger as log
 from ninja.errors import HttpError
 
+from apps.audit.utils import get_ip_address
 from apps.clients.models import Client
 from apps.common.auth import get_auth_identity
 from apps.users.constants import SYSTEM_USER_ID
@@ -133,7 +134,7 @@ def enforce_api_key(request: HttpRequest) -> None:
 
     # Если ключа в заголовках нет или он не совпадает - выбрасываем исключение
     if not expected_key or api_key != expected_key:
-        ip_address = request.META.get("HTTP_X_FORWARDED_FOR").split(",")[0].strip() or request.META.get("REMOTE_ADDR")
+        ip_address = get_ip_address(request)
         log.warning(f"Invalid API Key attempt from {ip_address}")
         raise HttpError(status_code=403, message="Недействительный API-ключ.")
 
