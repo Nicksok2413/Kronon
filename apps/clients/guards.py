@@ -1,5 +1,5 @@
 """
-Гарды для приложения Clients.
+Охранные функции (Guards) для приложения Clients.
 """
 
 from typing import Literal
@@ -19,7 +19,7 @@ async def get_client_or_404(client_id: UUID, status: Literal["active", "deleted"
     Проверяет существование клиента.
 
     Args:
-        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        client_id (UUID): ID клиента (UUIDv7).
         status (Literal): Флаг поиска (по умолчанию ищет только среди активных).
 
     Raises:
@@ -51,7 +51,7 @@ async def get_client_for_admin_or_404(
 
     Args:
         request (HttpRequest): Объект входящего запроса.
-        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        client_id (UUID): ID клиента (UUIDv7).
         status (Literal): Флаг поиска (по умолчанию ищет только среди активных).
 
     Raises:
@@ -75,7 +75,7 @@ async def get_client_for_edit_or_404(request: HttpRequest, client_id: UUID) -> C
 
     Args:
         request (HttpRequest): Объект входящего запроса.
-        client_id (UUID): Уникальный идентификатор клиента (UUIDv7).
+        client_id (UUID): ID клиента (UUIDv7).
 
     Raises:
         HttpError(404): Если клиент не найден.
