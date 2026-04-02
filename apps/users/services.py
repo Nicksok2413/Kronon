@@ -163,6 +163,14 @@ async def fire_employee(user: User, data: FireEmployeeIn, audit_context: dict[st
         data (FireEmployeeIn): ID сотрудника, которому будут переданы все клиенты увольняемого или None.
         audit_context (dict[str, Any]): Словарь контекста аудита.
     """
+    initiator_id = audit_context.get("user")
+
+    if str(user.id) == str(initiator_id):
+        raise ValueError("Вы не можете уволить сами себя.")
+
+    if not user.is_active:
+        raise ValueError("Сотрудник уже уволен.")
+
     try:
         # Запускаем асинхронно через утилиту (функцию-обертку с аудитом)
         await aexecute_with_audit(

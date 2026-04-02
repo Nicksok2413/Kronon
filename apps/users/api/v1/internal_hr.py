@@ -11,7 +11,6 @@ from uuid import UUID
 from django.http import HttpRequest
 from loguru import logger as log
 from ninja import Query, Router
-from ninja.errors import HttpError
 from ninja.pagination import PageNumberPagination, paginate
 
 from apps.audit.utils import get_initiator_log_str
@@ -28,7 +27,7 @@ from apps.users.schemas.internal_hr import (
     FireEmployeeIn,
     HireResponseOut,
 )
-from apps.users.selectors import get_internal_hr_user_queryset, get_user_by_id
+from apps.users.selectors import get_internal_hr_user_queryset
 from apps.users.services import fire_employee, hire_employee, update_employee
 
 # Эндпоинты по умолчанию доступны только по JWT и по внутреннему API-Ключу (для межсервисного взаимодействия)
@@ -224,20 +223,8 @@ async def fire_employee_endpoint(request: HttpRequest, user_id: UUID, payload: F
     initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' attempts to fire employee {user_id}.")
 
-    # Проверяем права внутреннего HR (RBAC)
-    await enforce_internal_hr_access(request)
-
     # Проверяем права (RBAC) и существование сотрудника
     user = await get_employee_for_internal_hr_or_404(request=request, user_id=user_id)
-
-    # Проверяем существование сотрудника (уволить можно только активного сотрудника)
-    user = await get_user_by_id(user_id=user_id, status="active")
-
-    if not user:
-        raise HttpError(404, "Сотрудник не найден или уже уволен.")
-
-    if user.id == request.user.id:
-        raise HttpError(400, "Вы не можете уволить сами себя через API.")
 
     # Вызываем сервис увольнения
     # Сервис может кинуть ValueError (например, преемник не найден)
