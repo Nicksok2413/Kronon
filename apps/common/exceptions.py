@@ -19,7 +19,7 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
     Регистрация глобальных обработчиков исключений для Ninja API.
 
     Args:
-        api: Экземпляр NinjaAPI, к которому привязываются обработчики.
+        api (NinjaAPI): Экземпляр NinjaAPI, к которому привязываются обработчики.
     """
 
     @api.exception_handler(HttpError)
@@ -28,8 +28,8 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
         Перехват стандартных ошибок Ninja (403 Forbidden, 404 Not Found).
 
         Args:
-            request: Объект входящего запроса.
-            exc: Исключение HttpError.
+            request (HttpRequest): Объект HTTP запроса.
+            exc (HttpError): Исключение HttpError.
 
         Returns:
             HttpResponse: 403 если прав нет, 404 если не найден.
@@ -43,8 +43,8 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
         Обработка ошибок парсинга данных на входе (неверный JSON, отсутствуют поля).
 
         Args:
-            request: Объект входящего запроса.
-            exc: Исключение ValidationError от Ninja.
+            request (HttpRequest): Объект HTTP запроса.
+            exc (NinjaValidationError): Исключение ValidationError от Ninja.
 
         Returns:
             HttpResponse: 422 с деталями ошибок.
@@ -62,8 +62,8 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
         Обработка ошибок валидации Pydantic (если они возникли вручную).
 
         Args:
-            request: Объект входящего запроса.
-            exc: Исключение ValidationError от Pydantic.
+            request (HttpRequest): Объект HTTP запроса.
+            exc (ValidationError): Исключение ValidationError от Pydantic.
 
         Returns:
             HttpResponse: 422 с деталями ошибок.
@@ -81,8 +81,8 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
         Обработка ошибок целостности базы данных (Unique, ForeignKey).
 
         Args:
-            request: Объект входящего запроса.
-            exc: Исключение IntegrityError.
+            request (HttpRequest): Объект HTTP запроса.
+            exc (IntegrityError): Исключение IntegrityError.
 
         Returns:
             HttpResponse: 409 для дубликатов или 400 для ошибок связей.
@@ -94,6 +94,11 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
             response_data = ErrorOut(message="Клиент с таким УНП уже существует.", code="duplicate_unp")
             return api.create_response(request=request, data=response_data, status=409)
 
+        # Обработка дубликата email (уникальный индекс)
+        if "email" in exc_msg:
+            response_data = ErrorOut(message="Сотрудник с таким Email уже существует.", code="duplicate_email")
+            return api.create_response(request=request, data=response_data, status=409)
+
         response_data = ErrorOut(message="Ошибка целостности данных в БД.", code="integrity_error")
         return api.create_response(request=request, data=response_data, status=400)
 
@@ -103,8 +108,8 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
         Обработка ошибок бизнес-логики через ValueError.
 
         Args:
-            request: Объект входящего запроса.
-            exc: Исключение ValueError.
+            request (HttpRequest): Объект HTTP запроса.
+            exc (ValueError): Исключение ValueError.
 
         Returns:
             HttpResponse: 400 ответ.
@@ -122,8 +127,8 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
         благодаря LoguruIntegration(event_level=ERROR).
 
         Args:
-            request: Объект входящего запроса.
-            exc: Любое необработанное исключение.
+            request (HttpRequest): Объект HTTP запроса.
+            exc (Exception): Любое необработанное исключение.
 
         Returns:
             HttpResponse: 500 ответ.
