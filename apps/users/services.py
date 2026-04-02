@@ -3,9 +3,9 @@
 """
 
 from typing import Any
+from uuid import UUID
 
 from django.db import transaction
-from django.utils import timezone
 from loguru import logger as log
 
 from apps.audit.utils import aexecute_with_audit
@@ -45,7 +45,6 @@ async def hire_employee(data: EmployeeCreate, audit_context: dict[str, Any]) -> 
 
         log.info(f"Employee hired. ID: {user.id}")
 
-        # .acreate() возвращает "чистый" объект (ID и базовые поля)
         # Делаем рефреш через селектор с подгрузкой связей (department, profile) для корректного ответа API
         full_user = await get_user_by_id(user.id, status="active")
 
@@ -82,6 +81,7 @@ async def update_employee(user: User, data: EmployeeUpdate, audit_context: dict[
     # exclude_unset=True: берем только то, что пришло с фронта
     payload = data.model_dump(exclude_unset=True)
 
+    # Early Exit
     if not payload:
         log.debug(f"Empty payload for employee {user.id}. Skipping update.")
         return user
@@ -116,55 +116,66 @@ async def update_employee(user: User, data: EmployeeUpdate, audit_context: dict[
         raise
 
 
-async def fire_employee(user: User, payload: FireEmployeeIn, audit_context: dict[str, Any]) -> None:
+def _fire_and_handover(user: User, successor_id: UUID | None) -> None:
     """
-    Увольняет сотрудника (Soft Delete) и опционально передает его клиентов преемнику.
-    Обеспечивает атомарность через синхронную транзакцию, но выполняется асинхронно через утилиту.
+    Синхронная утилита, содержит логику увольнения сотрудника (Soft Delete) и передачи дел внутри транзакции.
+    Обеспечивает атомарность через транзакцию, но выполняется асинхронно через утилиту aexecute_with_audit.
 
     Args:
-        user (User): Объект сотрудника.
-        payload (FireEmployeeIn): ID сотрудника, которому будут переданы все клиенты увольняемого (по умолчанию None).
-        audit_context (dict[str, Any]): Словарь контекста аудита.
+        user (User): Объект увольняемого сотрудника.
+        successor_id (UUID | None): ID сотрудника, которому будут переданы все клиенты увольняемого или None.
     """
-    # В payload.successor_id лежит либо ID сотрудника, которому будут переданы все клиенты увольняемого, либо None
-    successor_id = payload.successor_id
-
     # Логируем бизнес-контекст операции
     log.info(f"Starting offboarding for {user.id}. Successor: {successor_id}")
 
+    with transaction.atomic():
+        # Валидация преемника внутри транзакции
+        if successor_id:
+            # Ищем преемника
+            successor = User.objects.filter(id=successor_id, is_active=True).first()
+
+            # Проверяем существование преемника
+            if not successor:
+                raise ValueError("Сотрудник-преемник не найден или уволен.")
+
+            # Проверяем что преемник - это не сам увольняемый сотрудник
+            if successor.id == user.id:
+                raise ValueError("Нельзя передать дела самому себе.")
+
+            log.info(f"Transferring clients from {user.id} to successor {successor_id}...")
+
+            # Массово обновляем клиентов (запишется в аудит pghistory благодаря триггерам БД)
+            Client.objects.filter(accountant_id=user.id).update(accountant_id=successor.id)
+            Client.objects.filter(primary_accountant_id=user.id).update(primary_accountant_id=successor.id)
+            Client.objects.filter(payroll_accountant_id=user.id).update(payroll_accountant_id=successor.id)
+            Client.objects.filter(hr_specialist_id=user.id).update(hr_specialist_id=successor.id)
+
+        # Мягкое увольнение (блокировка аккаунта и простановка deleted_at)
+        user.delete()
+
+
+async def fire_employee(user: User, data: FireEmployeeIn, audit_context: dict[str, Any]) -> None:
+    """
+    Увольняет сотрудника (Soft Delete) и опционально передает его клиентов преемнику (Handover).
+
+    Args:
+        user (User): Объект сотрудника.
+        data (FireEmployeeIn): ID сотрудника, которому будут переданы все клиенты увольняемого или None.
+        audit_context (dict[str, Any]): Словарь контекста аудита.
+    """
     try:
-        # Синхронная функция, в которой работает transaction.atomic()
-        def _fire_and_handover() -> None:
-            with transaction.atomic():
-                if successor_id:
-                    # Валидация преемника внутри транзакции
-                    successor = User.objects.filter(id=successor_id, is_active=True).first()
-                    if not successor:
-                        raise ValueError("Сотрудник-преемник не найден или уволен.")
-                    if successor.id == user.id:
-                        raise ValueError("Нельзя передать дела самому себе.")
+        # Запускаем асинхронно через утилиту (функцию-обертку с аудитом)
+        await aexecute_with_audit(
+            audit_context=audit_context,
+            sync_func=_fire_and_handover,  # Синхронная функция, в которой работает transaction.atomic()
+            user=user,
+            successor_id=data.successor_id,
+        )
 
-                    log.info(f"Transferring clients from {user.id} to successor {successor.id}...")
-
-                    # Массово обновляем клиентов (запишется в аудит pghistory благодаря триггерам БД)
-                    Client.objects.filter(accountant_id=user.id).update(accountant_id=successor.id)
-                    Client.objects.filter(primary_accountant_id=user.id).update(primary_accountant_id=successor.id)
-                    Client.objects.filter(payroll_accountant_id=user.id).update(payroll_accountant_id=successor.id)
-                    Client.objects.filter(hr_specialist_id=user.id).update(hr_specialist_id=successor.id)
-
-                # Мягкое увольнение (блокировка аккаунта и простановка deleted_at)
-                now = timezone.now()
-                user.deleted_at = now
-                user.updated_at = now
-                user.is_active = False
-                user.save(update_fields=["deleted_at", "updated_at", "is_active"])
-
-        # Запускаем всё разом асинхронно через утилиту (функцию-обертку с аудитом)
-        await aexecute_with_audit(audit_context=audit_context, sync_func=_fire_and_handover)
         log.info(f"Employee {user.id} successfully fired.")
 
-        # TODO (Future): Запустить таску Celery для отправки алерта Главбуху
         # если successor_id был None (остались бесхозные клиенты)
+        # TODO (Future): Запустить таску Celery для отправки алёрта Главбуху
 
     except Exception as exc:
         # Логируем контекст ошибки перед тем, как она уйдет в глобальный хендлер

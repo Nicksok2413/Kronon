@@ -8,7 +8,6 @@ API Endpoints (v1) для внутреннего HR (Internal HR).
 from typing import Annotated
 from uuid import UUID
 
-from django.db import IntegrityError
 from django.http import HttpRequest
 from loguru import logger as log
 from ninja import Query, Router
@@ -19,6 +18,7 @@ from apps.audit.utils import get_initiator_log_str
 from apps.common.managers import SoftDeleteQuerySet
 from apps.common.permissions import enforce_internal_hr_access
 from apps.common.schemas import STANDARD_ERRORS
+from apps.users.guards import get_employee_for_internal_hr_or_404
 from apps.users.models import User
 from apps.users.schemas.filters import UserFilter
 from apps.users.schemas.internal_hr import (
@@ -81,6 +81,40 @@ async def list_employees_endpoint(
     return query_set
 
 
+@router.get("/{client_id}", response={200: EmployeePrivateOut, **STANDARD_ERRORS})
+async def get_employee_endpoint(request: HttpRequest, user_id: UUID) -> User:
+    """
+    Получить детальную информацию о сотруднике по ID.
+
+    Доступно системе, администраторам и внутреннему HR.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+        user_id (UUID): ID сотрудника (UUIDv7).
+
+    Raises:
+        HttpError(401): Токен отсутствует или недействителен.
+        HttpError(403): Доступ запрещен (RBAC).
+        HttpError(404): Если сотрудник не найден.
+        HttpError(500): Внутренняя ошибка сервера.
+
+    Returns:
+        User: Объект сотрудника (сериализуется в EmployeePrivateOut).
+    """
+    # Достаем контекст аудита, собранный в Middleware
+    audit_context = getattr(request, "audit_context", {})
+
+    # Логируем инициатора запроса
+    initiator_str = get_initiator_log_str(audit_context)
+    log.info(f"Initiator '{initiator_str}' requested private profile for {user_id}.")
+
+    # Проверяем права (RBAC) и существование сотрудника
+    user = await get_employee_for_internal_hr_or_404(request=request, user_id=user_id)
+
+    # Ninja сам преобразует User в EmployeePrivateOut
+    return user
+
+
 @router.post("/", response={201: HireResponseOut, **STANDARD_ERRORS})
 async def hire_employee_endpoint(request: HttpRequest, payload: EmployeeCreate) -> tuple[int, dict[str, User | str]]:
     """
@@ -113,14 +147,8 @@ async def hire_employee_endpoint(request: HttpRequest, payload: EmployeeCreate) 
     # Проверяем права внутреннего HR (RBAC)
     await enforce_internal_hr_access(request)
 
-    # TODO: мб нужно перенести try/except IntegrityError (дубликат email) в сервис
-    try:
-        # Вызываем сервис создания
-        user, temporary_password = await hire_employee(data=payload, audit_context=audit_context)
-    except IntegrityError:
-        # Перехватываем уникальность email (на уровне БД)
-        log.error("...")
-        raise HttpError(status_code=409, message=f"Сотрудник с email '{payload.email}' уже существует.") from None
+    # Вызываем сервис создания
+    user, temporary_password = await hire_employee(data=payload, audit_context=audit_context)
 
     # Возвращаем статус код, созданного пользователя и временный пароль
     return 201, {"employee": user, "temporary_password": temporary_password}
@@ -155,14 +183,8 @@ async def update_employee_endpoint(request: HttpRequest, user_id: UUID, payload:
     initiator_str = get_initiator_log_str(audit_context)
     log.info(f"Initiator '{initiator_str}' attempts to update employee {user_id}.")
 
-    # Проверяем права внутреннего HR (RBAC)
-    await enforce_internal_hr_access(request)
-
-    # Проверяем существование сотрудника (ищем по всем записям)
-    user = await get_user_by_id(user_id=user_id, status="all")
-
-    if not user:
-        raise HttpError(404, "Сотрудник не найден.")
+    # Проверяем права (RBAC) и существование сотрудника
+    user = await get_employee_for_internal_hr_or_404(request=request, user_id=user_id)
 
     # Вызываем сервис обновления
     updated_user = await update_employee(user=user, data=payload, audit_context=audit_context)
@@ -175,7 +197,8 @@ async def update_employee_endpoint(request: HttpRequest, user_id: UUID, payload:
 async def fire_employee_endpoint(request: HttpRequest, user_id: UUID, payload: FireEmployeeIn) -> tuple[int, None]:
     """
     Уволить сотрудника (Soft Delete).
-    Блокирует доступ к системе. Опционально передает всех клиентов преемнику.
+    Блокирует доступ к системе.
+    Опционально передает всех клиентов преемнику.
 
     Доступно системе, администраторам и внутреннему HR.
 
@@ -204,6 +227,9 @@ async def fire_employee_endpoint(request: HttpRequest, user_id: UUID, payload: F
     # Проверяем права внутреннего HR (RBAC)
     await enforce_internal_hr_access(request)
 
+    # Проверяем права (RBAC) и существование сотрудника
+    user = await get_employee_for_internal_hr_or_404(request=request, user_id=user_id)
+
     # Проверяем существование сотрудника (уволить можно только активного сотрудника)
     user = await get_user_by_id(user_id=user_id, status="active")
 
@@ -216,7 +242,7 @@ async def fire_employee_endpoint(request: HttpRequest, user_id: UUID, payload: F
     # Вызываем сервис увольнения
     # Сервис может кинуть ValueError (например, преемник не найден)
     # Глобальный value_error_handler превратит это в 400 Bad Request
-    await fire_employee(user=user, payload=payload, audit_context=audit_context)
+    await fire_employee(user=user, data=payload, audit_context=audit_context)
 
     # Возвращаем код ответа
     return 204, None
