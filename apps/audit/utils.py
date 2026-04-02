@@ -6,11 +6,52 @@
 """
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
+from django.http import HttpRequest
 from pghistory import context as pghistory_context
+
+
+def get_ip_address(request: HttpRequest) -> str | None:
+    """
+    Вспомогательный метод для получения IP адреса с учетом прокси.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+
+    Returns:
+        str | None: Строка с IP адресом или None.
+    """
+    x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+
+    if x_forwarded and isinstance(x_forwarded, str):
+        # Берем первый IP из списка (адрес клиента до прокси)
+        ip_address = x_forwarded.split(",")[0].strip()
+
+        return cast(str, ip_address)  # Явная типизация для mypy
+
+    remote_addr = request.META.get("REMOTE_ADDR")
+
+    if remote_addr and isinstance(remote_addr, str):
+        return cast(str, remote_addr)  # Явная типизация для mypy
+
+    return None
+
+
+def get_user_agent(request: HttpRequest) -> str:
+    """
+    Вспомогательный метод для получения User-Agent.
+
+    Args:
+        request (HttpRequest): Объект HTTP запроса.
+
+    Returns:
+        str: User-Agent или "Unknown".
+    """
+    user_agent = request.META.get("HTTP_USER_AGENT", "Unknown")[:255]  # Ограничиваем длину для БД
+    return cast(str, user_agent)  # Явная типизация для mypy
 
 
 def get_initiator_log_str(audit_context: dict[str, Any]) -> str:

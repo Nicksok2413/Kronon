@@ -20,6 +20,7 @@ from loguru import logger
 from pghistory.middleware import ASGIRequest, WSGIRequest
 from sentry_sdk import set_tag, set_user
 
+from apps.audit.utils import get_ip_address, get_user_agent
 from apps.users.constants import SYSTEM_USER_EMAIL, SYSTEM_USER_ID
 from apps.users.models import User
 
@@ -47,46 +48,6 @@ def _get_correlation_id(request: HttpRequest) -> str:
     request.correlation_id = correlation_id  # type: ignore[attr-defined]
 
     return correlation_id
-
-
-def _get_ip_address(request: HttpRequest) -> str | None:
-    """
-    Вспомогательный метод для получения IP адреса с учетом прокси.
-
-    Args:
-        request (HttpRequest): Объект HTTP запроса.
-
-    Returns:
-        str | None: Строка с IP адресом или None.
-    """
-    x_forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-
-    if x_forwarded and isinstance(x_forwarded, str):
-        # Берем первый IP из списка (адрес клиента до прокси)
-        ip_address = x_forwarded.split(",")[0].strip()
-
-        return cast(str, ip_address)  # Явная типизация для mypy
-
-    remote_addr = request.META.get("REMOTE_ADDR")
-
-    if remote_addr and isinstance(remote_addr, str):
-        return cast(str, remote_addr)  # Явная типизация для mypy
-
-    return None
-
-
-def _get_user_agent(request: HttpRequest) -> str:
-    """
-    Вспомогательный метод для получения User-Agent.
-
-    Args:
-        request (HttpRequest): Объект HTTP запроса.
-
-    Returns:
-        str: User-Agent или "Unknown".
-    """
-    user_agent = request.META.get("HTTP_USER_AGENT", "Unknown")[:255]  # Ограничиваем длину для БД
-    return cast(str, user_agent)  # Явная типизация для mypy
 
 
 def _apply_sentry(audit_context: dict[str, Any], correlation_id: str) -> None:
@@ -162,8 +123,8 @@ def _prepare_audit_context(request: HttpRequest, correlation_id: str) -> dict[st
         "url": request.path,  # URL
         "method": request.method,  # HTTP-метод
         "correlation_id": correlation_id,  # ID корреляции
-        "ip_address": _get_ip_address(request),  # IP адрес
-        "user_agent": _get_user_agent(request),  # User-Agent
+        "ip_address": get_ip_address(request),  # IP адрес
+        "user_agent": get_user_agent(request),  # User-Agent
     }
 
     # Проверяем заголовки на наличие системного API-ключа
