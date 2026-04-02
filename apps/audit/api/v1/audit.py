@@ -24,11 +24,11 @@ router = Router(tags=["Audit"])
 
 
 @router.get("/clients/{client_id}", response={200: list[ClientHistoryOut], **STANDARD_ERRORS})
-async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict[str, Any]]:
+async def get_client_history_endpoint(request: HttpRequest, client_id: UUID) -> list[dict[str, Any]]:
     """
     Получить журнал аудита (историю изменений) клиента.
-
     Возвращает список событий с диффами (разницами изменений) и контекстом операции.
+
     Доступно только системе и администраторам.
 
     Args:
@@ -39,6 +39,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
         HttpError(401): Токен отсутствует или недействителен.
         HttpError(403): При попытке доступа без прав администратора.
         HttpError(404): Если клиент не найден.
+        HttpError(500): Внутренняя ошибка сервера.
 
     Returns:
         list[dict[str, Any]]: Список событий изменения клиента.
@@ -53,7 +54,7 @@ async def get_client_history(request: HttpRequest, client_id: UUID) -> list[dict
     # Проверяем права (RBAC)
     await enforce_admin_access(request)
 
-    # Проверяем существование клиента (сам объект не нужен, поэтому .aexists для скорости)
+    # Проверяем существование клиента (сам объект не нужен, поэтому .aexists() для скорости)
     # TODO: можно искать также по удаленным клиентам
     client_exists = await Client.objects.filter(id=client_id).aexists()
 

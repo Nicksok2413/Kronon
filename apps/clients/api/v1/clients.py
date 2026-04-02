@@ -30,12 +30,13 @@ router = Router(tags=["Clients"])
 
 @router.get("/", response={200: list[ClientOut], **STANDARD_ERRORS})
 @paginate(PageNumberPagination, page_size=20)
-async def list_clients(
+async def list_clients_endpoint(
     request: HttpRequest,
     filters: Annotated[ClientFilter, Query(...)],
 ) -> SoftDeleteQuerySet[Client]:
     """
     Получить список клиентов с нативной OLP-фильтрацией, фильтрацией из запроса и пагинацией.
+
     Доступно системе, администраторам и ответственным лицам.
 
     Args:
@@ -74,9 +75,10 @@ async def list_clients(
 
 
 @router.get("/{client_id}", response={200: ClientOut, **STANDARD_ERRORS})
-async def get_client(request: HttpRequest, client_id: UUID) -> Client:
+async def get_client_endpoint(request: HttpRequest, client_id: UUID) -> Client:
     """
     Получить детальную информацию о клиенте по ID.
+
     Доступно системе, администраторам и ответственным лицам.
 
     Args:
@@ -87,6 +89,7 @@ async def get_client(request: HttpRequest, client_id: UUID) -> Client:
         HttpError(401): Токен отсутствует или недействителен.
         HttpError(403): Нет прав на просмотр данного клиента.
         HttpError(404): Если клиент не найден.
+        HttpError(500): Внутренняя ошибка сервера.
 
     Returns:
         Client: Объект клиента (сериализуется в ClientOut).
@@ -109,6 +112,7 @@ async def get_client(request: HttpRequest, client_id: UUID) -> Client:
 async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) -> tuple[int, Client]:
     """
     Создание нового клиента.
+
     Доступно только системе и администраторам.
 
     Args:
@@ -121,6 +125,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
         HttpError(403): Доступ запрещен (требуются права администратора).
         HttpError(409): Конфликт (например, дубликат УНП).
         HttpError(422): Ошибка структуры передаваемых данных.
+        HttpError(500): Внутренняя ошибка сервера.
 
     Returns:
         tuple[int, Client]: Код ответа, созданный объект клиента (сериализуется в ClientOut).
@@ -146,6 +151,7 @@ async def create_client_endpoint(request: HttpRequest, payload: ClientCreate) ->
 async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload: ClientUpdate) -> Client:
     """
     Частичное обновление данных клиента.
+
     Доступно системе, администраторам и ответственным лицам.
 
     Args:
@@ -159,6 +165,7 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
         HttpError(404): Если клиент не найден.
         HttpError(409): Конфликт данных (например, дубликат УНП).
         HttpError(422): Ошибка структуры передаваемых данных.
+        HttpError(500): Внутренняя ошибка сервера.
 
     Returns:
         Client: Обновленный объект клиента (сериализуется в ClientOut).
@@ -184,8 +191,8 @@ async def update_client_endpoint(request: HttpRequest, client_id: UUID, payload:
 async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple[int, None]:
     """
     Мягкое удаление (Soft Delete) клиента.
-
     Клиент скрывается из списков, но остается в БД.
+
     Доступно только системе и администраторам.
 
     Args:
@@ -196,6 +203,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
         HttpError(401): Токен отсутствует или недействителен.
         HttpError(403): Доступ запрещен (требуются права администратора).
         HttpError(404): Если клиент не найден.
+        HttpError(500): Внутренняя ошибка сервера.
 
     Returns:
         tuple[int, None]: Код ответа 204 (No Content), None
@@ -221,6 +229,7 @@ async def delete_client_endpoint(request: HttpRequest, client_id: UUID) -> tuple
 async def restore_client_endpoint(request: HttpRequest, client_id: UUID) -> Client:
     """
     Восстановление клиента после мягкого удаления.
+
     Доступно только системе и администраторам.
 
     Args:
@@ -231,6 +240,7 @@ async def restore_client_endpoint(request: HttpRequest, client_id: UUID) -> Clie
         HttpError(401): Токен отсутствует или недействителен.
         HttpError(403): Нет прав на редактирование данного клиента.
         HttpError(404): Если клиент не найден.
+        HttpError(500): Внутренняя ошибка сервера.
 
     Returns:
         Client: Восстановленный объект клиента (сериализуется в ClientOut).

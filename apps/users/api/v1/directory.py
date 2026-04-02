@@ -1,7 +1,6 @@
 """
 API Endpoints (v1) для Публичного справочника сотрудников (Directory).
 
-Доступно всем авторизованным пользователям.
 Возвращает только публичные данные (без деталей контрактов).
 """
 
@@ -28,20 +27,25 @@ router = Router(tags=["Directory"])
 
 @router.get("/", response={200: list[UserDirectoryOut], **STANDARD_ERRORS})
 @paginate(PageNumberPagination, page_size=20)
-async def list_directory_users(
+async def list_directory_users_endpoint(
     request: HttpRequest,
     filters: Annotated[UserFilter, Query(...)],
 ) -> SoftDeleteQuerySet[User]:
     """
     Получить список всех активных сотрудников (справочник).
-    Доступно всем авторизованным пользователям.
 
     Возвращает только публичные данные (без HR-информации).
     Поддерживает поиск по ФИО, email и фильтрацию по отделам.
 
+    Доступно всем авторизованным пользователям.
+
     Args:
         request (HttpRequest): Объект HTTP запроса.
         filters (UserFilter): Параметры фильтрации из Query Params.
+
+    Raises:
+        HttpError(401): Токен отсутствует или недействителен.
+        HttpError(500): Внутренняя ошибка сервера.
 
     Returns:
         SoftDeleteQuerySet[User]: Отфильтрованный ленивый список сотрудников (пагинация применяется декоратором).
@@ -65,9 +69,10 @@ async def list_directory_users(
 
 
 @router.get("/{user_id}", response={200: UserDirectoryOut, **STANDARD_ERRORS})
-async def get_directory_user(request: HttpRequest, user_id: UUID) -> User:
+async def get_directory_user_endpoint(request: HttpRequest, user_id: UUID) -> User:
     """
     Получить карточку сотрудника для справочника по ID.
+
     Доступно всем авторизованным пользователям.
 
     Args:
@@ -75,7 +80,9 @@ async def get_directory_user(request: HttpRequest, user_id: UUID) -> User:
         user_id (UUID): ID сотрудника (UUIDv7).
 
     Raises:
+        HttpError(401): Токен отсутствует или недействителен.
         HttpError(404): Если сотрудник не найден или уволен/неактивен.
+        HttpError(500): Внутренняя ошибка сервера.
 
     Returns:
         User: Объект сотрудника (сериализуется в UserDirectoryOut).

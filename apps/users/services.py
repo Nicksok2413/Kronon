@@ -31,13 +31,13 @@ async def hire_employee(data: EmployeeCreate, audit_context: dict[str, Any]) -> 
     # exclude_unset=True: берем только то, что пришло с фронта
     payload = data.model_dump(exclude_unset=True)
 
+    # Генерируем временный пароль
+    temporary_password = generate_temporary_password()
+
     # Логируем бизнес-контекст операции
     log.info(f"Hiring employee. Email: {data.email}, Role: {data.role}")
 
     try:
-        # Генерируем временный пароль
-        temporary_password = generate_temporary_password()
-
         # Синхронная функция для выполнения внутри пула потоков
         def _create_employee() -> User:
             employee = User.objects.create(**payload)
@@ -125,7 +125,7 @@ async def update_employee(user: User, data: EmployeeUpdate, audit_context: dict[
 async def fire_employee(user: User, payload: FireEmployeeIn, audit_context: dict[str, Any]) -> None:
     """
     Увольняет сотрудника (Soft Delete) и опционально передает его клиентов преемнику.
-    Выполняется в асинхронной транзакции для гарантии консистентности.
+    Обеспечивает атомарность через синхронную транзакцию, но выполняется асинхронно через утилиту.
 
     Args:
         user (User): Объект сотрудника.
@@ -135,65 +135,41 @@ async def fire_employee(user: User, payload: FireEmployeeIn, audit_context: dict
     # В payload.successor_id лежит либо ID сотрудника, которому будут переданы все клиенты увольняемого, либо None
     successor_id = payload.successor_id
 
-    try:
-        # # aatomic() - нативная асинхронная транзакция
-        # async with transaction.aatomic():
-        #     with pghistory_context(**audit_context):
-        #
-        #         # Если передан successor_id (Передача дел / Handover)
-        #         if successor_id:
-        #             # Проверяем, существует ли преемник и активен ли он
-        #             successor = await User.objects.active().filter(id=successor_id).afirst()
-        #
-        #             if not successor:
-        #                 raise ValueError("Сотрудник-преемник не найден или уже уволен.")
-        #
-        #             if successor.id == user.id:
-        #                 raise ValueError("Нельзя передать дела самому себе.")
-        #
-        #             log.info(f"Transferring clients from {user.id} to successor {successor.id}...")
-        #
-        #             # Массово обновляем клиентов (pghistory запишет аудит благодаря триггерам БД)
-        #             # .aupdate() - асинхронный массовый апдейт (очень быстрый)
-        #             await Client.objects.filter(accountant_id=user.id).aupdate(accountant_id=successor.id)
-        #             await Client.objects.filter(primary_accountant_id=user.id).aupdate(primary_accountant_id=successor.id)
-        #             await Client.objects.filter(payroll_accountant_id=user.id).aupdate(payroll_accountant_id=successor.id)
-        #             await Client.objects.filter(hr_specialist_id=user.id).aupdate(hr_specialist_id=successor.id)
-        #
-        #         # Мягкое увольнение (блокировка аккаунта и простановка deleted_at)
-        #         await user.adelete()
-        #
-        # log.info(f"Employee {user.id} successfully fired.")
+    # Логируем бизнес-контекст операции
+    log.info(f"Starting offboarding for {user.id}. Successor: {successor_id}")
 
-        # СИНХРОННАЯ функция, в которой работает transaction.atomic()
+    try:
+        # Синхронная функция, в которой работает transaction.atomic()
         def _fire_and_handover() -> None:
             with transaction.atomic():
                 if successor_id:
                     # Валидация преемника внутри транзакции
                     successor = User.objects.filter(id=successor_id, is_active=True).first()
                     if not successor:
-                        raise ValueError("Сотрудник-преемник не найден или уволен.") from None
+                        raise ValueError("Сотрудник-преемник не найден или уволен.")
                     if successor.id == user.id:
-                        raise ValueError("Нельзя передать дела самому себе.") from None
+                        raise ValueError("Нельзя передать дела самому себе.")
 
-                    # Массовый Update клиентов (запишется в аудит pghistory)
+                    log.info(f"Transferring clients from {user.id} to successor {successor.id}...")
+
+                    # Массово обновляем клиентов (запишется в аудит pghistory благодаря триггерам БД)
                     Client.objects.filter(accountant_id=user.id).update(accountant_id=successor.id)
                     Client.objects.filter(primary_accountant_id=user.id).update(primary_accountant_id=successor.id)
                     Client.objects.filter(payroll_accountant_id=user.id).update(payroll_accountant_id=successor.id)
                     Client.objects.filter(hr_specialist_id=user.id).update(hr_specialist_id=successor.id)
 
-                # Синхронное мягкое увольнение
+                # Мягкое увольнение (блокировка аккаунта и простановка deleted_at)
                 now = timezone.now()
                 user.deleted_at = now
                 user.updated_at = now
                 user.is_active = False
                 user.save(update_fields=["deleted_at", "updated_at", "is_active"])
 
-        # Запускаем всё разом через нашу утилиту
+        # Запускаем всё разом асинхронно через утилиту (функцию-обертку с аудитом)
         await aexecute_with_audit(audit_context=audit_context, sync_func=_fire_and_handover)
         log.info(f"Employee {user.id} successfully fired.")
 
-        # TODO (Future): Запустить таску Celery для отправки алерта Главбуху,
+        # TODO (Future): Запустить таску Celery для отправки алерта Главбуху
         # если successor_id был None (остались бесхозные клиенты)
 
     except Exception as exc:

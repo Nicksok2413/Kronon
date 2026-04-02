@@ -43,6 +43,7 @@ async def create_client(data: ClientCreate, audit_context: dict[str, Any]) -> Cl
         # Django ORM сам разберется: UUID-объекты пойдут в UUIDField, а словарь - в JSONField
         payload["contact_info"] = contact_info_json
 
+        # TODO: мб нужно обернуть в try/except для обработки IntegrityError (дубликат УНП)
         # Выполняем .create() асинхронно через утилиту (функцию-обертку с аудитом)
         client = await aexecute_with_audit(audit_context=audit_context, sync_func=Client.objects.create, **payload)
 
