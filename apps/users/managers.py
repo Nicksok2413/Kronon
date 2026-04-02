@@ -24,7 +24,6 @@ class CustomUserManager(BaseUserManager["User"].from_queryset(SoftDeleteQuerySet
     Наследует логику мягкого удаления и OLP-фильтрацию.
     """
 
-    # TODO: подумать над async
     def create_user(self, email: str, password: str | None = None, **extra_fields: Any) -> User:
         """
         Создает и сохраняет пользователя с указанным email и паролем.
