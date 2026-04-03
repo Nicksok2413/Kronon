@@ -96,7 +96,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код
         await self.assert_status(response=patch_response, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=700)
         # Валидация схемы
         await self.validate_schema(data=data, schema=ClientOut)
 

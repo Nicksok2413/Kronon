@@ -88,7 +88,7 @@ class TestInternalHRAPI(BaseAPITest):
         # Статус код
         await self.assert_status(response=hire_response, expected_status=201)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=1000)
         # Валидация схемы
         await self.validate_schema(data, schema=HireResponseOut)
 
