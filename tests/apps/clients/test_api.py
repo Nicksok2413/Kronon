@@ -28,8 +28,11 @@ class TestClientAPI(BaseAPITest):
         Проверка успешного создания клиента администратором.
 
         Args:
-            admin_client: Авторизованный асинхронный клиент (с правами админа).
+            admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
+
+        # --- Arrange (подготовка) ---
+
         # Подготавливаем данные
         payload: dict[str, Any] = {
             "name": "Test Company",
@@ -40,12 +43,14 @@ class TestClientAPI(BaseAPITest):
             "contact_info": {"general_email": "test@test.com"},
         }
 
+        # --- Act (действие) ---
+
         # Выполняем запрос
         start = perf_counter()
         response = await admin_client.post(self.endpoint, data=payload, content_type="application/json")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response, expected_status=201)
@@ -71,16 +76,21 @@ class TestClientAPI(BaseAPITest):
             auth_client (AsyncClient): Авторизованный асинхронный клиент (с правами бухгалтера).
             api_user (User): Обычный пользователь (бухгалтер).
         """
+
+        # --- Arrange (подготовка) ---
+
         # Создаем 25 клиентов через фабрику, назначаем accountant=api_user, чтобы OLP пропустил их для бухгалтера
         # Используем create_batch внутри sync_to_async для оптимизации
         await sync_to_async(ClientFactory.create_batch)(25, accountant=api_user)
+
+        # --- Act (действие) ---
 
         # Запрашиваем первую страницу
         start = perf_counter()
         response_page_1 = await auth_client.get(f"{self.endpoint}?page=1")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response_page_1, expected_status=200)
@@ -96,12 +106,14 @@ class TestClientAPI(BaseAPITest):
         assert len(json_response_page_1["items"]) == 20
         assert json_response_page_1["count"] == 25
 
+        # --- Act (действие) ---
+
         # Запрашиваем вторую страницу
         start = perf_counter()
         response_page_2 = await auth_client.get(f"{self.endpoint}?page=2")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response_page_2, expected_status=200)
@@ -124,6 +136,9 @@ class TestClientAPI(BaseAPITest):
         Args:
             admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
+
+        # --- Arrange (подготовка) ---
+
         # Создаем клиента с контактами
         initial_contacts = {
             "general_email": "old@test.com",
@@ -134,6 +149,8 @@ class TestClientAPI(BaseAPITest):
         # Подготавливаем данные (обновляем только email)
         patch_payload = {"contact_info": {"general_email": "new@test.com"}}
 
+        # --- Act (действие) ---
+
         # Патчим клиента
         start = perf_counter()
         patch_response = await admin_client.patch(
@@ -143,7 +160,7 @@ class TestClientAPI(BaseAPITest):
         )
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=patch_response, expected_status=200)
@@ -168,15 +185,19 @@ class TestClientAPI(BaseAPITest):
             admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
 
+        # --- Arrange (подготовка) ---
+
         # Создаем клиента
         client = await sync_to_async(ClientFactory)()
+
+        # --- Act (действие) ---
 
         # Мягкое удаление
         start = perf_counter()
         del_response = await admin_client.delete(f"{self.endpoint}{client.id}")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=del_response, expected_status=204)
@@ -187,10 +208,14 @@ class TestClientAPI(BaseAPITest):
         list_response = await admin_client.get(self.endpoint)
         assert list_response.json()["count"] == 0
 
+        # --- Act (действие) ---
+
         # Проверяем, что GET по ID выдает 404 (так как селектор фильтрует по active())
         start = perf_counter()
         get_response = await admin_client.get(f"{self.endpoint}{client.id}")
         elapsed_time = perf_counter() - start
+
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=get_response, expected_status=404)
@@ -199,10 +224,14 @@ class TestClientAPI(BaseAPITest):
         # Валидация схемы
         await self.validate_schema(data=get_response.json(), schema=ErrorOut)
 
+        # --- Act (действие) ---
+
         # Восстановление
         start = perf_counter()
         restore_response = await admin_client.patch(f"{self.endpoint}{client.id}/restore")
         elapsed_time = perf_counter() - start
+
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=restore_response, expected_status=200)
@@ -215,10 +244,14 @@ class TestClientAPI(BaseAPITest):
         list_response_2 = await admin_client.get(self.endpoint)
         assert list_response_2.json()["count"] == 1
 
+        # --- Act (действие) ---
+
         # Проверяем, что он доступен по ID
         start = perf_counter()
         get_response_2 = await admin_client.get(f"{self.endpoint}{client.id}")
         elapsed_time = perf_counter() - start
+
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=get_response_2, expected_status=200)

@@ -27,18 +27,23 @@ class TestGlobalExceptions(BaseAPITest):
         Args:
             admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
+
+        # --- Arrange (подготовка) ---
+
         # Подготавливаем данные
         payload = {
             "name": "A",
             "unp": "123",  # НЕВАЛИДНЫЙ УНП (нужно 9 цифр)
         }
 
+        # --- Act (действие) ---
+
         # Выполняем запрос
         start = perf_counter()
         response = await admin_client.post(self.endpoint, data=payload, content_type="application/json")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response, expected_status=422)
@@ -62,6 +67,8 @@ class TestGlobalExceptions(BaseAPITest):
             admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
 
+        # --- Arrange (подготовка) ---
+
         # Создаем клиента
         client = await sync_to_async(ClientFactory)()
 
@@ -71,12 +78,14 @@ class TestGlobalExceptions(BaseAPITest):
             "unp": client.unp,  # Пытаемся создать с существующим УНП
         }
 
+        # --- Act (действие) ---
+
         # Выполняем запрос
         start = perf_counter()
         response = await admin_client.post(self.endpoint, data=payload, content_type="application/json")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response, expected_status=409)
@@ -98,15 +107,20 @@ class TestGlobalExceptions(BaseAPITest):
         Args:
             admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
+
+        # --- Arrange (подготовка) ---
+
         # Генерируем несуществующий UUID
         fake_id = "019d0b27-0000-7000-8000-000000000000"
+
+        # --- Act (действие) ---
 
         # Выполняем запрос
         start = perf_counter()
         response = await admin_client.get(f"{self.endpoint}{fake_id}")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response, expected_status=404)

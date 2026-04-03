@@ -33,6 +33,8 @@ class TestClientSecurity(BaseAPITest):
             api_user (User): Обычный пользователь (бухгалтер).
         """
 
+        # --- Arrange (подготовка) ---
+
         # Создаем 'чужого' бухгалтера
         other_user = await sync_to_async(UserFactory)(role=UserRole.ACCOUNTANT)
 
@@ -45,7 +47,7 @@ class TestClientSecurity(BaseAPITest):
         response = await auth_client.get(self.endpoint)
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response, expected_status=200)
@@ -73,6 +75,9 @@ class TestClientSecurity(BaseAPITest):
             auth_client (AsyncClient): Авторизованный асинхронный клиент (с правами бухгалтера).
             api_user (User): Обычный пользователь (бухгалтер).
         """
+
+        # --- Arrange (подготовка) ---
+
         # Создаем клиента и назначаем api_user ответственным бухгалтером (accountant=api_user)
         client = await sync_to_async(ClientFactory)(accountant=api_user, name="Old Name")
 
@@ -85,7 +90,7 @@ class TestClientSecurity(BaseAPITest):
         )
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=patch_response, expected_status=200)
@@ -106,6 +111,9 @@ class TestClientSecurity(BaseAPITest):
         Args:
             auth_client (AsyncClient): Авторизованный асинхронный клиент (с правами бухгалтера).
         """
+
+        # --- Arrange (подготовка) ---
+
         # Создаем клиента (без привязки к api_user)
         client = await sync_to_async(ClientFactory)()
 
@@ -118,7 +126,7 @@ class TestClientSecurity(BaseAPITest):
         )
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код (api_user получает 403)
         await self.assert_status(response=patch_response, expected_status=403)
@@ -142,6 +150,9 @@ class TestClientSecurity(BaseAPITest):
             auth_client (AsyncClient): Авторизованный асинхронный клиент (с правами бухгалтера).
             api_user (User): Обычный пользователь (бухгалтер).
         """
+
+        # --- Arrange (подготовка) ---
+
         # Создаем клиента для обычного бухгалтера
         client = await sync_to_async(ClientFactory)(accountant=api_user)
 
@@ -150,7 +161,7 @@ class TestClientSecurity(BaseAPITest):
         del_response = await auth_client.delete(f"{self.endpoint}{client.id}")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код (Forbidden для бухгалтера, так как он не админ)
         await self.assert_status(response=del_response, expected_status=403)
@@ -173,6 +184,8 @@ class TestClientSecurity(BaseAPITest):
             api_user (User): Обычный пользователь (бухгалтер).
         """
 
+        # --- Arrange (подготовка) ---
+
         # Создаем клиента для обычного бухгалтера
         client = await sync_to_async(ClientFactory)(accountant=api_user)
 
@@ -184,7 +197,7 @@ class TestClientSecurity(BaseAPITest):
         restore_response = await auth_client.patch(f"{self.endpoint}{client.id}/restore")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код (Forbidden для бухгалтера, так как он не админ)
         await self.assert_status(response=restore_response, expected_status=403)
@@ -206,15 +219,19 @@ class TestClientSecurity(BaseAPITest):
             admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
 
+        # --- Arrange (подготовка) ---
+
         # Создаем клиента
         client = await sync_to_async(ClientFactory)()
+
+        # --- Act (действие) ---
 
         # Удаляем клиента от имени админа
         start = perf_counter()
         del_response = await admin_client.delete(f"{self.endpoint}{client.id}")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=del_response, expected_status=204)
@@ -229,18 +246,22 @@ class TestClientSecurity(BaseAPITest):
             admin_client (AsyncClient): Авторизованный асинхронный клиент (с правами админа).
         """
 
+        # --- Arrange (подготовка) ---
+
         # Создаем клиента
         client = await sync_to_async(ClientFactory)(name="Test Company")
 
         # Удаляем клиента вручную через ORM
         await client.adelete()
 
+        # --- Act (действие) ---
+
         # Восстанавливаем клиента от имени админа
         start = perf_counter()
         restore_response = await admin_client.patch(f"{self.endpoint}{client.id}/restore")
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=restore_response, expected_status=200)
@@ -258,22 +279,25 @@ class TestClientSecurity(BaseAPITest):
         """
         Проверка: системный ключ видит всё и обходит OLP/RBAC.
 
-
         Args:
             system_client (AsyncClient): Авторизованный асинхронный клиент (с системным API-ключом).
         """
 
-        # --- Список клиентов ---
+        # *** Список клиентов ***
+
+        # --- Arrange (подготовка) ---
 
         # Создаем 5 клиентов
         await sync_to_async(ClientFactory.create_batch)(5)
+
+        # --- Act (действие) ---
 
         # Запрос списка клиентов
         start = perf_counter()
         list_response = await system_client.get(self.endpoint)
         elapsed_time = perf_counter() - start
 
-        # --- Проверки ---
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=list_response, expected_status=200)
@@ -287,7 +311,9 @@ class TestClientSecurity(BaseAPITest):
 
         assert json_response["count"] >= 5
 
-        # --- Создание клиента ---
+        # *** Создание клиента ***
+
+        # --- Arrange (подготовка) ---
 
         # Подготавливаем данные
         payload: dict[str, Any] = {
@@ -299,10 +325,14 @@ class TestClientSecurity(BaseAPITest):
             "contact_info": {"general_email": "test@test.com"},
         }
 
+        # --- Act (действие) ---
+
         # Создаем клиента
         start = perf_counter()
         create_response = await system_client.post(self.endpoint, data=payload, content_type="application/json")
         elapsed_time = perf_counter() - start
+
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=create_response, expected_status=201)
@@ -318,7 +348,9 @@ class TestClientSecurity(BaseAPITest):
         assert create_json_response["name"] == "Old Name"
         assert create_json_response["contact_info"]["general_email"] == "test@test.com"
 
-        # --- Обновление клиента ---
+        # *** Обновление клиента ***
+
+        # --- Act (действие) ---
 
         # Патчим этого клиента
         start = perf_counter()
@@ -328,6 +360,8 @@ class TestClientSecurity(BaseAPITest):
             content_type="application/json",
         )
         elapsed_time = perf_counter() - start
+
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=patch_response, expected_status=200)
@@ -341,24 +375,32 @@ class TestClientSecurity(BaseAPITest):
 
         assert patch_json_response["name"] == "New Name"
 
-        # --- Удаление клиента ---
+        # *** Удаление клиента ***
+
+        # --- Act (действие) ---
 
         # Удаляем этого клиента
         start = perf_counter()
         del_response = await system_client.delete(f"{self.endpoint}{client_id}")
         elapsed_time = perf_counter() - start
 
+        # --- Assert (проверка) ----
+
         # Статус код
         await self.assert_status(response=del_response, expected_status=204)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
-        # --- Восстановление клиента ---
+        # *** Восстановление клиента ***
+
+        # --- Act (действие) ---
 
         # Восстанавливаем этого клиента
         start = perf_counter()
         restore_response = await system_client.patch(f"{self.endpoint}{client_id}/restore")
         elapsed_time = perf_counter() - start
+
+        # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=restore_response, expected_status=200)
