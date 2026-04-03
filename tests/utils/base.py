@@ -3,6 +3,8 @@
 """
 
 import json
+from collections.abc import Awaitable
+from time import perf_counter
 from typing import Any
 
 import pytest
@@ -111,3 +113,29 @@ class BaseAPITest:
 
         if actual_ms > max_ms:
             pytest.fail(f"API too slow! Response took: {actual_ms:.2f}ms, Limit: {max_ms}ms")
+
+    @classmethod
+    async def make_request(cls, request_awaitable: Awaitable[Any]) -> tuple[Any, Any, float]:
+        """
+        Выполняет HTTP-запрос, замеряет время выполнения и безопасно извлекает JSON.
+
+        Args:
+            request_awaitable (Awaitable[Any]): Awaitable объект (корутина) запроса от AsyncClient.
+
+        Returns:
+            tuple[Any, Any, float]: (Объект ответа, Распарсенный JSON или None, Время в миллисекундах).
+        """
+        start = perf_counter()
+
+        # Выполняем переданный запрос (Event Loop переключается сюда)
+        response = await request_awaitable
+
+        elapsed_time = perf_counter() - start
+
+        # Пытаемся извлечь JSON
+        try:
+            data = response.json()
+        except ValueError, AttributeError:
+            data = None
+
+        return response, data, elapsed_time
