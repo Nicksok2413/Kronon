@@ -12,6 +12,8 @@ from apps.users.constants import SYSTEM_USER_EMAIL, SYSTEM_USER_ID
 from apps.users.models import User, UserRole
 from tests.utils.factories import UserFactory
 
+# --- Users ---
+
 
 @pytest.fixture
 async def api_user() -> User:
@@ -24,6 +26,20 @@ async def api_user() -> User:
     # Оборачиваем синхронную фабрику в sync_to_async
     # Это выполнит создание юзера в отдельном потоке, не блокируя Event Loop
     user: User = await sync_to_async(UserFactory)(role=UserRole.ACCOUNTANT)
+    return user
+
+
+@pytest.fixture
+async def internal_hr_user() -> User:
+    """
+    Создает тестового внутреннего HR.
+
+    Returns:
+        User: Экземпляр модели внутреннего HR.
+    """
+    # Оборачиваем синхронную фабрику в sync_to_async
+    # Это выполнит создание юзера в отдельном потоке, не блокируя Event Loop
+    user: User = await sync_to_async(UserFactory)(role=UserRole.INTERNAL_HR)
     return user
 
 
@@ -64,6 +80,9 @@ async def system_user() -> User:
     return user
 
 
+# --- Async Clients ---
+
+
 @pytest.fixture
 async def auth_client(api_user: User) -> AsyncClient:
     """
@@ -83,6 +102,29 @@ async def auth_client(api_user: User) -> AsyncClient:
     # Если ninja_jwt полезет в базу - обернем его в sync_to_async, но пока так:
     # TODO: sync_to_async
     token: str = str(AccessToken.for_user(api_user))
+    client.defaults["Authorization"] = f"Bearer {token}"
+    return client
+
+
+@pytest.fixture
+async def internal_hr_client(internal_hr_user: User) -> AsyncClient:
+    """
+    Клиент (с JWT токеном) внутреннего HR.
+
+    Args:
+        internal_hr_user (User): Фикстура внутреннего HR.
+
+    Returns:
+        AsyncClient: Клиент внутреннего HR.
+    """
+    client = AsyncClient()
+
+    # Генерируем JWT токен
+    # Это CPU-bound операция (криптография), но иногда может лезть в БД (blacklist)
+    # Безопаснее делать это явно, но AccessToken.for_user обычно синхронный и быстрый
+    # Если ninja_jwt полезет в базу - обернем его в sync_to_async, но пока так:
+    # TODO: sync_to_async
+    token: str = str(AccessToken.for_user(internal_hr_user))
     client.defaults["Authorization"] = f"Bearer {token}"
     return client
 
