@@ -75,7 +75,7 @@ def has_internal_hr_access(user: User) -> bool:
         # Если права есть — пропускаем без дальнейших проверок
         return True
 
-    return user.role == UserRole.HR
+    return user.role == UserRole.INTERNAL_HR
 
 
 def has_client_access(user: User, client: Client) -> bool:
