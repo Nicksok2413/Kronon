@@ -30,11 +30,16 @@ def _get_base_user_queryset(status: Literal["active", "deleted", "all"] = "activ
 
     # Формируем QuerySet в зависимости от значения status
     if status == "deleted":
+        # Удаленные: deleted_at IS NOT NULL
         search_users = User.objects.deleted()
+
     elif status == "all":
+        # Все записи
         search_users = User.objects.all()
+
     else:
-        search_users = User.objects.active()
+        # Активные: не удалены (deleted_at IS NULL) И не заблокированы (is_active=True)
+        search_users = User.objects.active().filter(is_active=True)
 
     return cast(
         SoftDeleteQuerySet[User], search_users.select_related("department", "profile").order_by("-id")
