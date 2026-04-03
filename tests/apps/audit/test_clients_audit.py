@@ -15,14 +15,15 @@ from tests.utils.factories import ClientFactory
 
 
 class TestClientHistory(BaseAPITest):
-    """
-    Тестирование истории изменения клиентов (Audit Log).
+    """Тестирование истории изменения клиентов (Audit Log)."""
 
-    Attributes:
-        endpoint (str): Базовый URL эндпоинта.
-    """
+    @property
+    def endpoint(self) -> str:
+        return self.get_url("audit/clients")
 
-    endpoint: str = "/api/audit/clients/"
+    @property
+    def clients_endpoint(self) -> str:
+        return self.get_url("clients")
 
     async def test_history_logging(self, admin_client: AsyncClient) -> None:
         """Проверка эндпойнта получения списка событий изменения клиента."""
@@ -33,7 +34,9 @@ class TestClientHistory(BaseAPITest):
         patch_data = {"name": "Updated Name"}
 
         # Обновляем клиента от имени админа
-        await admin_client.patch(f"/api/clients/{client.id}", data=patch_data, content_type="application/json")
+        await admin_client.patch(
+            f"{self.clients_endpoint}{client.id}", data=patch_data, content_type="application/json"
+        )
 
         # Запрашиваем историю от имени админа
         start = perf_counter()
@@ -64,7 +67,9 @@ class TestClientHistory(BaseAPITest):
 
         # Патчим клиента от имени админа
         patch_data = {"name": "Updated Name"}
-        await admin_client.patch(f"/api/clients/{client.id}", data=patch_data, content_type="application/json")
+        await admin_client.patch(
+            f"{self.clients_endpoint}{client.id}", data=patch_data, content_type="application/json"
+        )
 
         # Проверяем историю в БД напрямую (что в pghistory записался admin_user.id)
         from apps.audit.selectors import get_client_history_queryset
@@ -85,7 +90,11 @@ class TestClientHistory(BaseAPITest):
         }
 
         # Создаем клиента через систему
-        response = await system_client.post("/api/clients/", data=payload, content_type="application/json")
+        response = await system_client.post(
+            self.clients_endpoint,
+            data=payload,
+            content_type="application/json",
+        )
         assert response.status_code == 201
         client_id = response.json()["id"]
 
@@ -109,7 +118,7 @@ class TestClientHistory(BaseAPITest):
         patch_data = {"name": "Updated Name"}
         test_user_agent = "Test-System/1.0"
         await system_client.patch(
-            f"/api/clients/{client.id}",
+            f"{self.clients_endpoint}{client.id}",
             data=patch_data,
             content_type="application/json",
             headers={"user-agent": test_user_agent},
@@ -149,7 +158,11 @@ class TestClientHistory(BaseAPITest):
 
         # Назначаем бухгалтера (api_user) через патч от имени админа
         patch_data = {"accountant_id": str(api_user.id)}
-        await admin_client.patch(f"/api/clients/{client.id}", data=patch_data, content_type="application/json")
+        await admin_client.patch(
+            f"{self.clients_endpoint}{client.id}",
+            data=patch_data,
+            content_type="application/json",
+        )
 
         # Запрашиваем историю от имени админа
         history_response = await admin_client.get(f"{self.endpoint}{client.id}")

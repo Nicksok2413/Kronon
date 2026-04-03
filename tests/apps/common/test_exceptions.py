@@ -16,7 +16,9 @@ from tests.utils.factories import ClientFactory
 class TestGlobalExceptions(BaseAPITest):
     """Тестирование перехвата ошибок и приведения их к схеме ErrorOut."""
 
-    endpoint: str = "/api/clients/"
+    @property
+    def endpoint(self) -> str:
+        return self.get_url("clients")
 
     async def test_validation_error_422(self, admin_client: AsyncClient) -> None:
         """

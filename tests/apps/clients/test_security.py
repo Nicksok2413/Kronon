@@ -16,14 +16,11 @@ from tests.utils.factories import ClientFactory, UserFactory
 
 
 class TestClientSecurity(BaseAPITest):
-    """
-    Тестирование систем аутентификации и доступа к эндпойнтам API Клиентов.
+    """Тестирование систем аутентификации и доступа к эндпойнтам API Клиентов."""
 
-    Attributes:
-        endpoint (str): Базовый URL эндпоинта.
-    """
-
-    endpoint: str = "/api/clients/"
+    @property
+    def endpoint(self) -> str:
+        return self.get_url("clients")
 
     # --- ТЕСТЫ OLP (объектные права) ---
 

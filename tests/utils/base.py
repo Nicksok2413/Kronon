@@ -19,6 +19,25 @@ class BaseAPITest:
     и валидации Pydantic-схем с информативным выводом ошибок в формате JSON.
     """
 
+    # Текущая версия API
+    api_version: str = "v1"
+
+    @classmethod
+    def get_url(cls, path: str) -> str:
+        """
+        Формирует полный URL с учетом версии API.
+
+        Args:
+            path (str): Путь эндпоинта (например, 'clients' или 'clients/123').
+
+        Returns:
+            str: Сформированный URL (например, '/api/v1/clients/').
+        """
+        # Убираем лишние слэши по краям, чтобы избежать //
+        clean_path = path.strip("/")
+
+        return f"/api/{cls.api_version}/{clean_path}/"
+
     @classmethod
     async def validate_schema(
         cls,

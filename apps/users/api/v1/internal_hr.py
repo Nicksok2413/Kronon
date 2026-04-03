@@ -80,7 +80,7 @@ async def list_employees_endpoint(
     return query_set
 
 
-@router.get("/{client_id}", response={200: EmployeePrivateOut, **STANDARD_ERRORS})
+@router.get("/{user_id}", response={200: EmployeePrivateOut, **STANDARD_ERRORS})
 async def get_employee_endpoint(request: HttpRequest, user_id: UUID) -> User:
     """
     Получить детальную информацию о сотруднике по ID.

@@ -17,14 +17,11 @@ from tests.utils.factories import ClientFactory
 
 
 class TestClientAPI(BaseAPITest):
-    """
-    Тестирование CRUD операций API Клиентов.
+    """Тестирование CRUD операций API Клиентов."""
 
-    Attributes:
-        endpoint (str): Базовый URL эндпоинта.
-    """
-
-    endpoint: str = "/api/clients/"
+    @property
+    def endpoint(self) -> str:
+        return self.get_url("clients")
 
     async def test_create_client_valid(self, admin_client: AsyncClient) -> None:
         """
