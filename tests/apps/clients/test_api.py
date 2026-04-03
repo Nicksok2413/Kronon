@@ -46,11 +46,9 @@ class TestClientAPI(BaseAPITest):
         # --- Act (действие) ---
 
         # Выполняем запрос
-        start = perf_counter()
-        response = await admin_client.post(self.endpoint, data=payload, content_type="application/json")
-        elapsed_time = perf_counter() - start
-
-        data: dict[str, Any] = response.json()
+        response, data, elapsed_time = await self.make_request(
+            admin_client.post(self.endpoint, data=payload, content_type="application/json")
+        )
 
         # --- Assert (проверка) ----
 
