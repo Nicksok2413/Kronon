@@ -162,17 +162,25 @@ async def fire_employee(user: User, data: FireEmployeeIn, audit_context: dict[st
     initiator_id = audit_context.get("user")
     successor_id = data.successor_id
 
-    # Early Exit
+    # --- Guard Clauses ---
+
+    # Security Guard (Авторизация и базовые права)
     if str(user.id) == str(initiator_id):
+        # Запрещаем ломать систему (увольнять себя), даже если это попытка передать дела (Handover)
         raise ValueError("Вы не можете уволить сами себя.")
 
-    # Early Exit
-    if str(user.id) == str(successor_id):
-        raise ValueError("Нельзя передать дела сотруднику, которого сейчас удаляете.")
-
-    # Early Exit
+    # Idempotency / Early Exit (Состояние ресурса)
     if not user.is_active:
-        raise ValueError("Сотрудник уже уволен.")
+        # Если юзер уже уволен - нам абсолютно всё равно, кого нам передали в successor_id
+        # Юзер уже в целевом состоянии, экономим ресурсы и просто выходим
+        log.info(f"Employee {user.id} is already fired. Early exit.")
+        return
+
+    # Business Invariant (Бизнес-логика текущей операции)
+    if str(user.id) == str(successor_id):
+        # Проверяем логику параметров только тогда, когда мы точно уверены,
+        # что собираемся выполнять бизнес-операцию (увольнение и передачу дел) прямо сейчас
+        raise ValueError("Нельзя передать дела сотруднику, которого сейчас удаляете.")
 
     try:
         # Запускаем асинхронно через утилиту (функцию-обертку с аудитом)
