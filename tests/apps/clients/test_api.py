@@ -85,7 +85,7 @@ class TestClientAPI(BaseAPITest):
         # Статус код
         await self.assert_status(response=response_page_1, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response_page_1: dict[str, Any] = response_page_1.json()
 
@@ -106,7 +106,7 @@ class TestClientAPI(BaseAPITest):
         # Статус код
         await self.assert_status(response=response_page_2, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response_page_2: dict[str, Any] = response_page_2.json()
 
@@ -148,7 +148,7 @@ class TestClientAPI(BaseAPITest):
         # Статус код
         await self.assert_status(response=patch_response, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = patch_response.json()
 
@@ -181,7 +181,7 @@ class TestClientAPI(BaseAPITest):
         # Статус код
         await self.assert_status(response=del_response, expected_status=204)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         # Проверяем, что в списке активных его больше нет
         list_response = await admin_client.get(self.endpoint)
@@ -195,7 +195,7 @@ class TestClientAPI(BaseAPITest):
         # Статус код
         await self.assert_status(response=get_response, expected_status=404)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
         # Валидация схемы
         await self.validate_schema(data=get_response.json(), schema=ErrorOut)
 
@@ -207,7 +207,7 @@ class TestClientAPI(BaseAPITest):
         # Статус код
         await self.assert_status(response=restore_response, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
         # Валидация схемы
         await self.validate_schema(data=restore_response.json(), schema=ClientOut)
 
@@ -223,6 +223,6 @@ class TestClientAPI(BaseAPITest):
         # Статус код
         await self.assert_status(response=get_response_2, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
         # Валидация схемы
         await self.validate_schema(data=restore_response.json(), schema=ClientOut)

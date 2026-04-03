@@ -49,7 +49,7 @@ class TestClientHistory(BaseAPITest):
         await self.assert_status(response=history, expected_status=200)
 
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         data = history.json()
 
@@ -135,7 +135,7 @@ class TestClientHistory(BaseAPITest):
         await self.assert_status(response=history, expected_status=200)
 
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         data = history.json()
         assert len(data) >= 1

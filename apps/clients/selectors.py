@@ -41,10 +41,18 @@ def _get_base_client_queryset(status: Literal["active", "deleted", "all"] = "act
 
     return search_clients.select_related(
         "department",
-        "accountant",
-        "primary_accountant",
-        "payroll_accountant",
-        "hr_specialist",
+        # Подгружаем связи для accountant
+        "accountant__department",
+        "accountant__profile",
+        # Подгружаем связи для primary_accountant
+        "primary_accountant__department",
+        "primary_accountant__profile",
+        # Подгружаем связи для payroll_accountant
+        "payroll_accountant__department",
+        "payroll_accountant__profile",
+        # Подгружаем связи для hr_specialist
+        "hr_specialist__department",
+        "hr_specialist__profile",
     ).order_by("-id")
 
 

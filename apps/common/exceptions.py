@@ -68,6 +68,12 @@ def setup_exception_handlers(api: NinjaAPI) -> None:
         Returns:
             HttpResponse: 422 с деталями ошибок.
         """
+        # Pydantic v2 по умолчанию включает в вывод сырой 'input' (например, объекты Django),
+        # которые невозможно сериализовать в JSON
+        # Можно исключить их через include_input=False
+        # safe_errors = exc.errors(include_url=False, include_context=False, include_input=False)
+        # details=safe_errors,
+
         response_data = ErrorOut(
             message="Ошибка структуры данных.",
             code="pydantic_validation_error",

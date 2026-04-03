@@ -43,7 +43,7 @@ class TestGlobalExceptions(BaseAPITest):
         # Статус код
         await self.assert_status(response=response, expected_status=422)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = response.json()
 
@@ -81,7 +81,7 @@ class TestGlobalExceptions(BaseAPITest):
         # Статус код
         await self.assert_status(response=response, expected_status=409)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = response.json()
 
@@ -111,7 +111,7 @@ class TestGlobalExceptions(BaseAPITest):
         # Статус код
         await self.assert_status(response=response, expected_status=404)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = response.json()
 

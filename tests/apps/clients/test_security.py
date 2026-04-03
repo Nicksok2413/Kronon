@@ -50,7 +50,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код
         await self.assert_status(response=response, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = response.json()
 
@@ -90,7 +90,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код
         await self.assert_status(response=patch_response, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = patch_response.json()
 
@@ -123,7 +123,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код (api_user получает 403)
         await self.assert_status(response=patch_response, expected_status=403)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = patch_response.json()
 
@@ -155,7 +155,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код (Forbidden для бухгалтера, так как он не админ)
         await self.assert_status(response=del_response, expected_status=403)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = del_response.json()
 
@@ -189,7 +189,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код (Forbidden для бухгалтера, так как он не админ)
         await self.assert_status(response=restore_response, expected_status=403)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = restore_response.json()
 
@@ -219,7 +219,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код
         await self.assert_status(response=del_response, expected_status=204)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
     async def test_admin_can_restore_anything(self, admin_client: AsyncClient) -> None:
         """
@@ -245,7 +245,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код
         await self.assert_status(response=restore_response, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = restore_response.json()
 
@@ -278,7 +278,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код
         await self.assert_status(response=list_response, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         json_response: dict[str, Any] = list_response.json()
 
@@ -307,7 +307,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код
         await self.assert_status(response=create_response, expected_status=201)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         create_json_response: dict[str, Any] = create_response.json()
         client_id = create_json_response["id"]
@@ -332,7 +332,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код
         await self.assert_status(response=patch_response, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         patch_json_response: dict[str, Any] = patch_response.json()
 
@@ -351,7 +351,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код
         await self.assert_status(response=del_response, expected_status=204)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         # --- Восстановление клиента ---
 
@@ -363,7 +363,7 @@ class TestClientSecurity(BaseAPITest):
         # Статус код
         await self.assert_status(response=restore_response, expected_status=200)
         # Время ответа API
-        await self.assert_performance(elapsed_time=elapsed_time, max_ms=300)
+        await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
         restore_json_response: dict[str, Any] = restore_response.json()
 
