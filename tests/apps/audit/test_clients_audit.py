@@ -55,21 +55,23 @@ class TestClientHistory(BaseAPITest):
         history = await admin_client.get(f"{self.endpoint}{client.id}")
         elapsed_time = perf_counter() - start
 
+        data = history.json()
+
         # --- Assert (проверка) ----
+
+        assert len(data) >= 1
 
         # Статус код
         await self.assert_status(response=history, expected_status=200)
-
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        data = history.json()
-
         # Валидация схемы
         await self.validate_schema(data=data, schema=ClientHistoryOut, many=True)
 
+        # Получаем событие 'update'
         update_event = next(event for event in data if event["pgh_label"] == "update")
-        assert len(data) >= 1
+
+        # Проверяем наличие изменений в pgh_diff
         assert update_event["pgh_diff"]["name"][1] == "Updated Name"
 
     async def test_history_initiator_sync(self, admin_client: AsyncClient, admin_user: User):
@@ -101,7 +103,6 @@ class TestClientHistory(BaseAPITest):
 
         # Статус код
         await self.assert_status(response=response, expected_status=200)
-
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
@@ -131,7 +132,7 @@ class TestClientHistory(BaseAPITest):
 
         # --- Act (действие) ---
 
-        # Создаем клиента через систему
+        # Создаем клиента от имени системного юзера
         start = perf_counter()
         response = await system_client.post(
             self.clients_endpoint,
@@ -140,16 +141,14 @@ class TestClientHistory(BaseAPITest):
         )
         elapsed_time = perf_counter() - start
 
+        client_id = response.json()["id"]
+
         # --- Assert (проверка) ----
 
         # Статус код
-        await self.assert_status(response=response, expected_status=200)
-
+        await self.assert_status(response=response, expected_status=201)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        assert response.status_code == 201
-        client_id = response.json()["id"]
 
         # Проверяем историю в БД напрямую (что в pghistory записался SYSTEM_USER_ID)
         history = await get_client_history_queryset(client_id)
@@ -191,17 +190,16 @@ class TestClientHistory(BaseAPITest):
         history = await system_client.get(f"{self.endpoint}{client.id}")
         elapsed_time = perf_counter() - start
 
+        data = history.json()
+
         # --- Assert (проверка) ----
+
+        assert len(data) >= 1
 
         # Статус код
         await self.assert_status(response=history, expected_status=200)
-
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        data = history.json()
-        assert len(data) >= 1
-
         # Валидация схемы
         await self.validate_schema(data=data, schema=ClientHistoryOut, many=True)
 
@@ -240,23 +238,25 @@ class TestClientHistory(BaseAPITest):
         history_response = await admin_client.get(f"{self.endpoint}{client.id}")
         elapsed_time = perf_counter() - start
 
+        data = history_response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=history_response, expected_status=200)
-
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        data = history_response.json()
+        # Валидация схемы
+        await self.validate_schema(data=data, schema=ClientHistoryOut, many=True)
 
         # Получаем событие 'update'
         update_event = next(event for event in data if event["pgh_label"] == "update")
+
+        # Diff - массив [old_value, new_value]
         diff = update_event["pgh_diff"]
 
         # Проверяем, что поле accountant_id изменилось
         assert "accountant_id" in diff
-        # Diff - массив [old_value, new_value]
         # Так как изначально accountant был None, старое значение должно быть None
         assert diff["accountant_id"][0] is None
         # Новое значение должно быть равно ID нашего бухгалтера

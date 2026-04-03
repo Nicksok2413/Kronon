@@ -47,25 +47,24 @@ class TestClientSecurity(BaseAPITest):
         response = await auth_client.get(self.endpoint)
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response, expected_status=200)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        json_response: dict[str, Any] = response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=json_response["items"], schema=ClientOut, many=True)
+        await self.validate_schema(data=data["items"], schema=ClientOut, many=True)
 
         # Проверяем, что в списке только my_client
-        assert json_response["count"] == 1
-        assert json_response["items"][0]["id"] == str(my_client.id)
-        assert json_response["items"][0]["name"] == "My Client"
+        assert data["count"] == 1
+        assert data["items"][0]["id"] == str(my_client.id)
+        assert data["items"][0]["name"] == "My Client"
 
         # Проверяем, что чужого клиента нет в списке
-        assert all(item["id"] != str(other_client.id) for item in json_response["items"])
+        assert all(item["id"] != str(other_client.id) for item in data["items"])
 
     async def test_client_update_olp(self, auth_client: AsyncClient, api_user: User) -> None:
         """
@@ -90,19 +89,18 @@ class TestClientSecurity(BaseAPITest):
         )
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = patch_response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=patch_response, expected_status=200)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        json_response: dict[str, Any] = patch_response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ClientOut)
+        await self.validate_schema(data=data, schema=ClientOut)
 
-        assert json_response["name"] == "New Name"
+        assert data["name"] == "New Name"
 
     async def test_client_update_olp_forbidden(self, auth_client: AsyncClient) -> None:
         """
@@ -126,19 +124,18 @@ class TestClientSecurity(BaseAPITest):
         )
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = patch_response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код (api_user получает 403)
         await self.assert_status(response=patch_response, expected_status=403)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        json_response: dict[str, Any] = patch_response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ErrorOut)
+        await self.validate_schema(data=data, schema=ErrorOut)
 
-        assert "нет прав" in json_response["message"].lower()
+        assert "нет прав" in data["message"].lower()
 
     # --- ТЕСТЫ RBAC (Роли) ---
 
@@ -161,19 +158,18 @@ class TestClientSecurity(BaseAPITest):
         del_response = await auth_client.delete(f"{self.endpoint}{client.id}")
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = del_response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код (Forbidden для бухгалтера, так как он не админ)
         await self.assert_status(response=del_response, expected_status=403)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        json_response: dict[str, Any] = del_response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ErrorOut)
+        await self.validate_schema(data=data, schema=ErrorOut)
 
-        assert "требуются права администратора" in json_response["message"].lower()
+        assert "требуются права администратора" in data["message"].lower()
 
     async def test_client_restore_requires_admin_rbac(self, auth_client: AsyncClient, api_user: User) -> None:
         """
@@ -197,19 +193,18 @@ class TestClientSecurity(BaseAPITest):
         restore_response = await auth_client.patch(f"{self.endpoint}{client.id}/restore")
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = restore_response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код (Forbidden для бухгалтера, так как он не админ)
         await self.assert_status(response=restore_response, expected_status=403)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        json_response: dict[str, Any] = restore_response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ErrorOut)
+        await self.validate_schema(data=data, schema=ErrorOut)
 
-        assert "требуются права администратора" in json_response["message"].lower()
+        assert "требуются права администратора" in data["message"].lower()
 
     async def test_admin_can_delete_anything(self, admin_client: AsyncClient) -> None:
         """
@@ -261,19 +256,18 @@ class TestClientSecurity(BaseAPITest):
         restore_response = await admin_client.patch(f"{self.endpoint}{client.id}/restore")
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = restore_response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=restore_response, expected_status=200)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        json_response: dict[str, Any] = restore_response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ClientOut)
+        await self.validate_schema(data=data, schema=ClientOut)
 
-        assert json_response["name"] == "Test Company"
+        assert data["name"] == "Test Company"
 
     async def test_system_api_full_access(self, system_client: AsyncClient) -> None:
         """
@@ -297,19 +291,18 @@ class TestClientSecurity(BaseAPITest):
         list_response = await system_client.get(self.endpoint)
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = list_response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=list_response, expected_status=200)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        json_response: dict[str, Any] = list_response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=json_response["items"], schema=ClientOut, many=True)
+        await self.validate_schema(data=data["items"], schema=ClientOut, many=True)
 
-        assert json_response["count"] >= 5
+        assert data["count"] >= 5
 
         # *** Создание клиента ***
 
@@ -332,21 +325,20 @@ class TestClientSecurity(BaseAPITest):
         create_response = await system_client.post(self.endpoint, data=payload, content_type="application/json")
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = create_response.json()
+        client_id = data["id"]
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=create_response, expected_status=201)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        create_json_response: dict[str, Any] = create_response.json()
-        client_id = create_json_response["id"]
-
         # Валидация схемы
-        await self.validate_schema(data=create_json_response, schema=ClientOut)
+        await self.validate_schema(data=data, schema=ClientOut)
 
-        assert create_json_response["name"] == "Old Name"
-        assert create_json_response["contact_info"]["general_email"] == "test@test.com"
+        assert data["name"] == "Old Name"
+        assert data["contact_info"]["general_email"] == "test@test.com"
 
         # *** Обновление клиента ***
 
@@ -361,19 +353,18 @@ class TestClientSecurity(BaseAPITest):
         )
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = patch_response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=patch_response, expected_status=200)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        patch_json_response: dict[str, Any] = patch_response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=patch_json_response, schema=ClientOut)
+        await self.validate_schema(data=data, schema=ClientOut)
 
-        assert patch_json_response["name"] == "New Name"
+        assert data["name"] == "New Name"
 
         # *** Удаление клиента ***
 
@@ -400,16 +391,15 @@ class TestClientSecurity(BaseAPITest):
         restore_response = await system_client.patch(f"{self.endpoint}{client_id}/restore")
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = restore_response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=restore_response, expected_status=200)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        restore_json_response: dict[str, Any] = restore_response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=restore_json_response, schema=ClientOut)
+        await self.validate_schema(data=data, schema=ClientOut)
 
-        assert restore_json_response["name"] == "New Name"
+        assert data["name"] == "New Name"

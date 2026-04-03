@@ -43,21 +43,20 @@ class TestGlobalExceptions(BaseAPITest):
         response = await admin_client.post(self.endpoint, data=payload, content_type="application/json")
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response, expected_status=422)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        json_response: dict[str, Any] = response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ErrorOut)
+        await self.validate_schema(data=data, schema=ErrorOut)
 
-        assert json_response["code"] == "validation_error"
-        assert "details" in json_response
-        assert "unp" in str(json_response["details"])
+        assert data["code"] == "validation_error"
+        assert "details" in data
+        assert "unp" in str(data["details"])
 
     async def test_integrity_error_409(self, admin_client: AsyncClient) -> None:
         """
@@ -85,20 +84,19 @@ class TestGlobalExceptions(BaseAPITest):
         response = await admin_client.post(self.endpoint, data=payload, content_type="application/json")
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response, expected_status=409)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        json_response: dict[str, Any] = response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ErrorOut)
+        await self.validate_schema(data=data, schema=ErrorOut)
 
-        assert json_response["code"] == "duplicate_unp"
-        assert "УНП" in json_response["message"]
+        assert data["code"] == "duplicate_unp"
+        assert "УНП" in data["message"]
 
     async def test_not_found_404(self, admin_client: AsyncClient) -> None:
         """
@@ -120,16 +118,15 @@ class TestGlobalExceptions(BaseAPITest):
         response = await admin_client.get(f"{self.endpoint}{fake_id}")
         elapsed_time = perf_counter() - start
 
+        data: dict[str, Any] = response.json()
+
         # --- Assert (проверка) ----
 
         # Статус код
         await self.assert_status(response=response, expected_status=404)
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
-
-        json_response: dict[str, Any] = response.json()
-
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ErrorOut)
+        await self.validate_schema(data=data, schema=ErrorOut)
 
-        assert json_response["code"] == "http_error_404"
+        assert data["code"] == "http_error_404"

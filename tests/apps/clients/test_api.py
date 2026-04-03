@@ -57,16 +57,16 @@ class TestClientAPI(BaseAPITest):
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
-        json_response: dict[str, Any] = response.json()
+        data: dict[str, Any] = response.json()
 
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ClientOut)
+        await self.validate_schema(data=data, schema=ClientOut)
 
-        assert json_response["name"] == "Test Company"
-        assert json_response["contact_info"]["general_email"] == "test@test.com"
+        assert data["name"] == "Test Company"
+        assert data["contact_info"]["general_email"] == "test@test.com"
 
         # Проверяем, что клиент реально создался в БД (асинхронно)
-        assert await Client.objects.filter(id=json_response["id"]).aexists()
+        assert await Client.objects.filter(id=data["id"]).aexists()
 
     async def test_get_client_list_paginated(self, auth_client: AsyncClient, api_user: User) -> None:
         """
@@ -97,14 +97,14 @@ class TestClientAPI(BaseAPITest):
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
-        json_response_page_1: dict[str, Any] = response_page_1.json()
+        data_page_1: dict[str, Any] = response_page_1.json()
 
         # Валидация схемы
-        await self.validate_schema(data=json_response_page_1["items"], schema=ClientOut, many=True)
+        await self.validate_schema(data=data_page_1["items"], schema=ClientOut, many=True)
 
         # Проверка структуры пагинации Ninja: {items: [...], count: ...}
-        assert len(json_response_page_1["items"]) == 20
-        assert json_response_page_1["count"] == 25
+        assert len(data_page_1["items"]) == 20
+        assert data_page_1["count"] == 25
 
         # --- Act (действие) ---
 
@@ -120,13 +120,13 @@ class TestClientAPI(BaseAPITest):
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
-        json_response_page_2: dict[str, Any] = response_page_2.json()
+        data_page_2: dict[str, Any] = response_page_2.json()
 
         # Валидация схемы
-        await self.validate_schema(data=json_response_page_2["items"], schema=ClientOut, many=True)
+        await self.validate_schema(data=data_page_2["items"], schema=ClientOut, many=True)
 
         # Проверка количества элементов второй страницы
-        assert len(json_response_page_2["items"]) == 5
+        assert len(data_page_2["items"]) == 5
 
     async def test_update_client_contact_info_deep_merge(self, admin_client: AsyncClient) -> None:
         """
@@ -167,15 +167,15 @@ class TestClientAPI(BaseAPITest):
         # Время ответа API
         await self.assert_performance(elapsed_time=elapsed_time, max_ms=500)
 
-        json_response: dict[str, Any] = patch_response.json()
+        data: dict[str, Any] = patch_response.json()
 
         # Валидация схемы
-        await self.validate_schema(data=json_response, schema=ClientOut)
+        await self.validate_schema(data=data, schema=ClientOut)
 
         # Проверяем, что email обновился
-        assert json_response["contact_info"]["general_email"] == "new@test.com"
+        assert data["contact_info"]["general_email"] == "new@test.com"
         # Проверяем, что телефон не исчез (Deep Merge сработал)
-        assert json_response["contact_info"]["general_phone"] == "+375291111111"
+        assert data["contact_info"]["general_phone"] == "+375291111111"
 
     async def test_soft_delete_and_restore(self, admin_client: AsyncClient) -> None:
         """
